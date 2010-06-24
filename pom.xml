@@ -4,7 +4,7 @@
 	<groupId>org.dataone</groupId>
 	<artifactId>cn-mnsynchronization</artifactId>
 	<packaging>pom</packaging>
-	<name>DataONE-CnPrototype</name>
+	<name>DataONE-CnMnSynchronization</name>
 	<version>0.3.0</version>
 	<description>Cn Member Node Synchronization</description>
         <url>http://dataone.org</url>
