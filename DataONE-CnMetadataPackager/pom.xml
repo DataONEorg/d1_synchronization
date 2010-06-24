@@ -8,18 +8,17 @@
     <version>0.4.0</version>
     <description>Cn Metadata Packager Prototype</description>
     <url>http://dataone.org</url>
-    <!--
+ 
     <parent>
         <groupId>org.dataone</groupId>
-        <artifactId>cn-prototype</artifactId>
+        <artifactId>cn-mnsynchronization</artifactId>
         <version>0.3.0</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
--->
-    <build>
 
+    <build>
+	<defaultGoal>assembly:assembly</defaultGoal>
         <plugins>
-            <!-- netbeans modules in 5.5+ are 1.5 compatible -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
@@ -34,14 +33,6 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jar-plugin</artifactId>
                 <version>2.2</version>
-<!--                <configuration>
-                    <archive>
-                        <manifest>
-                            <mainClass>org.dataone.cn.batch.proto.Main</mainClass>
-                            <packageName>org.dataone.cn.batch.proto</packageName>
-                        </manifest>
-                    </archive>
-                </configuration> -->
             </plugin>
             <plugin>
                 <artifactId>maven-assembly-plugin</artifactId>
@@ -85,11 +76,6 @@
                 <enabled>false</enabled>
             </snapshots>
         </repository>
-        <!--        <repository>
-            <id>spring-releases</id>
-            <name>Spring Maven RELEASE Repository</name>
-            <url>http://s3.amazonaws.com/maven.springframework.org/release</url>
-        </repository> -->
         <repository>
             <id>Jibx Maven Repository</id>
             <url>http://jibx.sourceforge.net/maven/</url>
@@ -126,7 +112,7 @@
         </dependency>
         <dependency>
            <groupId>org.dataone</groupId>
-           <artifactId>DataONE-CnHoksiHangukbuniseyo</artifactId>
+           <artifactId>dataone-cnhoksihangukbuniseyo</artifactId>
            <version>0.0.1</version>
            <type>jar</type>
            <optional>false</optional>
