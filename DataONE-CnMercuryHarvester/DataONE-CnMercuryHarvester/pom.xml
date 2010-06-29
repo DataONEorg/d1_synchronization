@@ -12,7 +12,9 @@
     <packaging>jar</packaging>
     <version>0.3.0</version>
     <name>DataONE-CnMercuryHarvester</name>
-
+    <properties>
+        <org.springframework.version>2.5.6</org.springframework.version>
+    </properties>
     <build>
         <defaultGoal>assembly:assembly</defaultGoal>
         <plugins>
@@ -75,22 +77,26 @@
         </repository>
     </repositories>
     <dependencies>
-
+ 
         <dependency>
             <groupId>org.springframework</groupId>
-            <artifactId>spring-core</artifactId>
-            <version>3.0.2.RELEASE</version>
-            <type>jar</type>
-            <optional>false</optional>
-            <scope>compile</scope>
+            <artifactId>spring</artifactId>
+            <version>${org.springframework.version}</version>
         </dependency>
         <dependency>
             <groupId>org.springframework</groupId>
-            <artifactId>spring-context</artifactId>
-            <version>3.0.2.RELEASE</version>
-            <type>jar</type>
-            <optional>false</optional>
-            <scope>compile</scope>
+            <artifactId>spring-core</artifactId>
+            <version>${org.springframework.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-beans</artifactId>
+            <version>${org.springframework.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-jdbc</artifactId>
+            <version>${org.springframework.version}</version>
         </dependency>
         <dependency>
             <groupId>log4j</groupId>
