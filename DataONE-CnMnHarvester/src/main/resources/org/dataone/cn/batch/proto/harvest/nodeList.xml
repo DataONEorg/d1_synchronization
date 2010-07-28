@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!--
+    Document   : nodeList.xml
+    Created on : July 15, 2010, 3:10 PM
+    Author     : rwaltz
+    Description:
+        Purpose of the document follows.
+-->
+
+<ns1:nodeList  xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance'
+   xmlns:ns1='http://dataone.org/service/types/NodeList/0.1'
+   xsi:schemaLocation='http://dataone.org/service/types/NodeList/0.1 https://repository.dataone.org/software/cicore/trunk/schemas/nodelist.xsd'>
+    <node replicate="true" synchronize="true" type="mn">
+        <identifier>http://cn-rpw</identifier>
+        <name>DataONESamples</name>
+        <baseURL>http://cn-rpw/mn/</baseURL>
+        <services>
+            <service api="mn_crud" method="get" rest="object/${GUID}" available="true"    datechecked="2010-06-21T11:28:00Z" />
+            <service api="mn_crud" method="getSystemMetadata" rest="meta/${GUID}" available="true"     datechecked="2010-06-21T11:28:00Z" />
+            <service api="mn_replicate" method="listObjects" rest="object" available="true"    datechecked="2010-06-21T11:28:00Z" />
+        </services>
+        <synchronization>
+            <schedule sec="00" min="00" hour="12" mday="*"  mon="*" wday="*" year="*" />
+            <lastHarvested>2010-06-21T11:28:00Z</lastHarvested>
+            <lastCompleteHarvest>2010-06-21T11:28:00Z</lastCompleteHarvest>
+        </synchronization>
+    </node>
+    <node replicate="true" synchronize="true" type="mn">
+        <identifier>http://dev-dryad-mn.dataone.org</identifier>
+        <name>dryad</name>
+        <baseURL>http://dev-dryad-mn.dataone.org/mn/</baseURL>
+        <services>
+            <service api="mn_crud" method="get" rest="object/${GUID}" available="true"    datechecked="2010-06-21T11:28:00Z" />
+            <service api="mn_crud" method="getSystemMetadata" rest="meta/${GUID}" available="true"     datechecked="2010-06-21T11:28:00Z" />
+            <service api="mn_replicate" method="listObjects" rest="object" available="true"    datechecked="2010-06-21T11:28:00Z" />
+        </services>
+        <synchronization>
+            <schedule sec="00" min="00" hour="12" mday="*"  mon="*" wday="*" year="*" />
+            <lastHarvested>2010-06-21T11:28:00Z</lastHarvested>
+            <lastCompleteHarvest>2010-06-21T11:28:00Z</lastCompleteHarvest>
+        </synchronization>
+    </node>
+    <node replicate="true" synchronize="true" type="mn">
+        <identifier>http://daacmn.dataone.utk.edu</identifier>
+        <name>daac</name>
+        <baseURL>http://daacmn.dataone.utk.edu/mn/</baseURL>
+        <services>
+            <service api="mn_crud" method="get" rest="object/${GUID}" available="true"    datechecked="2010-06-21T11:28:00Z" />
+            <service api="mn_crud" method="getSystemMetadata" rest="meta/${GUID}" available="true"     datechecked="2010-06-21T11:28:00Z" />
+            <service api="mn_replicate" method="listObjects" rest="object" available="true"    datechecked="2010-06-21T11:28:00Z" />
+        </services>
+        <synchronization>
+            <schedule sec="00" min="00" hour="12" mday="*"  mon="*" wday="*" year="*" />
+            <lastHarvested>2010-06-21T11:28:00Z</lastHarvested>
+            <lastCompleteHarvest>2010-06-21T11:28:00Z</lastCompleteHarvest>
+        </synchronization>
+    </node>
+    <node replicate="true" synchronize="true" type="mn">
+        <identifier>http://knb-mn.ecoinformatics.org</identifier>
+        <name>knb</name>
+        <baseURL>http://knb-mn.ecoinformatics.org/mn/</baseURL>
+        <services>
+            <service api="mn_crud" method="get" rest="object/${GUID}" available="true"    datechecked="2010-06-21T11:28:00Z" />
+            <service api="mn_crud" method="getSystemMetadata" rest="meta/${GUID}" available="true"     datechecked="2010-06-21T11:28:00Z" />
+            <service api="mn_replicate" method="listObjects" rest="object" available="true"    datechecked="2010-06-21T11:28:00Z" />
+        </services>
+        <synchronization>
+            <schedule sec="00" min="00" hour="12" mday="*"  mon="*" wday="*" year="*" />
+            <lastHarvested>2010-06-21T11:28:00Z</lastHarvested>
+            <lastCompleteHarvest>2010-06-21T11:28:00Z</lastCompleteHarvest>
+        </synchronization>
+    </node>
+    <node replicate="true" synchronize="false" type="cn">
+        <identifier>http://cn-unm-1.dataone.org</identifier>
+        <name>cn-unm-1</name>
+        <baseURL>http://cn-unm-1.dataone.org/cn/</baseURL>
+        <services>
+            <service api="cn_crud" method="get" rest="object/${GUID}" available="true"    datechecked="2010-06-21T11:28:00Z" />
+            <service api="cn_crud" method="getSystemMetadata" rest="meta/${GUID}" available="true"     datechecked="2010-06-21T11:28:00Z" />
+            <service api="cn_query" method="search" rest="object" available="true"    datechecked="2010-06-21T11:28:00Z" />
+        </services>
+    </node>
+    <node replicate="true" synchronize="false" type="cn">
+        <identifier>http://cn-ucsb-1.dataone.org</identifier>
+        <name>cn-ucsb-1</name>
+        <baseURL>http://cn-ucsb-1.dataone.org/cn/</baseURL>
+        <services>
+            <service api="cn_crud" method="get" rest="object/${GUID}" available="true"    datechecked="2010-06-21T11:28:00Z" />
+            <service api="cn_crud" method="getSystemMetadata" rest="meta/${GUID}" available="true"     datechecked="2010-06-21T11:28:00Z" />
+            <service api="cn_query" method="search" rest="object" available="true"    datechecked="2010-06-21T11:28:00Z" />
+        </services>
+    </node>
+    <node replicate="true" synchronize="false" type="cn">
+        <identifier>http://cn-orc-1.dataone.org</identifier>
+        <name>cn-orc-1</name>
+        <baseURL>http://cn-orc-1.dataone.org/cn/</baseURL>
+        <services>
+            <service api="cn_crud" method="get" rest="object/${GUID}" available="true"    datechecked="2010-06-21T11:28:00Z" />
+            <service api="cn_crud" method="getSystemMetadata" rest="meta/${GUID}" available="true"     datechecked="2010-06-21T11:28:00Z" />
+            <service api="cn_query" method="search" rest="object" available="true"    datechecked="2010-06-21T11:28:00Z" />
+        </services>
+    </node>
+</ns1:nodeList>
