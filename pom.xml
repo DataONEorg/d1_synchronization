@@ -12,6 +12,8 @@
 		<module>DataONE-CnMetadataPackager</module>
 		<module>DataONE-CnHoksiHangukbuniseyo</module>
                 <module>DataONE-CnMercuryIndexer</module>
+                <module>DataONE-CnMercuryDbHarvester</module>
+                <module>DataONE-CnBatchScheduler</module>
         </modules>
 	<build>
 		<plugins>
