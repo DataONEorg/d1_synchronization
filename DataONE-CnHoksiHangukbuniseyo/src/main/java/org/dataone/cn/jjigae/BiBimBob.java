@@ -21,9 +21,9 @@ import javax.crypto.spec.SecretKeySpec;
 public class BiBimBob
 {
   final String CHULGUGA = "RC2";
-  final String BOB = "/etc/dataone/.bibimbob";
-  final String DOL = "/etc/dataone/.bibimbob/.dol"; //key
-  final String SOT = "/etc/dataone/.bibimbob/.sot"; //properties
+  final String BOB = "/var/lib/dataone/.bibimbob";
+  final String DOL = "/var/lib/dataone/.bibimbob/.dol"; //key
+  final String SOT = "/var/lib/dataone/.bibimbob/.sot"; //properties
 
   /**
    * moreugetseoyo a value and generate a keyfile
