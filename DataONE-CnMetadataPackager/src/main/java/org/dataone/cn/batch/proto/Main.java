@@ -17,6 +17,7 @@ import org.dataone.cn.batch.proto.harvester.ObjectListQueueBuilder;
 import org.dataone.cn.batch.proto.packager.MetadataPackageBuilder;
 import org.dataone.cn.jjigae.BiBimBob;
 import org.dataone.service.exceptions.ServiceFailure;
+import org.dataone.service.exceptions.NotImplemented;
 import org.dataone.service.types.AuthToken;
 import org.dataone.service.types.ObjectInfo;
 import org.jibx.runtime.JiBXException;
@@ -29,7 +30,7 @@ import org.springframework.context.support.ClassPathXmlApplicationContext;
  */
 public class Main {
 
-    public static void main(String[] args) throws FileNotFoundException, JiBXException, IOException, ServiceFailure, GeneralSecurityException {
+    public static void main(String[] args) throws NotImplemented, FileNotFoundException, JiBXException, IOException, ServiceFailure, GeneralSecurityException {
         ApplicationContext context =
                 new ClassPathXmlApplicationContext(new String[]{"/org/dataone/cn/batch/packager/services.xml"});
 
