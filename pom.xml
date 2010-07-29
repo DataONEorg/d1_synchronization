@@ -10,6 +10,7 @@
         <url>http://dataone.org</url>
 	<modules>
 		<module>DataONE-CnMetadataPackager</module>
+		<module>DataONE-CnMnHarvester</module>
 		<module>DataONE-CnHoksiHangukbuniseyo</module>
                 <module>DataONE-CnMercuryIndexer</module>
                 <module>DataONE-CnMercuryDbHarvester</module>
