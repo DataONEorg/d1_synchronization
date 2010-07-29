@@ -13,6 +13,7 @@ import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Level;
 import org.apache.log4j.Logger;
 import org.dataone.cn.batch.utils.NodeListAccess;
 import org.dataone.cn.batch.utils.NodeReference;
@@ -126,6 +127,15 @@ public class ObjectListQueueWriter {
                 logger.info(sciMetaStream == null ? "no" : "yes");
                 hasException = false;
                 lastMofidiedDate = systemMetadata.getDateSysMetadataModified();
+                     try {
+                        if (sciMetaStream != null) {
+                            sciMetaStream.close();
+                            sciMetaStream = null;
+                        }
+
+                    } catch (IOException ex) {
+                        logger.error(ex.getMessage(), ex);
+                    }
             }
 
         } catch (IdentifierNotUnique ex) {
@@ -166,14 +176,34 @@ public class ObjectListQueueWriter {
         }
     }
 
-    public void writeToMetacat(InputStream objectInputStream, SystemMetadata sysmeta) throws InvalidToken, ServiceFailure, NotAuthorized, IdentifierNotUnique, UnsupportedType, InsufficientResources, InvalidSystemMetadata, NotImplemented {
+    public void writeToMetacat(InputStream objectInputStream, SystemMetadata sysmeta) throws ServiceFailure  {
         Identifier guid = new Identifier();
 // get the system metadata from the system
         Identifier d1Identifier = null;
         guid.setValue(sysmeta.getIdentifier().getValue());
-        d1Identifier = cnWriter.create(token, guid, objectInputStream, sysmeta);
-        cnWriter.setAccess(token, guid, "public", "read", "allow", "allowFirst");
-        logger.info("create success, id returned is " + d1Identifier.getValue());
+        try {
+            d1Identifier = cnWriter.create(token, guid, objectInputStream, sysmeta);
+        } catch (InvalidToken ex) {
+            logger.error("d1client.create:\n" + ex.serialize(ex.FMT_XML));
+        } catch (ServiceFailure ex) {
+             logger.error("d1client.create:\n" + ex.serialize(ex.FMT_XML));
+        } catch (NotAuthorized ex) {
+             logger.error("d1client.create:\n" + ex.serialize(ex.FMT_XML));
+        } catch (IdentifierNotUnique ex) {
+             logger.error("d1client.create:\n" + ex.serialize(ex.FMT_XML));
+        } catch (UnsupportedType ex) {
+            logger.error("d1client.create:\n" + ex.serialize(ex.FMT_XML));
+        } catch (InsufficientResources ex) {
+             logger.error("d1client.create:\n" + ex.serialize(ex.FMT_XML));
+        } catch (InvalidSystemMetadata ex) {
+             logger.error("d1client.create:\n" + ex.serialize(ex.FMT_XML));
+        } catch (NotImplemented ex) {
+             logger.error("d1client.create:\n" + ex.serialize(ex.FMT_XML));
+        }
+        if (d1Identifier != null) {
+            cnWriter.setAccess(token, guid, "public", "read", "allow", "allowFirst");
+            logger.info("create success, id returned is " + d1Identifier.getValue());
+        }
     }
 
     private File writeSystemMetadataToFile(SystemMetadata systemMetadata, String filenamePath) throws JiBXException, FileNotFoundException {
