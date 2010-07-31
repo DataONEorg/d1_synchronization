@@ -8,13 +8,12 @@
         Purpose of the document follows.
 -->
 
-
 <beans default-init-method="init" xmlns="http://www.springframework.org/schema/beans"
        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
        xmlns:util="http://www.springframework.org/schema/util"
        xsi:schemaLocation="http://www.springframework.org/schema/beans
-       http://www.springframework.org/schema/beans/spring-beans-3.0.xsd
-       http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util-3.0.xsd">
+       http://www.springframework.org/schema/beans/spring-beans-2.5.xsd
+       http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util-2.5.xsd">
 
     <bean id="log4jInitialization"
      class="org.springframework.beans.factory.config.MethodInvokingFactoryBean">
@@ -23,81 +22,107 @@
        <property name="targetMethod" value="initLogging" />
         <property name="arguments">
         <list>
-          <!--<value>classpath:org/dataone/cn/batch/proto/scheduler/log4j.properties</value> -->
-           <value>file:/etc/dataone/mn-synchronize/log4j.properties</value>
+           <value>file:/etc/dataone/mercury/log4j.properties</value>
          </list>
        </property>
       </bean>
+
     <bean id="log4jInitializationRedirectStdOutErr"
      class="org.dataone.cn.batch.proto.scheduler.utils.StdOutErrLog" />
 
    <bean id="properties" class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
       <property name="location">
-         <value>file:/etc/dataone/mn-synchronize/synchronization.properties</value>
+         <value>file:/etc/dataone/mercury/mercury.properties</value>
       </property>
    </bean>
 
-   <bean id="nodeListAccess" class="org.dataone.cn.batch.utils.NodeListAccess">
-       <constructor-arg value="${access.nodeListFileLocation}"/>
-   </bean>
-
-   <bean id="nodeList" class="org.dataone.service.types.NodeList"
-        factory-bean="nodeListAccess"
-        factory-method="getNodeList" />
-
-    <bean id="mnNodeReferenceUtility" class="org.dataone.cn.batch.utils.NodeReference">
-        <property name="mnNodeList" ref="nodeList" />
-        <property name="mnNodeIdentifier" value="${synchronize.mnIdentifier}" />
+    <bean id="dataSource" class="com.mchange.v2.c3p0.ComboPooledDataSource" destroy-method="close">
+        <property name="driverClass" value="${mercury3.driverClassName}"/>
+        <property name="jdbcUrl" value="${mercury3.url}"/>
+        <property name="user" value="${mercury3.username}"/>
+        <property name="password" value="${mercury3.password}"/>
     </bean>
-
+    
    <import resource="/scienceMetadataFormats.xml" />
-   <import resource="/metadataPackagerService.xml" />
-   <import resource="/mnHarvestService.xml" />
+   <import resource="/datanet_schema_xpath.xml"/>
+   <import resource="/traceExecution.xml"/>
+   <import resource="/mercuryDbHarvesterContext.xml" />
+   <import resource="/ornlDaacIndexerContext.xml" />
+   <import resource="/knbIndexerContext.xml" />
+   <import resource="/dryadIndexerContext.xml" />
 
-
-    <bean name="harvesterJob" class="org.dataone.cn.batch.proto.scheduler.jobs.MnHarvesterJob">
-        <property name="bob" ref="biBimBob" />
-        <property name="cnToken" ref="cnToken" />
-        <property name="cnClient" ref="cnClient" />
-        <property name="queueBuilder" ref="objectListQueue" />
-        <property name="queueProcessor" ref="objectListProcessor" />
-        <property name="queueWriter" ref="objectListWriter" />
+    
+    <bean name="mercuryDbHarvesterJob" class="org.dataone.cn.batch.proto.scheduler.jobs.MercuryDbHarvesterJob">
+        <property name="mercuryDbHarvest" ref="mercuryDbHarvester" />
     </bean>
 
-    <bean id="runMnHarvesterJob" class="org.springframework.scheduling.quartz.MethodInvokingJobDetailFactoryBean">
-      <property name="targetObject" ref="harvesterJob" />
-      <property name="targetMethod" value="harvestMetadata" />
+    <bean id="runMercuryDbHarvesterJob" class="org.springframework.scheduling.quartz.MethodInvokingJobDetailFactoryBean">
+      <property name="targetObject" ref="mercuryDbHarvesterJob" />
+      <property name="targetMethod" value="harvestDb" />
       <property name="concurrent" value="false" />
     </bean>
 
-    <bean id="cronMnHarvesterBean" class="org.springframework.scheduling.quartz.CronTriggerBean">
-        <property name="jobDetail" ref="runMnHarvesterJob" />
+    <bean id="cronMercuryDbHarvesterBean" class="org.springframework.scheduling.quartz.CronTriggerBean">
+        <property name="jobDetail" ref="runMercuryDbHarvesterJob" />
         <!-- run at every hour of every day -->
-        <property name="cronExpression" value="0 0/5 * * * ?" />
+        <property name="cronExpression" value="0 * * * * ?" />
     </bean>
 
-    <bean name="packagerJob" class="org.dataone.cn.batch.proto.scheduler.jobs.PackagerJob">
-        <property name="logReader" ref="logReader" />
-        <property name="packageWriter" ref="metadataPackagerWriter" />
+    <bean name="daacIndexerJob" class="org.dataone.cn.batch.proto.scheduler.jobs.MercuryIndexerJob">
+        <property name="indexer" ref="ornlDaacIndexer" />
     </bean>
 
-    <bean id="runMnPackagerJob" class="org.springframework.scheduling.quartz.MethodInvokingJobDetailFactoryBean">
-      <property name="targetObject" ref="packagerJob" />
-      <property name="targetMethod" value="packageMetadata" />
+    <bean id="runDaacIndexerJob" class="org.springframework.scheduling.quartz.MethodInvokingJobDetailFactoryBean">
+      <property name="targetObject" ref="daacIndexerJob" />
+      <property name="targetMethod" value="indexMercury" />
       <property name="concurrent" value="false" />
     </bean>
 
-    <bean id="cronMnPackagerBean" class="org.springframework.scheduling.quartz.CronTriggerBean">
-        <property name="jobDetail" ref="runMnPackagerJob" />
+    <bean id="cronDaacIndexerJob" class="org.springframework.scheduling.quartz.CronTriggerBean">
+        <property name="jobDetail" ref="runDaacIndexerJob" />
         <!-- run at every hour of every day -->
         <property name="cronExpression" value="0 1/5 * * * ?" />
     </bean>
-    
+
+    <bean name="knbIndexerJob" class="org.dataone.cn.batch.proto.scheduler.jobs.MercuryIndexerJob">
+        <property name="indexer" ref="knbIndexer" />
+    </bean>
+
+    <bean id="runKnbIndexerJob" class="org.springframework.scheduling.quartz.MethodInvokingJobDetailFactoryBean">
+      <property name="targetObject" ref="knbIndexerJob" />
+      <property name="targetMethod" value="indexMercury" />
+      <property name="concurrent" value="false" />
+    </bean>
+
+    <bean id="cronKnbIndexerJob" class="org.springframework.scheduling.quartz.CronTriggerBean">
+        <property name="jobDetail" ref="runKnbIndexerJob" />
+        <!-- run at every hour of every day -->
+        <property name="cronExpression" value="0 2/5 * * * ?" />
+    </bean>
+
+    <bean name="dryadIndexerJob" class="org.dataone.cn.batch.proto.scheduler.jobs.MercuryIndexerJob">
+        <property name="indexer" ref="dryadIndexer" />
+    </bean>
+
+    <bean id="runDryadIndexerJob" class="org.springframework.scheduling.quartz.MethodInvokingJobDetailFactoryBean">
+      <property name="targetObject" ref="dryadIndexerJob" />
+      <property name="targetMethod" value="indexMercury" />
+      <property name="concurrent" value="false" />
+    </bean>
+
+    <bean id="cronDryadIndexerJob" class="org.springframework.scheduling.quartz.CronTriggerBean">
+        <property name="jobDetail" ref="runDryadIndexerJob" />
+        <!-- run at every hour of every day -->
+        <property name="cronExpression" value="0 4/5 * * * ?" />
+    </bean>
+
     <bean id="scheduler" class="org.springframework.scheduling.quartz.SchedulerFactoryBean">
         <property name="triggers">
             <list>
-                <ref bean="cronMnPackagerBean" />
-                <ref bean="cronMnHarvesterBean" />
+<!--                <ref bean="cronMercuryDbHarvesterBean" /> -->
+                <ref bean="cronDaacIndexerJob" />
+                <ref bean="cronKnbIndexerJob" />
+                <ref bean="cronDryadIndexerJob" /> 
             </list>
         </property>
     </bean>
