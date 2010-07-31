@@ -1,0 +1,494 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<beans xmlns="http://www.springframework.org/schema/beans"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.springframework.org/schema/beans 
+    http://www.springframework.org/schema/beans/spring-beans-2.0.xsd">
+    
+    <bean id="instance" class="java.util.LinkedHashMap">
+        <constructor-arg>
+            <map>
+                <entry key="instance" value = "ornldaac"/>
+            </map>
+        </constructor-arg>
+    </bean>
+    
+    <!-- need a better way to configure this so that we must not recompile at every addition of a
+    namespace -->
+    <bean id="dataoneMercuryNamespaceContext" class="org.dataone.cn.mercury.MercuryNamespaceContext">
+	<property name="namespaceHashMap" >
+		<map>
+			<entry key="eml" value="eml://ecoinformatics.org/eml-2.0.1"/>
+			<entry key="mets" value="http://www.loc.gov/METS/"/>
+			<entry key="dim" value="http://www.dspace.org/xmlns/dspace/dim"/>
+			<entry key="D1" value="http://dataone.org/service/types/SystemMetadata/0.1"/>
+		</map>
+    	</property>
+    </bean>
+
+    <bean id="fgdc" class="java.util.LinkedHashMap">
+        <constructor-arg>
+            <map>
+                <entry key="TEXT">
+                    <ref bean="TEXT" />
+                </entry>
+                <entry key="GEO">
+                    <ref bean="GEO" />
+                </entry>
+                <entry key="DATE">
+                    <ref bean="DATE" />
+                </entry>
+                <entry key="CSV">
+                    <ref bean="CSV" />
+                </entry>
+                <entry key="TEXT_SINGLE">
+                    <ref bean="TEXT_SINGLE" />
+                </entry>
+                <entry key="LOOKUP">
+                    <ref bean="LOOKUP" />
+                </entry>
+                <entry key="DEFAULTING_LOOKUP">
+                    <ref bean="DEFAULTING_LOOKUP" />
+                </entry>
+                <entry key="DATELIST">
+                    <ref bean="DATELIST" />
+                </entry>
+                <entry key="fileID_CHOOSER">
+                    <ref bean="fileID_CHOOSER" />
+                </entry>
+            </map>
+        </constructor-arg>
+    </bean>
+
+    <bean id="eml" class="java.util.LinkedHashMap">
+        <constructor-arg>
+            <map>
+                <entry key="EML_TEXT">
+                    <ref bean="EML_TEXT" />
+                </entry>
+                <entry key="EML_GEO">
+                    <ref bean="EML_GEO" />
+                </entry>
+                <entry key="EML_DATE">
+                    <ref bean="EML_DATE" />
+                </entry>
+                <entry key="EML_CSV">
+                    <ref bean="EML_CSV" />
+                </entry>
+                <entry key="EML_TEXT_SINGLE">
+                    <ref bean="EML_TEXT_SINGLE" />
+                </entry>
+                <entry key="EML_LOOKUP">
+                    <ref bean="EML_LOOKUP" />
+                </entry>
+                <entry key="EML_DEFAULTING_LOOKUP">
+                    <ref bean="EML_DEFAULTING_LOOKUP" />
+                </entry>
+                <entry key="EML_DATELIST">
+                    <ref bean="EML_DATELIST" />
+                </entry>
+                <entry key="EML_fileID_CHOOSER">
+                    <ref bean="EML_fileID_CHOOSER" />
+                </entry>
+            </map>
+        </constructor-arg>
+    </bean>
+  
+    <bean id="mets" class="java.util.LinkedHashMap">
+        <constructor-arg>
+            <map>
+                <entry key="METS_TEXT">
+                    <ref bean="METS_TEXT" />
+                </entry>
+                <entry key="METS_DATE">
+                    <ref bean="METS_DATE" />
+                </entry>
+                <entry key="METS_CSV">
+                    <ref bean="METS_CSV" />
+                </entry>
+                <entry key="METS_TEXT_SINGLE">
+                    <ref bean="METS_TEXT_SINGLE" />
+                </entry>
+            </map>
+        </constructor-arg>
+    </bean>
+  
+    <bean id="TEXT_SINGLE" class="java.util.LinkedHashMap">
+        <constructor-arg>
+            <map>
+                <entry key="abstract" 	value = "//metadata/idinfo/descript/abstract/text()"/>
+                <entry key="title" 		value = "//metadata/idinfo/citation/citeinfo/title/text()"/>
+                <entry key="web_url" 		value = "//metadata/idinfo/citation/citeinfo/onlink/text()"/>
+                <entry key="data_url" 		value = "//metadata/idinfo/distinfo/digopt/onlinopt/computer/networka/networkr/text()"/>
+                <entry key="contactOrganization" 		value = "//metadata/distinfo/distrib/cntinfo/cntperp/cntorg/text()"/>
+                <entry key="ogc_url" 					value = "//metadata/mercury/OGC_URL/text()"/>
+
+                <entry key="identifier"    value = "//metadata/mercury/systemMetadata/identifier/text()"/>
+                <entry key="objectFormat"  value = "//metadata/mercury/systemMetadata/objectFormat/text()"/>
+                <entry key="size"          value = "//metadata/mercury/systemMetadata/size/text()"/>
+                <entry key="submitter"     value = "//metadata/mercury/systemMetadata/submitter/text()"/>
+                <entry key="rightsHolder"  value = "//metadata/mercury/systemMetadata/rightsHolder/text()"/>
+                <entry key="obsoletes"     value = "//metadata/mercury/systemMetadata/obsoletes/text()"/>
+                <entry key="obsoletedBy"   value = "//metadata/mercury/systemMetadata/obsoletedBy/text()"/>
+                <entry key="derivedFrom"   value = "//metadata/mercury/systemMetadata/derivedFrom/text()"/>
+                <entry key="describes"     value = "//metadata/mercury/systemMetadata/describes/text()"/>
+                <entry key="describedBy"   value = "//metadata/mercury/systemMetadata/describedBy/text()"/>
+                <entry key="checksum"      value = "//metadata/mercury/systemMetadata/checksum/text()"/>
+                <entry key="checksumAlgorithm"  value = "//metadata/mercury/systemMetadata/checksum/@algorithm"/>
+   		  
+                <entry key="accessRule"         value = "//metadata/mercury/systemMetadata/accessRule/text()"/>
+                <entry key="replicationPolicy"  value = "//metadata/mercury/systemMetadata/replicationPolicy/text()"/>
+                <entry key="replicationAllowed" value = "//metadata/mercury/systemMetadata/replicationPolicy/@replicationAllowed"/>
+                <entry key="numberReplicas"     value = "//metadata/mercury/systemMetadata/replicationPolicy/@numberReplicas"/>
+                <entry key="preferredMemberNode"  value = "//metadata/mercury/systemMetadata/replicationPolicy/preferredMemberNode/text()"/>
+                <entry key="blockedMemberNode"    value = "//metadata/mercury/systemMetadata/replicationPolicy/blockedMemberNode/text()"/>
+
+            </map>
+        </constructor-arg>
+    </bean>
+  
+    <bean id="TEXT" class="java.util.LinkedHashMap">
+        <constructor-arg>
+            <map>
+                <entry key="origin" 		value = "//metadata/idinfo/citation/citeinfo/origin/text()"/>
+                <entry key="edition" 		value = "//metadata/idinfo/citeinfo/edition/text()"/>
+
+                <entry key="investigator" 	value = "//metadata/mercury/Principal_Investigator/Name/text()"/>
+                <entry key="parameter" 		value = "//metadata/mercury/Parameter_Description/Parameter/text()"/>
+                <entry key="project" 		value = "//metadata/mercury/Project/text()"/>
+                <entry key="purpose" 		value = "//metadata/idinfo/descript/Purpose/text()"/>
+                <entry key="sensor" 		value = "//metadata/mercury/Parameter_Description/Sensor/text()"/>
+                <entry key="source" 		value = "//metadata/mercury/Parameter_Description/Source/text()"/>
+                <entry key="site" 			value = "//metadata/mercury/Site_Information/Site/text()"/>
+                <entry key="term" 			value = "//metadata/mercury/Parameter_Description/Term/text()"/>
+                <entry key="topic" 			value = "//metadata/mercury/Parameter_Description/Topic/text()"/>
+            </map>
+        </constructor-arg>
+    </bean>
+
+    <bean id="GEO" class="java.util.LinkedHashMap">
+        <constructor-arg>
+            <map>
+                <entry key="eastbc" 		value = "//metadata/idinfo/spdom/bounding/eastbc/text()"/>
+                <entry key="northbc" 		value = "//metadata/idinfo/spdom/bounding/northbc/text()"/>
+                <entry key="southbc" 		value = "//metadata/idinfo/spdom/bounding/southbc/text()"/>
+                <entry key="westbc" 		value = "//metadata/idinfo/spdom/bounding/westbc/text()"/>
+            </map>
+        </constructor-arg>
+    </bean>
+ 
+ 
+    <bean id="coords_LIST" class="java.util.LinkedHashMap">
+        <constructor-arg>
+            <map>
+                <entry key="coords" 	value = "//metadata/idinfo/spdom/bounding/eastbc/text()"/>
+                <entry key="northbc" 		value = "//metadata/idinfo/spdom/bounding/northbc/text()"/>
+                <entry key="southbc" 		value = "//metadata/idinfo/spdom/bounding/southbc/text()"/>
+                <entry key="westbc" 		value = "//metadata/idinfo/spdom/bounding/westbc/text()"/>
+            </map>
+        </constructor-arg>
+    </bean>
+
+    <bean id="fileID_CHOOSER" class="java.util.LinkedHashMap">
+        <constructor-arg>
+            <map>
+                <entry key="fileID" 	value = "//metadata/mercury/File_ID/text()"/>
+                <entry key="northbc" 		value = "//metadata/idinfo/datsetid/text()"/>
+            </map>
+        </constructor-arg>
+    </bean>
+
+ 
+  
+    <bean id="DATE" class="java.util.LinkedHashMap">
+        <constructor-arg>
+            <map>
+                <entry key="begdate" 		value = "//metadata/mercury/begdate/text()"/>
+                <entry key="enddate" 		value = "//metadata/mercury/enddate/text()"/>
+
+                <entry key="embargoExpires"  value = "//metadata/mercury/systemMetadata/embargoExpires/text()"/>
+                <entry key="last_modified"    value = "//metadata/mercury/systemMetadata/last_modified/text()"/>
+            </map>
+        </constructor-arg>
+    </bean>
+ 
+    <bean id="DATELIST" class="java.util.LinkedHashMap">
+        <constructor-arg>
+            <map>
+      	
+                <entry key="pubDate" 		value = "//metadata/idinfo/citation/citeinfo/pubdate/text()"/>
+                <entry key="metd" 			value = "//metadata/metainfo/metd/text()"/>
+                <entry key="metrd" 			value = "//metadata/metainfo/metrd/text()"/>
+                <entry key="enddate" 		value = "//metadata/mercury/enddate/text()"/>
+                <entry key="last_modified"   value = "//metadata/mercury/systemMetadata/last_modified/text()"/>
+         
+            </map>
+        </constructor-arg>
+    </bean>
+ 
+    <bean id="CSV" class="java.util.LinkedHashMap">
+        <constructor-arg>
+            <map>
+                <entry key="keywords" 	value = "//metadata/mercury/Keywords/text()"/>
+                <entry key="gcmdkeyword" 	value = "//metadata/idinfo/keywords/theme[themekt[contains(.,'(GCMD) Science Keywords')]]/themekey/text()"/>
+                <entry key="placeKey" 		value = "//metadata/idinfo/keywords/place/placekey/text()"/>
+            </map>
+        </constructor-arg>
+    </bean>
+
+    <bean id="CSV2" class="java.util.LinkedHashMap">
+        <constructor-arg>
+            <map>
+                <entry key="themekt" 					value = "//metadata/idinfo/keywords/theme/themekt/text()"/>
+                <entry key="themekey" 					value = "//metadata/idinfo/keywords/theme/themekey/text()"/>
+                <entry key="placekt" 					value = "//metadata/idinfo/keywords/place/placekt/text()"/>
+                <entry key="placekey" 					value = "//metadata/idinfo/keywords/place/placekey/text()"/>
+                <entry key="placekeyword" 				value = "//metadata/idinfo/keywords/place[placekt[contains(.,'(GCMD) Location Keywords')]]/placekey/text()"/>
+                <entry key="temporalkeyword" 			value = "//metadata/idinfo/keywords/temporal[tempkt[contains(.,'(GCMD) Temporal Keywords')]]/tempkey/text()"/>
+                <entry key="pointOfContact" 			value = "//metadata/idinfo/ptcontac/cntinfo/cntorgp/cntorg/text()"/>
+                <entry key="supplinf" 					value = "//metadata/idinfo/descript/supplinf/text()"/>
+                <entry key="contactPerson" 				value = "//metadata/distinfo/distrib/cntinfo/cntperp/cntper/text()"/>
+                <entry key="pubDate" 		value = "//metadata/idinfo/citation/citeinfo/pubdate/text()"/>
+            </map>
+        </constructor-arg>
+    </bean>
+
+    <bean id="LOOKUP" class="java.util.LinkedHashMap">
+        <constructor-arg>
+            <map>
+      	 
+                <entry key="originator" 			value = "//metadata/idinfo/citation/citeinfo/origin/text()"/>
+            </map>
+        </constructor-arg>
+    </bean>
+
+    <bean id="DEFAULTING_LOOKUP" class="java.util.LinkedHashMap">
+        <constructor-arg>
+            <map>
+                <entry key="presentationCat" 		value = "//metadata/idinfo/citation/citeinfo/geoform/text()"/>
+          
+            </map>
+        </constructor-arg>
+    </bean>
+
+    <bean id="presentationCat" class="org.springframework.beans.factory.config.PropertiesFactoryBean">
+        <property name="location" value="/presentationForm_lookup.properties" />
+    </bean>
+
+    <bean id="originator" class="org.springframework.beans.factory.config.PropertiesFactoryBean">
+        <property name="location" value="/originator_test2.properties" />
+    </bean>
+     <bean id="fgdcLookupProperties" class="java.util.LinkedHashMap">
+        <constructor-arg>
+            <map>
+                <entry key="presentationCat"><ref bean="presentationCat" /></entry>
+                <entry key="originator"><ref bean="originator" /></entry>
+            </map>
+        </constructor-arg>
+    </bean>
+ <!-- 
+ 
+ EML section below... structured as above, just with bean names prefixed and new xpath strings
+
+new facets.. include in indexing.
+
+project: //eml:eml/ dataset/ project/ title/text()oko
+keywords: //eml:eml/ dataset/ keywordSet/ keyword/text()  ....already there
+Organization: //eml:eml/ dataset/ creator/ organizationName/text()....already there
+Distribution: //eml:eml/ dataset/ distribution/@scope ok
+originator: concat (//eml:eml/ dataset/ creator/ individualName/ givenName /text()," ",//eml:eml/ dataset/ creator/ individualName/ surName /text())
+ 
+ 
+  --> 
+ 
+    <bean id="EML_TEXT_SINGLE" class="java.util.LinkedHashMap">
+        <constructor-arg>
+            <map>
+      
+                <entry key="project" 	value = "//eml:eml/ dataset/ project/ title/text()"/>
+                <entry key="distribution" 	value = "//eml:eml/ dataset/ distribution/@scope"/>
+      
+                <entry key="abstract" 	value = "//dataset/abstract/para/text()"/>
+                <entry key="title" 	value = "//dataset/title/text()"/>
+                <entry key="web_url" 	value = "//dataset/distribution/online/url/text()"/>
+                <entry key="contactOrganization" 		value = "//dataset/creator/organizationName/text()"/>
+      
+      
+                <entry key="identifier"    value = "//systemMetadata/identifier/text()"/>
+                <entry key="objectFormat"  value = "//systemMetadata/objectFormat/text()"/>
+                <entry key="size"          value = "//systemMetadata/size/text()"/>
+                <entry key="submitter"     value = "//systemMetadata/submitter/text()"/>
+                <entry key="rightsHolder"  value = "//systemMetadata/rightsHolder/text()"/>
+                <entry key="obsoletes"     value = "//systemMetadata/obsoletes/text()"/>
+                <entry key="obsoletedBy"   value = "//systemMetadata/obsoletedBy/text()"/>
+                <entry key="derivedFrom"   value = "//systemMetadata/derivedFrom/text()"/>
+                <entry key="describes"     value = "//systemMetadata/describes/text()"/>
+                <entry key="describedBy"   value = "//systemMetadata/describedBy/text()"/>
+                <entry key="checksum"      value = "//systemMetadata/checksum/text()"/>
+                <entry key="checksumAlgorithm"  value = "//systemMetadata/checksum/@algorithm"/>
+   		  
+                <entry key="accessRule"         value = "//systemMetadata/accessRule/text()"/>
+                <entry key="replicationPolicy"  value = "//systemMetadata/replicationPolicy/text()"/>
+                <entry key="replicationAllowed" value = "//systemMetadata/replicationPolicy/@replicationAllowed"/>
+                <entry key="numberReplicas"     value = "//systemMetadata/replicationPolicy/@numberReplicas"/>
+                <entry key="preferredMemberNode"  value = "//systemMetadata/replicationPolicy/preferredMemberNode/text()"/>
+                <entry key="blockedMemberNode"    value = "//systemMetadata/replicationPolicy/blockedMemberNode/text()"/>
+            </map>
+        </constructor-arg>
+    </bean>
+  
+    <bean id="EML_TEXT" class="java.util.LinkedHashMap">
+        <constructor-arg>
+            <map>
+                <entry key="origin" 		value = "concat (//eml:eml/ dataset/ creator/ individualName/ givenName /text(),' ',//eml:eml/ dataset/ creator/ individualName/ surName /text())"/>
+                <entry key="investigator" 	value = "//eml:eml/dataset/creator/individualName/surName/text()"/>
+            </map>
+        </constructor-arg>
+    </bean>
+
+    <bean id="EML_GEO" class="java.util.LinkedHashMap">
+        <constructor-arg>
+            <map>
+                <entry key="eastbc" 		value = "//dataset/coverage/geographicCoverage/boundingCoordinates/eastBoundingCoordinate/text()"/>
+                <entry key="northbc" 		value = "//dataset/coverage/geographicCoverage/boundingCoordinates/northBoundingCoordinate/text()"/>
+                <entry key="southbc" 		value = "//dataset/coverage/geographicCoverage/boundingCoordinates/southBoundingCoordinate/text()"/>
+                <entry key="westbc" 		value = "//dataset/coverage/geographicCoverage/boundingCoordinates/westBoundingCoordinate/text()"/>
+            </map>
+        </constructor-arg>
+    </bean>
+  
+    <bean id="EML_DATE" class="java.util.LinkedHashMap">
+        <constructor-arg>
+            <map>
+                <entry key="begdate" 		value = "//dataset/coverage/temporalCoverage/rangeOfDates/beginDate/calendarDate/text()"/>
+                <entry key="enddate" 		value = "//dataset/coverage/temporalCoverage/rangeOfDates/endDate/calendarDate/text()"/>
+                <entry key="embargoExpires"  value = "//systemMetadata/embargoExpires/text()"/>
+                <entry key="last_modified"    value = "//systemMetadata/last_modified/text()"/>
+            </map>
+        </constructor-arg>
+    </bean>
+ 
+    <bean id="EML_DATELIST" class="java.util.LinkedHashMap">
+        <constructor-arg>
+            <map>
+                <entry key="pubDate" 		value = "//dataset/pubDate/text()"/>
+                <entry key="enddate" 		value = "//dataset/coverage/temporalCoverage/rangeOfDates/endDate/calendarDate/text()"/>
+                <entry key="last_modified"   value = "//systemMetadata/last_modified/text()"/>
+            </map>
+        </constructor-arg>
+    </bean>
+  
+    <bean id="EML_fileID_CHOOSER" class="java.util.LinkedHashMap">
+        <constructor-arg>
+            <map>
+                <entry key="fileID" 	value = "//metadata/mercury/File_ID/text()"/>
+                <entry key="northbc" 		value = "//metadata/idinfo/datsetid/text()"/>
+            </map>
+        </constructor-arg>
+    </bean>
+  
+    <bean id="EML_CSV" class="java.util.LinkedHashMap">
+        <constructor-arg>
+            <map>
+                <entry key="keywords" 	value = "//dataset/keywordSet/keyword/text()"/>
+                <entry key="placeKey" 	value = "//dataset/keywordSet/keyword[@keywordType='place']/text()"/>
+            </map>
+        </constructor-arg>
+    </bean>
+
+    <bean id="EML_LOOKUP" class="java.util.LinkedHashMap">
+        <constructor-arg>
+            <map>
+                <entry key="EML_originator" 			value = "//metadata/idinfo/citation/citeinfo/origin/text()"/>
+            </map>
+        </constructor-arg>
+    </bean>
+
+    <bean id="EML_DEFAULTING_LOOKUP" class="java.util.LinkedHashMap">
+        <constructor-arg>
+            <map>
+                <entry key="EML_presentationCat" value = "//metadata/idinfo/citation/citeinfo/geoform/text()"/>
+            </map>
+        </constructor-arg>
+    </bean>
+     <bean id="emlLookupProperties" class="java.util.LinkedHashMap">
+        <constructor-arg>
+            <map>
+                <entry key="presentationCat"><ref bean="EML_LOOKUP" /></entry>
+                <entry key="originator"><ref bean="EML_DEFAULTING_LOOKUP" /></entry>
+            </map>
+        </constructor-arg>
+    </bean>
+
+  <!-- 
+ 
+ METS section below... structured as above, just with bean names prefixed and new xpath strings
+ 
+  --> 
+    <bean id="METS_TEXT" class="java.util.LinkedHashMap">
+        <constructor-arg>
+            <map>
+                <entry key="origin"      value = "//mets:METS/ mets:dmdSec/ mets:mdWrap/ mets:xmlData/ dim:dim/ dim:field[@qualifier='author']/text()"/>
+     
+                <entry key="investigator"   value = "//mets:METS/ mets:dmdSec/ mets:mdWrap/ mets:xmlData/ dim:dim/ dim:field[@qualifier='author']/text()"/>
+            </map>
+        </constructor-arg>
+    </bean>
+ 
+ 
+ 
+    <bean id="METS_CSV" class="java.util.LinkedHashMap">
+        <constructor-arg>
+            <map>
+                <entry key="keywords"     value = "//mets:METS/ mets:dmdSec/ mets:mdWrap/ mets:xmlData/ dim:dim/ dim:field[@element='subject']/text()"/>
+         
+            </map>
+        </constructor-arg>
+    </bean>
+ 
+    <bean id="METS_TEXT_SINGLE" class="java.util.LinkedHashMap">
+        <constructor-arg>
+            <map>
+
+                <entry key="distribution"     value = "//mets:METS/ mets:dmdSec/ mets:mdWrap/ mets:xmlData/ dim:dim/ dim:field[@element='type']/text()"/>
+      
+                <entry key="abstract"  value = "//mets:METS/ mets:dmdSec/ mets:mdWrap/ mets:xmlData/ dim:dim/ dim:field[@element='subject']/text()"/>
+                <entry key="title"     value = "//mets:METS/ mets:dmdSec/ mets:mdWrap/ mets:xmlData/ dim:dim/ dim:field[@element='title']/text()"/>
+                <entry key="web_url"   value = "//mets:METS/ mets:dmdSec/ mets:mdWrap/ mets:xmlData/ dim:dim/ dim:field[@qualifier='uri']/text()"/>
+                <entry key="contactOrganization"       value = "//mets:METS/ mets:amdSec/ mets:techMD/ mets:mdWrap/ mets:xmlData/ D1:systemMetadata/ originMemberNode/text()"/>
+
+                <entry key="identifier"    value = "//D1:systemMetadata/identifier/text()"/>
+                <entry key="objectFormat"  value = "//D1:systemMetadata/objectFormat/text()"/>
+                <entry key="size"          value = "//D1:systemMetadata/size/text()"/>
+                <entry key="submitter"     value = "//D1:systemMetadata/submitter/text()"/>
+                <entry key="rightsHolder"  value = "//D1:systemMetadata/rightsHolder/text()"/>
+                <entry key="obsoletes"     value = "//D1:systemMetadata/obsoletes/text()"/>
+                <entry key="obsoletedBy"   value = "//D1:systemMetadata/obsoletedBy/text()"/>
+                <entry key="derivedFrom"   value = "//D1:systemMetadata/derivedFrom/text()"/>
+                <entry key="describes"     value = "//D1:systemMetadata/describes/text()"/>
+                <entry key="describedBy"   value = "//D1:systemMetadata/describedBy/text()"/>
+                <entry key="checksum"      value = "//D1:systemMetadata/checksum/text()"/>
+                <entry key="checksumAlgorithm"  value = "//D1:systemMetadata/checksum/@algorithm"/>
+          
+                <entry key="accessRule"         value = "//D1:systemMetadata/accessRule/text()"/>
+                <entry key="replicationPolicy"  value = "//D1:systemMetadata/replicationPolicy/text()"/>
+                <entry key="replicationAllowed" value = "//D1:systemMetadata/replicationPolicy/@replicationAllowed"/>
+                <entry key="numberReplicas"     value = "//D1:systemMetadata/replicationPolicy/@numberReplicas"/>
+                <entry key="preferredMemberNode"  value = "//D1:systemMetadata/replicationPolicy/preferredMemberNode/text()"/>
+                <entry key="blockedMemberNode"    value = "//D1:systemMetadata/replicationPolicy/blockedMemberNode/text()"/>
+            </map>
+        </constructor-arg>
+    </bean>
+  
+    <bean id="METS_DATE" class="java.util.LinkedHashMap">
+        <constructor-arg>
+            <map>
+                <entry key="begdate"      value = "//mets:METS/ mets:dmdSec/ mets:mdWrap/ mets:xmlData/ dim:dim/ dim:field[@element='date' and @qualifier='issued' ]/text()"/>
+                <entry key="enddate"      value = "//mets:METS/ mets:dmdSec/ mets:mdWrap/ mets:xmlData/ dim:dim/ dim:field[@element='date' and @qualifier='available' ]/text()"/>
+                <entry key="embargoExpires"  value = "//D1:systemMetadata/embargoExpires/text()"/>
+                <entry key="last_modified"    value = "//D1:systemMetadata/last_modified/text()"/>
+            </map>
+        </constructor-arg>
+    </bean>
+ 
+</beans>
