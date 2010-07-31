@@ -9,10 +9,13 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.TimeZone;
 import java.util.logging.Level;
 import org.apache.log4j.Logger;
 import org.dataone.cn.batch.utils.NodeListAccess;
@@ -115,15 +118,15 @@ public class ObjectListQueueWriter {
                 }
 
                 // Verify that the ordering is correct or blow up
-                if (systemMetadata.getDateSysMetadataModified().before(lastMofidiedDate)) {
-                    throw new Exception("Dates are not ordered correctly!");
+                if ((systemMetadata.getDateSysMetadataModified().getTime() < lastMofidiedDate.getTime()) ) {
+                    throw new Exception("Dates are not ordered correctly! " + convertDateToGMT(systemMetadata.getDateSysMetadataModified()) + " " + systemMetadata.getDateSysMetadataModified().getTime()+ "of record: " + identifier + " is before previous lastModifieddate of " + convertDateToGMT(lastMofidiedDate) + " " + lastMofidiedDate.getTime());
                 }
 
                 this.writeToMetacat(sciMetaStream, readQueue.get(identifier));
 
                 // XXX IN THE FUTURE TO VERIFY THAT EVERYTHING
                 // is printed write to a log discrete log file?
-                logger.info("sent metacat " + identifier.getValue() + " with sci meta? ");
+                logger.info("sent metacat " + identifier.getValue() + " with DateSysMetadataModified of " +  convertDateToGMT(systemMetadata.getDateSysMetadataModified()) + " with sci meta? ");
                 logger.info(sciMetaStream == null ? "no" : "yes");
                 hasException = false;
                 lastMofidiedDate = systemMetadata.getDateSysMetadataModified();
@@ -169,6 +172,7 @@ public class ObjectListQueueWriter {
             }
         }
         if (lastMofidiedDate.after(mnNode.getSynchronization().getLastHarvested())) {
+            lastMofidiedDate.setTime(lastMofidiedDate.getTime() + (1000 -(lastMofidiedDate.getTime()%1000)));
             nodeReferenceUtility.getMnNode().getSynchronization().setLastHarvested(lastMofidiedDate);
             nodeListAccess.setNodeList(nodeReferenceUtility.getMnNodeList());
             nodeListAccess.persistNodeListToFileSystem();
@@ -221,7 +225,13 @@ public class ObjectListQueueWriter {
         }
         return outputFile;
     }
-
+    private String convertDateToGMT(Date d)
+    {
+        DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ");
+        dateFormat.setTimeZone(TimeZone.getTimeZone("GMT-0"));
+        String s = dateFormat.format(d);
+        return s;
+    }
     public MemberNodeCrud getMnReader() {
         return mnReader;
     }

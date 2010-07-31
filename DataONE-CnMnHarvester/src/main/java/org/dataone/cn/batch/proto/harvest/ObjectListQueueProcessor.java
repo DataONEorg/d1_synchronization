@@ -17,7 +17,6 @@ import org.dataone.service.exceptions.ServiceFailure;
 import org.dataone.service.mn.MemberNodeCrud;
 import org.dataone.service.types.AuthToken;
 import org.dataone.service.types.Identifier;
-import org.dataone.service.types.Node;
 import org.dataone.service.types.NodeReference;
 import org.dataone.service.types.ObjectInfo;
 import org.dataone.service.types.SystemMetadata;
@@ -71,12 +70,10 @@ public class ObjectListQueueProcessor {
     private List<ObjectInfo> readQueue;
     private Map<Identifier, SystemMetadata> writeQueue;
     private AuthToken token;
-    private Node node;
     private String mnIdentifier; // This is only a temporary solution
 //    public void processQueue(Node node) { XXX future call i think, because we will be processing this for specific nodes
     public void processQueue() {
         boolean hasException;
-
         for (ObjectInfo objectInfo : readQueue) {
             hasException = true;
             try {
@@ -141,14 +138,6 @@ public class ObjectListQueueProcessor {
 
     public void setToken(AuthToken token) {
         this.token = token;
-    }
-
-    public Node getNodeList() {
-        return this.node;
-    }
-
-    public void setNodeList(Node node) {
-        this.node = node;
     }
 
     public String getMnIdentifier() {

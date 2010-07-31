@@ -1,13 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<!--
-    Document   : nodeList.xml
-    Created on : July 15, 2010, 3:10 PM
-    Author     : rwaltz
-    Description:
-        Purpose of the document follows.
--->
-
 <ns1:nodeList  xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance'
    xmlns:ns1='http://dataone.org/service/types/NodeList/0.1'
    xsi:schemaLocation='http://dataone.org/service/types/NodeList/0.1 https://repository.dataone.org/software/cicore/trunk/schemas/nodelist.xsd'>
@@ -43,7 +35,7 @@
     </node>
     <node replicate="true" synchronize="true" type="mn">
         <identifier>http://daacmn.dataone.utk.edu</identifier>
-        <name>daac</name>
+        <name>ornldaac</name>
         <baseURL>http://daacmn.dataone.utk.edu/mn/</baseURL>
         <services>
             <service api="mn_crud" method="get" rest="object/${GUID}" available="true"    datechecked="2010-06-21T11:28:00Z" />

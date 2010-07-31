@@ -5,13 +5,13 @@
 
   <groupId>org.dataone</groupId>
   <artifactId>dataone-cnhoksihangukbuniseyo</artifactId>
-  <version>0.0.1</version>
+  <version>0.4.0</version>
   <name>DataONE-CnHoksiHangukbuniseyo</name>
   <url>http://dataone.org</url>
     <parent>
         <groupId>org.dataone</groupId>
         <artifactId>cn-mnsynchronization</artifactId>
-        <version>0.3.0</version>
+        <version>0.4.0</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
   <build>

@@ -37,7 +37,9 @@ public class ObjectListQueueBuilder {
     static final Comparator<ObjectInfo> LAST_MOFIDIED_ORDER =
                                  new Comparator<ObjectInfo>() {
         public int compare(ObjectInfo o1, ObjectInfo o2) {
-            return o1.getDateSysMetadataModified().compareTo(o2.getDateSysMetadataModified());
+            Long o1Time = o1.getDateSysMetadataModified().getTime();
+            Long o2Time = o2.getDateSysMetadataModified().getTime();
+            return o1Time.compareTo(o2Time);
         }
     };
 
@@ -48,11 +50,11 @@ public class ObjectListQueueBuilder {
         Node mnNode = nodeReferenceUtility.getMnNode();
         ObjectList objectList = null;
         Date now = new Date();
-        Date lastHarvestDate = mnNode.getSynchronization().getLastCompleteHarvest();
+        Date lastHarvestDate = mnNode.getSynchronization().getLastHarvested();
         try {
             do {
                 objectList = mnReader.listObjects(token, lastHarvestDate, now, null, true, start, count);
-                if (objectList == null) {
+                if (objectList == null || objectList.getTotal() == 0) {
                     break;
                 }
                 start += objectList.getCount();

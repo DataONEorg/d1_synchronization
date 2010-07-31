@@ -44,16 +44,20 @@ public class MetadataPackageWriter {
     private MetadataPackageAccess metadataPackageAccess;
     public void writePackages() throws FileNotFoundException, JiBXException, IOException, ParserConfigurationException, SAXException, Exception {
         logger.info("start write for " + readQueue.keySet().size() + " number of packages");
+        int writtenPackages = 0;
         for (String key : readQueue.keySet()) {
             Map<String, String> mergeFiles = readQueue.get(key);
-            logger.info("found: sci" + mergeFiles.get("SCIMETA") + ": sys:" + mergeFiles.get("SYSMETA"));
-            this.writePackage(mergeFiles.get("SCIMETA"), mergeFiles.get("SYSMETA"));
+            logger.info("found: scimetadata: " + mergeFiles.get("SCIMETA") + ": sysmetadata: " + mergeFiles.get("SYSMETA"));
+            if (this.writePackage(mergeFiles.get("SCIMETA"), mergeFiles.get("SYSMETA"))) {
+                ++writtenPackages;
+            }
+            logger.info("wrote: scimetadata: " + mergeFiles.get("SCIMETA") + ": sysmetadata: " + mergeFiles.get("SYSMETA"));
         }
         metadataPackageAccess.writePersistentData();
-        logger.info("ending write");
+        logger.info("ending wrote " + writtenPackages + " number of packages");
     }
 
-    private void writePackage(String scienceMetadataFile, String systemMetadataFile) throws FileNotFoundException, JiBXException, IOException, ParserConfigurationException, SAXException, Exception {
+    private boolean writePackage(String scienceMetadataFile, String systemMetadataFile) throws JiBXException, IOException, ParserConfigurationException, SAXException, Exception {
 
 // TODO code application logic here
 
@@ -61,9 +65,13 @@ public class MetadataPackageWriter {
             DocumentBuilder parser = documentBuilderFactory.newDocumentBuilder();
             Document sciMeta;
             Document sysMeta;
-
-            sciMeta = parser.parse(new File(readMetacatDirectory + File.separator + scienceMetadataFile));
-            sysMeta = parser.parse(new File(readMetacatDirectory + File.separator + systemMetadataFile));
+            try {
+                sciMeta = parser.parse(new File(readMetacatDirectory + File.separator + scienceMetadataFile));
+                sysMeta = parser.parse(new File(readMetacatDirectory + File.separator + systemMetadataFile));
+            } catch (Exception ex) {
+                logger.error(ex.getMessage(), ex);
+                return false;
+            }
             Element mercury = null;
             String objectFormat = "";
             Element root = sciMeta.getDocumentElement();
@@ -122,7 +130,7 @@ public class MetadataPackageWriter {
             String mergedMetadata = systemMetadataFile.concat("_MERGED.xml");
             writeXmlFile(sciMeta,  mergedMetadataDirPath + File.separator + mergedMetadata);
 
-
+            return true;
     }
 
     private void writeXmlFile(Document doc, String filename) {
