@@ -1,22 +1,25 @@
-
+<?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
     <modelVersion>4.0.0</modelVersion>
+    <groupId>org.dataone</groupId>
+    <artifactId>mercury-dbharvester</artifactId>
+    <version>0.4.0</version>
+    <name>DataONE-CnMercuryDbHarvester</name>
+    <packaging>jar</packaging>
+
     <parent>
         <artifactId>cn-mnsynchronization</artifactId>
         <groupId>org.dataone</groupId>
-        <version>0.3.0</version>
+        <version>0.4.0</version>
     </parent>
-    <groupId>org.dataone</groupId>
-    <artifactId>data-mercury-harvester</artifactId>
-    <packaging>jar</packaging>
-    <version>0.3.0</version>
-    <name>DataONE-CnMercuryHarvester</name>
+
     <properties>
         <org.springframework.version>2.5.6</org.springframework.version>
     </properties>
+
     <build>
-        <defaultGoal>assembly:assembly</defaultGoal>
+        <defaultGoal>install</defaultGoal>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -33,35 +36,6 @@
                 <artifactId>maven-jar-plugin</artifactId>
                 <version>2.2</version>
             </plugin>
-            <plugin>
-                <artifactId>maven-assembly-plugin</artifactId>
-                <version>2.2-beta-5</version>
-                <configuration>
-                    <finalName>run-${artifactId}</finalName>
-                    <outputDirectory>${basedir}</outputDirectory>
-                    <appendAssemblyId>false</appendAssemblyId>
-                    <descriptorRefs>
-                        <descriptorRef>
-                            jar-with-dependencies
-                        </descriptorRef>
-                    </descriptorRefs>
-                    <archive>
-                        <manifest>
-                            <mainClass>org.dataone.cn.batch.proto.Main</mainClass>
-                            <packageName>org.dataone.cn.batch.proto</packageName>
-                        </manifest>
-                    </archive>
-                </configuration>
-                <executions>
-                    <execution>
-                        <id>create-executable-jar</id>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>single</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
         </plugins>
     </build>
     <repositories>
@@ -77,7 +51,33 @@
         </repository>
     </repositories>
     <dependencies>
- 
+        <dependency>
+            <groupId>dom4j</groupId>
+            <artifactId>dom4j</artifactId>
+            <version>1.6.1</version>
+        </dependency>
+        <dependency>
+            <groupId>xalan</groupId>
+            <artifactId>xalan</artifactId>
+            <version>2.7.1</version>
+        </dependency>
+        <dependency>
+            <groupId>jaxen</groupId>
+            <artifactId>jaxen</artifactId>
+            <version>1.1-beta-6</version>
+        </dependency>
+
+<!--        <dependency>
+            <groupId>mysql</groupId>
+            <artifactId>mysql-connector-java</artifactId>
+            <version>3.1.14</version>
+        </dependency> -->
+        <dependency>
+            <groupId>mysql</groupId>
+            <artifactId>mysql-connector-java</artifactId>
+            <version>5.0.3</version>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework</groupId>
             <artifactId>spring</artifactId>
@@ -110,6 +110,13 @@
             <version>4.7</version>
             <type>jar</type>
             <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>jacksum</groupId>
+            <artifactId>jacksum</artifactId>
+            <version>1.6.0</version>
+            <scope>system</scope>
+            <systemPath>${basedir}/lib/jacksum.jar</systemPath>
         </dependency>
     </dependencies>
 
