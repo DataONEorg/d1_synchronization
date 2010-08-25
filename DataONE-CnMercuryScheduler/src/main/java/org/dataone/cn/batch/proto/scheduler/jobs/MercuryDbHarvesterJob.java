@@ -30,15 +30,17 @@ public class MercuryDbHarvesterJob {
         if (mercuryBaseDir.exists() && mercuryBaseDir.canRead()) {
             File[] sources = mercuryBaseDir.listFiles();
             logger.info("Found " + sources.length + " sources");
+            // TODO this is an sequential, iterative approach rather than a parallel threaded approach, may be inefficient
             for (File source: sources) {
-
-            // make certain the top level directory is a valid source
+            // TODO make certain source is a directory and not a file
+            // TODO make certain the top level directory is a valid source
                 String sourceName = source.getName();
                 logger.info("Found " + sourceName );
                 File[] objectSchema = source.listFiles();
                 logger.info("Found " + objectSchema.length + " schema dirs");
                 // only use those schema/objectTypes that have a Mapping
                 for (File schema: objectSchema) {
+                	// TODO make certain schema is a directory and not a file
                     String schemaName = schema.getName();
                     logger.info("Process " + schemaName);
                     mercuryDbHarvest.setSchema(schemaName);

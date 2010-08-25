@@ -35,6 +35,7 @@ import org.springframework.scheduling.quartz.SchedulerFactoryBean;
  */
 
 public class MercuryDaemon  implements Daemon {
+	/* TODO  reduce the number of DataONE Daemon implementations by configuring the application context file path via command line */
     private String appContextLocation = "file:/etc/dataone/mercury/applicationContext.xml";
     private ApplicationContext context;
     public MercuryDaemon() {
