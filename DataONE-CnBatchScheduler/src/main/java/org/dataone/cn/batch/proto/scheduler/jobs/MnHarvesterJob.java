@@ -50,6 +50,7 @@ public class MnHarvesterJob {
             ArrayList<ObjectInfo> objectInfoList = new ArrayList<ObjectInfo>();
             // Need the LinkedHashMap to preserver insertion order
             LinkedHashMap<Identifier, SystemMetadata> writeQueue = new LinkedHashMap<Identifier, SystemMetadata>();
+            // TODO review how tomcat sessions deal with multiple logins from same user
             AuthToken authToken = cnClient.login(bi.get(0), bi.get(1));
             cnToken.setToken(authToken.getToken());
             queueBuilder.setWriteQueue(objectInfoList);
