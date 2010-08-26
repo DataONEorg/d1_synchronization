@@ -75,6 +75,9 @@ public class LogReader {
         while (!processLogFiles.isEmpty()) {
             File processFile = processLogFiles.removeLast();
             // record the lastModfiedDateTime of the file
+            // TODO There maybe more data written to this file before it is opened and read, need to read that date
+            // after the buffer has been completely read
+            
             processingFileLastModified = processFile.lastModified();
             // pass in the skip bytes argument
             // return the total bytes read
@@ -113,7 +116,7 @@ public class LogReader {
                     && (numRead = bufferedEventStream.read(buffer, offset, buffer.length - offset)) >= 0) {
                 offset += numRead;
             }
-
+            bufferedEventStream.close();
             // Ensure all the bytes have been read in
             if (offset < buffer.length) {
                 throw new IOException("Could not completely read file " + processFile.getName());
@@ -183,6 +186,7 @@ public class LogReader {
         if (eventLogFile == null || !(eventLogFile.exists())) {
             throw new Exception("Log file " + eventLogFilePath + File.separator + eventLogFileName + "does not exist");
         }
+        // TODO This reading through multiple files 
         if (eventLogFileDir.exists() && eventLogFileDir.isDirectory()) {
             // create a directory listing of all rolled over log files
             // to determine if we need to catch up in synchronization
@@ -209,7 +213,7 @@ public class LogReader {
 
         return processLogFiles;
     }
-
+    // TODO Need a better comparator, or at least test this one with 0-100 entries...
     class LogDirFilesComparator implements Comparator<File> {
 
         // Comparator interface requires defining compare method.

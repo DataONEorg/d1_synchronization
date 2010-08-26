@@ -94,6 +94,7 @@ public class MetadataPackageWriter {
             Node adoptedMetadata = sciMeta.importNode(sysMeta.getDocumentElement(), true);
             adoptedMetadata = sciMeta.renameNode(adoptedMetadata, "", "systemMetadata");
             mercury.appendChild(adoptedMetadata);
+            // TODO this should only append the mercury element to the document root if the mercury element does not exist
             sciMeta.getDocumentElement().appendChild(mercury);
 //           sciMeta.normalizeDocument();
             // need to retrieve the systemmetadata to get GUID and ObjectType to
@@ -147,7 +148,7 @@ public class MetadataPackageWriter {
             Transformer xformer = TransformerFactory.newInstance().newTransformer();
 
             xformer.transform(source, result);
-
+            
         } catch (Exception e) {
             logger.error(e.getMessage(),e);
         }
