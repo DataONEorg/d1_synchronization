@@ -135,6 +135,7 @@ public class Indexer {
                     try {
                         //	XPath_Handler xpathHandler = new XPath_Handler(solrdb, instance, source,xpr_maps);
 
+                    	// TODO	 need to determine the Copyright and license status of com.epublishing.schema
                         AddDocument addDoc = AddDocument.Factory.newInstance();
                         Add add = addDoc.addNewAdd();
                         Doc doc = add.addNewDoc();

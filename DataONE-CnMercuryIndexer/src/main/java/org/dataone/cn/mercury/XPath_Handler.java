@@ -43,10 +43,12 @@ public class XPath_Handler implements DocumentHandler {
 	private Doc doc;
 	private static ArrayList<String> filterWords = new ArrayList<String>();
 
+	//TODO getDocument2 is same as getDocument
 	public synchronized Doc getDocument2(InputStream is, Doc adoc)
 			throws DocumentHandlerException {
 
 		try {
+			// TODO I don't think this is working correctly in a multi-threaded environment
 			doc = adoc;
 
 			// populateDocument2(is);
