@@ -6,91 +6,176 @@
     <node replicate="true" synchronize="true" type="mn">
         <identifier>http://cn-rpw</identifier>
         <name>DataONESamples</name>
+        <description>personal member node not widely available</description>
         <baseURL>http://cn-rpw/mn/</baseURL>
-        <services>
-            <service api="mn_crud" method="get" rest="object/${GUID}" available="true"    datechecked="2010-06-21T11:28:00Z" />
-            <service api="mn_crud" method="getSystemMetadata" rest="meta/${GUID}" available="true"     datechecked="2010-06-21T11:28:00Z" />
-            <service api="mn_replicate" method="listObjects" rest="object" available="true"    datechecked="2010-06-21T11:28:00Z" />
-        </services>
+ 		<services>
+			<service version="0.5a" available="true">
+				<name>mn_crud</name>
+				<method name="get" rest="object/${GUID}" implemented="true" />
+				<method name="getSystemMetadata" rest="meta/${GUID}" implemented="true" />
+				</service>
+			<service version="0.5a" available="true">
+				<name>mn_replication</name>
+				<method name="listObjects" rest="object" implemented="true"/>
+				</service>
+			</services>
         <synchronization>
             <schedule sec="00" min="00" hour="12" mday="*"  mon="*" wday="*" year="*" />
             <lastHarvested>2010-06-21T11:28:00Z</lastHarvested>
             <lastCompleteHarvest>2010-06-21T11:28:00Z</lastCompleteHarvest>
-        </synchronization>
-    </node>
+            </synchronization>
+        <health state="up">
+			<ping success="true" lastSuccess="2010-06-21T11:28:00Z"/>
+			<status dateChecked="2010-06-21T11:28:00Z" success="true"/>
+			</health>
+        </node>
+
     <node replicate="true" synchronize="true" type="mn">
         <identifier>http://dev-dryad-mn.dataone.org</identifier>
         <name>dryad</name>
+        <description>the development dryad member node</description>
         <baseURL>http://dev-dryad-mn.dataone.org/mn/</baseURL>
-        <services>
-            <service api="mn_crud" method="get" rest="object/${GUID}" available="true"    datechecked="2010-06-21T11:28:00Z" />
-            <service api="mn_crud" method="getSystemMetadata" rest="meta/${GUID}" available="true"     datechecked="2010-06-21T11:28:00Z" />
-            <service api="mn_replicate" method="listObjects" rest="object" available="true"    datechecked="2010-06-21T11:28:00Z" />
-        </services>
+		<services>
+			<service version="0.5a" available="true">
+				<name>mn_crud</name>
+				<method name="get" rest="object/${GUID}" implemented="true" />
+				<method name="getSystemMetadata" rest="meta/${GUID}" implemented="true" />
+				</service>
+			<service version="0.5a" available="true">
+				<name>mn_replication</name>
+				<method name="listObjects" rest="object" implemented="true"/>
+				</service>
+			</services>
+
         <synchronization>
             <schedule sec="00" min="00" hour="12" mday="*"  mon="*" wday="*" year="*" />
             <lastHarvested>2010-06-21T11:28:00Z</lastHarvested>
             <lastCompleteHarvest>2010-06-21T11:28:00Z</lastCompleteHarvest>
-        </synchronization>
-    </node>
+            </synchronization>
+        <health state="up">
+			<ping success="true" lastSuccess="2010-06-21T11:28:00Z"/>
+			<status dateChecked="2010-06-21T11:28:00Z" success="true"/>
+			</health>
+    	</node>
+
     <node replicate="true" synchronize="true" type="mn">
         <identifier>http://daacmn.dataone.utk.edu</identifier>
         <name>ornldaac</name>
+        <description>looks like the real daac mn</description>
         <baseURL>http://daacmn.dataone.utk.edu/mn/</baseURL>
         <services>
-            <service api="mn_crud" method="get" rest="object/${GUID}" available="true"    datechecked="2010-06-21T11:28:00Z" />
-            <service api="mn_crud" method="getSystemMetadata" rest="meta/${GUID}" available="true"     datechecked="2010-06-21T11:28:00Z" />
-            <service api="mn_replicate" method="listObjects" rest="object" available="true"    datechecked="2010-06-21T11:28:00Z" />
-        </services>
+        	<service version="0.5a" available="true">
+				<name>mn_crud</name>
+				<method name="get" rest="object/${GUID}" implemented="true" />
+				<method name="getSystemMetadata" rest="meta/${GUID}" implemented="true" />
+				</service>
+			<service version="0.5a" available="true">
+				<name>mn_replication</name>
+				<method name="listObjects" rest="object" implemented="true"/>
+				</service>
+			</services>
         <synchronization>
             <schedule sec="00" min="00" hour="12" mday="*"  mon="*" wday="*" year="*" />
             <lastHarvested>2010-06-21T11:28:00Z</lastHarvested>
             <lastCompleteHarvest>2010-06-21T11:28:00Z</lastCompleteHarvest>
-        </synchronization>
-    </node>
+            </synchronization>
+        <health state="up">
+			<ping success="true" lastSuccess="2010-06-21T11:28:00Z"/>
+			<status dateChecked="2010-06-21T11:28:00Z" success="true"/>
+			</health>
+        </node>
+
     <node replicate="true" synchronize="true" type="mn">
         <identifier>http://knb-mn.ecoinformatics.org</identifier>
         <name>knb</name>
+        <description>looks like the real KNB member node</description>
         <baseURL>http://knb-mn.ecoinformatics.org/mn/</baseURL>
         <services>
-            <service api="mn_crud" method="get" rest="object/${GUID}" available="true"    datechecked="2010-06-21T11:28:00Z" />
-            <service api="mn_crud" method="getSystemMetadata" rest="meta/${GUID}" available="true"     datechecked="2010-06-21T11:28:00Z" />
-            <service api="mn_replicate" method="listObjects" rest="object" available="true"    datechecked="2010-06-21T11:28:00Z" />
-        </services>
-        <synchronization>
+        	<service version="0.5a" available="true">
+				<name>mn_crud</name>
+				<method name="get" rest="object/${GUID}" implemented="true" />
+				<method name="getSystemMetadata" rest="meta/${GUID}" implemented="true" />
+				</service>
+			<service version="0.5a" available="true">
+				<name>mn_replication</name>
+				<method name="listObjects" rest="object" implemented="true"/>
+				</service>
+			</services>
+         <synchronization>
             <schedule sec="00" min="00" hour="12" mday="*"  mon="*" wday="*" year="*" />
             <lastHarvested>2010-06-21T11:28:00Z</lastHarvested>
             <lastCompleteHarvest>2010-06-21T11:28:00Z</lastCompleteHarvest>
         </synchronization>
-    </node>
+        <health state="up">
+			<ping success="true" lastSuccess="2010-06-21T11:28:00Z"/>
+			<status dateChecked="2010-06-21T11:28:00Z" success="true"/>
+			</health>
+    	</node>
+
     <node replicate="true" synchronize="false" type="cn">
         <identifier>http://cn-unm-1.dataone.org</identifier>
         <name>cn-unm-1</name>
+        <description>the UNM coordinating node, pre-production?</description>
         <baseURL>http://cn-unm-1.dataone.org/cn/</baseURL>
         <services>
-            <service api="cn_crud" method="get" rest="object/${GUID}" available="true"    datechecked="2010-06-21T11:28:00Z" />
-            <service api="cn_crud" method="getSystemMetadata" rest="meta/${GUID}" available="true"     datechecked="2010-06-21T11:28:00Z" />
-            <service api="cn_query" method="search" rest="object" available="true"    datechecked="2010-06-21T11:28:00Z" />
-        </services>
-    </node>
+            <service version="0.5a" available="true"> 
+            	<name>cn_crud</name>
+            	<method name="get" rest="object/${GUID}" implemented="true" />
+            	<method name="getSystemMetadata" rest="meta/${GUID}" implemented="true" />
+              </service>
+            <service version="0.5a" available="true">
+            	<name>cn_query</name>
+            	<method name="search" rest="object" implemented="true" />
+        	   	</service>
+        	</services>
+        <health state="up">
+			<ping success="true" lastSuccess="2010-06-21T11:28:00Z"/>
+			<status dateChecked="2010-06-21T11:28:00Z" success="true"/>
+			</health>
+        </node>
+
     <node replicate="true" synchronize="false" type="cn">
         <identifier>http://cn-ucsb-1.dataone.org</identifier>
         <name>cn-ucsb-1</name>
+        <description>the UCSB/NCEAS coordinating node, pre-production?</description>
         <baseURL>http://cn-ucsb-1.dataone.org/cn/</baseURL>
         <services>
-            <service api="cn_crud" method="get" rest="object/${GUID}" available="true"    datechecked="2010-06-21T11:28:00Z" />
-            <service api="cn_crud" method="getSystemMetadata" rest="meta/${GUID}" available="true"     datechecked="2010-06-21T11:28:00Z" />
-            <service api="cn_query" method="search" rest="object" available="true"    datechecked="2010-06-21T11:28:00Z" />
-        </services>
-    </node>
+            <service version="0.5a" available="true"> 
+            	<name>cn_crud</name>
+            	<method name="get" rest="object/${GUID}" implemented="true" />
+            	<method name="getSystemMetadata" rest="meta/${GUID}" implemented="true" />
+              </service>
+            <service version="0.5a" available="true">
+            	<name>cn_query</name>
+            	<method name="search" rest="object" implemented="true" />
+        	   	</service>
+        	</services>
+        <health state="up">
+			<ping success="true" lastSuccess="2010-06-21T11:28:00Z"/>
+			<status dateChecked="2010-06-21T11:28:00Z" success="true"/>
+			</health>
+        </node>
+
     <node replicate="true" synchronize="false" type="cn">
         <identifier>http://cn-orc-1.dataone.org</identifier>
         <name>cn-orc-1</name>
+		<description>the ORNL coordinating node, pre-production?</description>
         <baseURL>http://cn-orc-1.dataone.org/cn/</baseURL>
         <services>
-            <service api="cn_crud" method="get" rest="object/${GUID}" available="true"    datechecked="2010-06-21T11:28:00Z" />
-            <service api="cn_crud" method="getSystemMetadata" rest="meta/${GUID}" available="true"     datechecked="2010-06-21T11:28:00Z" />
-            <service api="cn_query" method="search" rest="object" available="true"    datechecked="2010-06-21T11:28:00Z" />
-        </services>
-    </node>
+            <service version="0.5a" available="true"> 
+            	<name>cn_crud</name>
+            	<method name="get" rest="object/${GUID}" implemented="true" />
+            	<method name="getSystemMetadata" rest="meta/${GUID}" implemented="true" />
+              </service>
+            <service version="0.5a" available="true">
+            	<name>cn_query</name>
+            	<method name="search" rest="object" implemented="true" />
+        	   	</service>
+        	</services>
+        <health state="up">
+			<ping success="true" lastSuccess="2010-06-21T11:28:00Z"/>
+			<status dateChecked="2010-06-21T11:28:00Z" success="true"/>
+			</health>
+        </node>
+
 </ns1:nodeList>
