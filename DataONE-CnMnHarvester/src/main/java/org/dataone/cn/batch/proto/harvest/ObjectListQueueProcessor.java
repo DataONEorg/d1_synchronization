@@ -78,9 +78,9 @@ public class ObjectListQueueProcessor {
             hasException = true;
             try {
     //            sciMetaFile = this.writeScienceMetadataToFile(objectInfo);
-
+                logger.debug("Retrieve SystemMetadata for " + objectInfo.getIdentifier().getValue());
                 SystemMetadata systemMetadata = mnReader.getSystemMetadata(null, objectInfo.getIdentifier());
-
+                logger.debug("Found SystemMetadata " + systemMetadata.getIdentifier().getValue() +  " for Identifier " + objectInfo.getIdentifier().getValue());
                 NodeReference nodeReference = new NodeReference();
 
                 nodeReference.setValue(mnIdentifier); //XXX get this from the identifier of the node that is being synchronized
@@ -89,6 +89,13 @@ public class ObjectListQueueProcessor {
                 originalReplica.setReplicationStatus(ReplicationStatus.COMPLETED);
                 originalReplica.setReplicaVerified(new Date());
                 systemMetadata.addReplica(originalReplica);
+
+                //
+                // XXX  do we really want
+                // to add in the originating node as a Replica,
+                // or just leave it as the authoritative node
+                //
+                systemMetadata.setOriginMemberNode(nodeReference);
                 writeQueue.put( objectInfo.getIdentifier(), systemMetadata);
                 hasException = false;
             } catch (InvalidToken ex) {

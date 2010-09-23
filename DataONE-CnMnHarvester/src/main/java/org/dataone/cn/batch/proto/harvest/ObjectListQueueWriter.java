@@ -102,7 +102,9 @@ public class ObjectListQueueWriter {
 
         try {
             for (Iterator<Identifier> it = readQueue.keySet().iterator(); it.hasNext();) {
+
                 Identifier identifier = it.next();
+                logger.debug("Write " + identifier.getValue() + " to metacat");
                 hasException = true;
 
                 // is the object format a data object or a scimetadata object
@@ -110,6 +112,7 @@ public class ObjectListQueueWriter {
                 // need a mapping between objectformat and objectType
                 //
                 SystemMetadata systemMetadata = readQueue.get(identifier);
+                logger.debug("Writing systemMetadata to metacat: " + systemMetadata.getIdentifier().getValue());
                 ObjectFormat objectFormat = systemMetadata.getObjectFormat();
                 if (validSciMetaObjectFormats.contains(objectFormat)) {
                     sciMetaStream = mnReader.get(null, identifier);
@@ -122,11 +125,11 @@ public class ObjectListQueueWriter {
                     throw new Exception("Dates are not ordered correctly! " + convertDateToGMT(systemMetadata.getDateSysMetadataModified()) + " " + systemMetadata.getDateSysMetadataModified().getTime()+ "of record: " + identifier + " is before previous lastModifieddate of " + convertDateToGMT(lastMofidiedDate) + " " + lastMofidiedDate.getTime());
                 }
 
-                this.writeToMetacat(sciMetaStream, readQueue.get(identifier));
+                this.writeToMetacat(sciMetaStream, systemMetadata);
 
                 // XXX IN THE FUTURE TO VERIFY THAT EVERYTHING
-                // is printed write to a log discrete log file?
-                logger.info("sent metacat " + identifier.getValue() + " with DateSysMetadataModified of " +  convertDateToGMT(systemMetadata.getDateSysMetadataModified()) + " with sci meta? ");
+                // is printed write to a discrete log file?
+                logger.info("Sent metacat " + identifier.getValue() + " with DateSysMetadataModified of " +  convertDateToGMT(systemMetadata.getDateSysMetadataModified()) + " with sci meta? ");
                 logger.info(sciMetaStream == null ? "no" : "yes");
                 hasException = false;
                 lastMofidiedDate = systemMetadata.getDateSysMetadataModified();
