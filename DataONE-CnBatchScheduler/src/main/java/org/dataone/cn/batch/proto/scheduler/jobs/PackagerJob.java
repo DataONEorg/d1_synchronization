@@ -9,7 +9,7 @@ import java.io.FileNotFoundException;
 import java.util.logging.Level;
 import org.apache.log4j.Logger;
 
-import org.dataone.cn.batch.proto.packager.LogReader;
+import org.dataone.cn.batch.proto.packager.EventLogReader;
 import org.dataone.cn.batch.proto.packager.MetadataPackageWriter;
 
 /**
@@ -17,13 +17,13 @@ import org.dataone.cn.batch.proto.packager.MetadataPackageWriter;
  * @author rwaltz
  */
 public class PackagerJob {
-    LogReader logReader;
+    EventLogReader eventLogReader;
     MetadataPackageWriter packageWriter;
     Logger logger = Logger.getLogger(this.getClass().getName());
     public void packageMetadata()  {
         try {
-            logReader.readEventLogfile();
-            packageWriter.setReadQueue(logReader.getMergeQueue());
+            eventLogReader.readLogfile();
+            packageWriter.setReadQueue(eventLogReader.getMergeQueue());
             packageWriter.writePackages();
         } catch (FileNotFoundException ex) {
             logger.error(ex.getMessage(),ex);
@@ -32,12 +32,12 @@ public class PackagerJob {
         }
 
     }
-    public LogReader getLogReader() {
-        return logReader;
+    public EventLogReader getLogReader() {
+        return eventLogReader;
     }
 
-    public void setLogReader(LogReader logReader) {
-        this.logReader = logReader;
+    public void setLogReader(EventLogReader eventLogReader) {
+        this.eventLogReader = eventLogReader;
     }
 
     public MetadataPackageWriter getPackageWriter() {

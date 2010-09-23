@@ -77,7 +77,7 @@
     </bean>
 
     <bean name="packagerJob" class="org.dataone.cn.batch.proto.scheduler.jobs.PackagerJob">
-        <property name="logReader" ref="logReader" />
+        <property name="eventLogReader" ref="eventLogReader" />
         <property name="packageWriter" ref="metadataPackagerWriter" />
     </bean>
 
