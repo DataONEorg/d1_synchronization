@@ -23,15 +23,15 @@ import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 @ContextConfiguration(locations = {"classpath:/org/dataone/cn/batch/proto/packager/MetadataPackageWriterTestCase-context.xml"})
 public class MetadataPackageWriterTestCase {
 
-    LogReader logReader;
+    EventLogReader eventLogReader;
     MetadataPackageWriter packageWriter;
     String testPackageHarvestDirectoryString;
-    String testLogFilePersistDataName;
+    String testEventLogFilePersistDataName;
     String testEventError;
     MetadataPackageAccess metadataPackageAccess;
     @Resource
-    public void setTestLogFilePersistDataName(String testLogFilePersistDataName) {
-        this.testLogFilePersistDataName = testLogFilePersistDataName;
+    public void setTestEventLogFilePersistDataName(String testEventLogFilePersistDataName) {
+        this.testEventLogFilePersistDataName = testEventLogFilePersistDataName;
     }
 
     @Resource
@@ -40,11 +40,11 @@ public class MetadataPackageWriterTestCase {
     }
 
     @Resource
-    public void setLogReader(LogReader logReader) {
-        this.logReader = logReader;
+    public void setTestEventLogReader(EventLogReader eventLogReader) {
+        this.eventLogReader = eventLogReader;
     }
     @Resource
-    public void setPackageWriter(MetadataPackageWriter packageWriter) {
+    public void setTestMetadataPackageWriter(MetadataPackageWriter packageWriter) {
         this.packageWriter = packageWriter;
     }
     @Resource
@@ -57,27 +57,27 @@ public class MetadataPackageWriterTestCase {
     }
     @Test
     public void testPackagingMetadataMergeQueue() throws Exception {
-        logReader.readEventLogfile();
-        packageWriter.setReadQueue(logReader.getMergeQueue());
+        eventLogReader.readLogfile();
+        packageWriter.setReadQueue(eventLogReader.getMergeQueue());
         packageWriter.writePackages();
 /*      
         System.out.println("sucess");
-        for (String key : logReader.getMergeQueue().results.keySet()) {
+        for (String key : eventLogReader.getMergeQueue().results.keySet()) {
             System.out.println("found GUID " + key);
             Map<String, String> mergeFiles = results.get(key);
             for (String keyMerge : mergeFiles.keySet()) {
                 System.out.println("\tfound " + keyMerge + " for " + mergeFiles.get(keyMerge));
             }
         } */
-        File testLogFilePersistDataNameFile = new File(this.testPackageHarvestDirectoryString + File.separator + this.testLogFilePersistDataName);
-        testLogFilePersistDataNameFile.delete();
+        File testEventLogFilePersistDataNameFile = new File(this.testPackageHarvestDirectoryString + File.separator + this.testEventLogFilePersistDataName);
+        testEventLogFilePersistDataNameFile.delete();
     }
     @Test
     public void testPackagingMetadataMergeQueueFailure() throws Exception {
         metadataPackageAccess.init();
-        logReader.setEventLogFileName(this.testEventError);
-        logReader.readEventLogfile();
-        packageWriter.setReadQueue(logReader.getMergeQueue());
+        eventLogReader.setEventLogFileName(this.testEventError);
+        eventLogReader.readLogfile();
+        packageWriter.setReadQueue(eventLogReader.getMergeQueue());
         try {
             packageWriter.writePackages();
         } catch (FileNotFoundException ex) {
@@ -85,14 +85,14 @@ public class MetadataPackageWriterTestCase {
         }
 /*
         System.out.println("sucess");
-        for (String key : logReader.getMergeQueue().results.keySet()) {
+        for (String key : eventLogReader.getMergeQueue().results.keySet()) {
             System.out.println("found GUID " + key);
             Map<String, String> mergeFiles = results.get(key);
             for (String keyMerge : mergeFiles.keySet()) {
                 System.out.println("\tfound " + keyMerge + " for " + mergeFiles.get(keyMerge));
             }
         } */
-        File testLogFilePersistDataNameFile = new File(this.testPackageHarvestDirectoryString + File.separator + this.testLogFilePersistDataName);
-        testLogFilePersistDataNameFile.delete();
+        File testEventLogFilePersistDataNameFile = new File(this.testPackageHarvestDirectoryString + File.separator + this.testEventLogFilePersistDataName);
+        testEventLogFilePersistDataNameFile.delete();
     }
 }

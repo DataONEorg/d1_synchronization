@@ -5,10 +5,13 @@
 package org.dataone.cn.batch.proto.packager;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Map;
 import javax.annotation.Resource;
 import org.dataone.cn.batch.utils.MetadataPackageAccess;
 import org.junit.*;
+import static org.junit.Assert.*;
 import org.junit.runner.RunWith;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
@@ -25,16 +28,18 @@ import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
  *
  */
 @RunWith(SpringJUnit4ClassRunner.class)
-@ContextConfiguration(locations = {"classpath:/org/dataone/cn/batch/proto/packager/LogReaderTestCase-context.xml"})
-public class LogReaderTestCase {
+@ContextConfiguration(locations = {"classpath:/org/dataone/cn/batch/proto/packager/ReplicationLogReaderTestCase-context.xml"})
+public class ReplicationLogReaderTestCase {
 
-    EventLogReader eventLogReader;
+    ReplicationLogReader replicationLogReader;
     String testPackageHarvestDirectoryString;
     String testLogFilePersistDataName;
     String testEvent2;
     String testEvent3;
     MetadataPackageAccess metadataPackageAccess;
-    @Resource
+    StringBuffer results1Buffer = new StringBuffer();
+    StringBuffer results2Buffer = new StringBuffer();
+    @Resource      
     public void setTestLogFilePersistDataName(String testLogFilePersistDataName) {
         this.testLogFilePersistDataName = testLogFilePersistDataName;
     }
@@ -45,19 +50,10 @@ public class LogReaderTestCase {
     }
 
     @Resource
-    public void setLogReader(EventLogReader eventLogReader) {
-        this.eventLogReader = eventLogReader;
+    public void setReplicationLogReader(ReplicationLogReader logReader) {
+        this.replicationLogReader = logReader;
     }
 
-    @Resource
-    public void setTestEvent2(String testEvent2) {
-        this.testEvent2 = testEvent2;
-    }
-
-    @Resource
-    public void setTestEvent3(String testEvent3) {
-        this.testEvent3 = testEvent3;
-    }
     @Resource
     public void setMetadataPackageAccess(MetadataPackageAccess metadataPackageAccess) {
         this.metadataPackageAccess = metadataPackageAccess;
@@ -65,25 +61,47 @@ public class LogReaderTestCase {
 
     @Test
     public void testLogReader() throws Exception {
-        eventLogReader.readLogfile();
-        Map<String, Map<String, String>> results = eventLogReader.getMergeQueue();
+        replicationLogReader.readLogfile();
+        Map<String, Map<String, String>> results = replicationLogReader.getMergeQueue();
         metadataPackageAccess.writePersistentData();
-/*        System.out.println("sucess");
-        for (String key : results.keySet()) {
+        System.out.println("sucess with " + results.size()  +" entries");
+        results1Buffer.append(results.size());
+        ArrayList<String> keyset = new ArrayList<String>(results.keySet());
+        Collections.sort(keyset);
+        for (String key : keyset) {
             System.out.println("found GUID " + key);
+            results1Buffer.append(key);
             Map<String, String> mergeFiles = results.get(key);
             for (String keyMerge : mergeFiles.keySet()) {
+                results1Buffer.append(keyMerge);
+                results1Buffer.append(mergeFiles.get(keyMerge));
                 System.out.println("\tfound " + keyMerge + " for " + mergeFiles.get(keyMerge));
             }
-        } */
+        }
     }
-
     @Test
+    public void testLogPersistence() throws Exception {
+
+        Map<String, Map<String, String>> results =metadataPackageAccess.getPendingDataQueue();
+        results2Buffer.append(results.size());
+        ArrayList<String> keyset = new ArrayList<String>(results.keySet());
+        Collections.sort(keyset);
+        for (String key : keyset) {
+            results2Buffer.append(key);
+            Map<String, String> mergeFiles = results.get(key);
+            for (String keyMerge : mergeFiles.keySet()) {
+                results2Buffer.append(keyMerge);
+                results2Buffer.append(mergeFiles.get(keyMerge));
+            }
+        }
+         assertTrue(results2Buffer.toString().contentEquals(results2Buffer.toString()));
+    }
+//    @Test
     public void testLogReaderWithAdditionalLogging() throws Exception {
 
-        eventLogReader.setEventLogFileName(testEvent2);
-        eventLogReader.readLogfile();
-        Map<String, Map<String, String>> results = eventLogReader.getMergeQueue();
+        replicationLogReader.setEventLogFileName(testEvent2);
+        replicationLogReader.readLogfile();
+        Map<String, Map<String, String>> results = replicationLogReader.getMergeQueue();
 /*        for (String key : results.keySet()) {
             System.out.println("found GUID " + key);
             Map<String, String> mergeFiles = results.get(key);
@@ -95,13 +113,13 @@ public class LogReaderTestCase {
         testLogFilePersistDataNameFile.delete();
     }
 
-    @Test
+//    @Test
     public void testLogReaderWithDosNewlines() throws Exception {
-        eventLogReader.newline = "\r\n";
+        replicationLogReader.newline = "\r\n";
         metadataPackageAccess.init();
-        eventLogReader.setEventLogFileName(testEvent3);
-        eventLogReader.readLogfile();
-        Map<String, Map<String, String>> results = eventLogReader.getMergeQueue();
+        replicationLogReader.setEventLogFileName(testEvent3);
+        replicationLogReader.readLogfile();
+        Map<String, Map<String, String>> results = replicationLogReader.getMergeQueue();
 /*        for (String key : results.keySet()) {
             System.out.println("found GUID " + key);
             Map<String, String> mergeFiles = results.get(key);

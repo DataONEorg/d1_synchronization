@@ -25,6 +25,7 @@ import java.util.regex.Pattern;
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.log4j.Logger;
 import org.dataone.cn.batch.utils.MetadataPackageAccess;
+import org.dataone.cn.batch.utils.MetadataPackageAccessKey;
 
 ;
 
@@ -32,15 +33,19 @@ import org.dataone.cn.batch.utils.MetadataPackageAccess;
  *
  * @author rwaltz
  */
-public class LogReader {
+public class EventLogReader {
 
-    Logger logger = Logger.getLogger(LogReader.class.getName());
+    Logger logger = Logger.getLogger(EventLogReader.class.getName());
 
-    private String eventLogFileName;
-    private String eventLogFilePath;
+    public static final String GUIDTOKEN = "D1GUID:";
+    public static final String SCIDATATOKEN = ":D1SCIMETADATA:";
+    public static final String SYSDATATOKEN = ":D1SYSMETADATA:";
+
+    protected String logFileName;
+    protected String logFilePath;
 
     public static String newline = System.getProperty("line.separator");
-    private MetadataPackageAccess metadataPackageAccess;
+    protected MetadataPackageAccess metadataPackageAccess;
     //
     // this will be map of a map, the first key is GUID
     // the map that the GUID points to will have two entires
@@ -52,10 +57,10 @@ public class LogReader {
     private Map<String, Map<String, String>> mergeQueue;
     private LogDirFilesComparator logDirFilesComparator = new LogDirFilesComparator();
 
-    public void readEventLogfile() throws FileNotFoundException, Exception {
-        this.mergeQueue = new HashMap<String, Map<String, String>>();
+    public void readLogfile() throws FileNotFoundException, Exception {
+        this.setMergeQueue(new HashMap<String, Map<String, String>>());
         // entries are from the event log
-        File eventLogFileDir = new File(eventLogFilePath);
+        File logFileDir = new File(logFilePath);
         // this is the date the file that is being processed is last modified
         long processingFileLastModified = 0;
         long skipInLogFile = 0;
@@ -67,10 +72,10 @@ public class LogReader {
         // Persistent file that will tell you how many bytes to skip before reading.
         // It will also maintain the lastAccessedDate of the file being processed
 
-        processLogFiles = this.getLogFileQueue(eventLogFileDir, persistMappings.get(metadataPackageAccess.DATE_TIME_LAST_ACCESSED_FIELD));
+        processLogFiles = this.getLogFileQueue(logFileDir, persistMappings.get(MetadataPackageAccessKey.DATE_TIME_LAST_ACCESSED_FIELD.toString()));
 
         // process the files in order
-        skipInLogFile = persistMappings.get(metadataPackageAccess.SKIP_IN_LOG_FIELD).longValue();
+        skipInLogFile = persistMappings.get(MetadataPackageAccessKey.SKIP_IN_LOG_FIELD.toString()).longValue();
 
         while (!processLogFiles.isEmpty()) {
             File processFile = processLogFiles.removeLast();
@@ -81,20 +86,19 @@ public class LogReader {
             processingFileLastModified = processFile.lastModified();
             // pass in the skip bytes argument
             // return the total bytes read
-            totalBytesRead = this.processEventLogFile(processFile, skipInLogFile);
+            totalBytesRead = this.processLogFile(processFile, skipInLogFile);
             // 0 out the skip bytes argument
             skipInLogFile = 0;
         }
 
-        persistMappings.put(metadataPackageAccess.SKIP_IN_LOG_FIELD, new Long(totalBytesRead));
-        persistMappings.put(metadataPackageAccess.DATE_TIME_LAST_ACCESSED_FIELD, new Long(processingFileLastModified));
+        persistMappings.put(MetadataPackageAccessKey.SKIP_IN_LOG_FIELD.toString(), new Long(totalBytesRead));
+        persistMappings.put(MetadataPackageAccessKey.DATE_TIME_LAST_ACCESSED_FIELD.toString(), new Long(processingFileLastModified));
 
         metadataPackageAccess.setPersistMappings(persistMappings);
 
-
     }
 
-    private long processEventLogFile(File processFile, long skipInLogFile) throws FileNotFoundException, IOException, Exception {
+    protected long processLogFile(File processFile, long skipInLogFile) throws FileNotFoundException, IOException, Exception {
         Long totalBytesRead;
         int offset = 0;
         int numRead = 0;
@@ -104,19 +108,19 @@ public class LogReader {
             if (bufferSize.intValue() > Integer.MAX_VALUE) {
                 throw new Exception("File " + processFile.getAbsolutePath() + " too long with " + bufferSize.longValue() + " bytes");
             }
-            FileInputStream eventFileInputStream = new FileInputStream(processFile);
-            BufferedInputStream bufferedEventStream = new BufferedInputStream(eventFileInputStream);
-            bufferedEventStream.skip(skipInLogFile);
+            FileInputStream fileInputStream = new FileInputStream(processFile);
+            BufferedInputStream bufferedStream = new BufferedInputStream(fileInputStream);
+            bufferedStream.skip(skipInLogFile);
 
             byte[] buffer = new byte[bufferSize.intValue()];
 
             // Read in the bytes
 
             while (offset < buffer.length
-                    && (numRead = bufferedEventStream.read(buffer, offset, buffer.length - offset)) >= 0) {
+                    && (numRead = bufferedStream.read(buffer, offset, buffer.length - offset)) >= 0) {
                 offset += numRead;
             }
-            bufferedEventStream.close();
+            bufferedStream.close();
             // Ensure all the bytes have been read in
             if (offset < buffer.length) {
                 throw new IOException("Could not completely read file " + processFile.getName());
@@ -142,7 +146,7 @@ public class LogReader {
             }
             logger.info("size of buffer = " + buffer.length + " lastByteOffset = " + lastByteOffset);
             BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(new ByteArrayInputStream(buffer)));
-            this.buildEventMergeQueue(bufferedReader);
+            this.buildMergeQueue(bufferedReader);
 
         }
         totalBytesRead = new Long(offset);
@@ -150,26 +154,26 @@ public class LogReader {
         return totalBytesRead.longValue() + skipInLogFile - lastByteOffset;
     }
 
-    private void buildEventMergeQueue(BufferedReader bufferedReader) throws IOException {
+    protected void buildMergeQueue(BufferedReader bufferedReader) throws IOException {
         int readlines = 0;
         String logEntry;
         // logfile entry should look something like:
         //knb 20100718-16:22:00: [INFO]: create D1GUID:knb:testid:201019913220178:D1SCIMETADATA:autogen.20101991322022.1:D1SYSMETA:autogen.20101991322039.1:
         while ((logEntry = bufferedReader.readLine()) != null) {
             logger.trace(logEntry);
-            if (logEntry.contains("create") && logEntry.contains("D1GUID:")) {
+            if (logEntry.contains("create") && logEntry.contains(GUIDTOKEN)) {
                 ++readlines;
                 HashMap<String, String> sciSysMetaHashMap = new HashMap<String, String>();
-                String[] findIdFields = logEntry.split("D1GUID:", 2);
-                int guidMarker = findIdFields[1].lastIndexOf(":D1SCIMETADATA:");
+                String[] findIdFields = logEntry.split(GUIDTOKEN, 2);
+                int guidMarker = findIdFields[1].lastIndexOf(SCIDATATOKEN);
                 String guid = findIdFields[1].substring(0, guidMarker);
-                String[] sysSciMetaIdFields = findIdFields[1].substring(guidMarker + ":D1SCIMETADATA:".length()).split(":D1SYSMETA:", 2);
-                sciSysMetaHashMap.put("SCIMETA", sysSciMetaIdFields[0]);
+                String[] sysSciMetaIdFields = findIdFields[1].substring(guidMarker + SCIDATATOKEN.length()).split(SYSDATATOKEN, 2);
+                sciSysMetaHashMap.put(MetadataPackageAccessKey.SCIMETA.toString(), sysSciMetaIdFields[0]);
                 int finalIndex = sysSciMetaIdFields[1].lastIndexOf(":");
                 if (finalIndex == -1) {
                     finalIndex = sysSciMetaIdFields[1].length() - 1;
                 }
-                sciSysMetaHashMap.put("SYSMETA", sysSciMetaIdFields[1].substring(0, finalIndex));
+                sciSysMetaHashMap.put(MetadataPackageAccessKey.SYSMETA.toString(), sysSciMetaIdFields[1].substring(0, finalIndex));
                 this.mergeQueue.put(guid, sciSysMetaHashMap);
             }
         }
@@ -178,37 +182,37 @@ public class LogReader {
 
 
 
-    private LinkedList<File> getLogFileQueue(File eventLogFileDir, long dateTimeLastAccessed) throws Exception {
+    private LinkedList<File> getLogFileQueue(File logFileDir, long dateTimeLastAccessed) throws Exception {
 
         LinkedList<File> processLogFiles = new LinkedList<File>();
 
-        File eventLogFile = new File(eventLogFilePath + File.separator + eventLogFileName);
-        if (eventLogFile == null || !(eventLogFile.exists())) {
-            throw new Exception("Log file " + eventLogFilePath + File.separator + eventLogFileName + "does not exist");
+        File logFile = new File(logFilePath + File.separator + logFileName);
+        if (logFile == null || !(logFile.exists())) {
+            throw new Exception("Log file " + logFilePath + File.separator + logFileName + "does not exist");
         }
         // TODO This reading through multiple files 
-        if (eventLogFileDir.exists() && eventLogFileDir.isDirectory()) {
+        if (logFileDir.exists() && logFileDir.isDirectory()) {
             // create a directory listing of all rolled over log files
             // to determine if we need to catch up in synchronization
-            LogDirFilter eventLogFileDirFilter = new LogDirFilter(eventLogFileName + "\\.\\d+", dateTimeLastAccessed);
+            LogDirFilter logFileDirFilter = new LogDirFilter(logFileName + "\\.\\d+", dateTimeLastAccessed);
 
-            File[] eventLogFileDirList = eventLogFileDir.listFiles(eventLogFileDirFilter);
+            File[] logFileDirList = logFileDir.listFiles(logFileDirFilter);
 
-            if (eventLogFileDirList != null && eventLogFileDirList.length > 0) {
+            if (logFileDirList != null && logFileDirList.length > 0) {
 
-                Arrays.sort(eventLogFileDirList, logDirFilesComparator);
+                Arrays.sort(logFileDirList, logDirFilesComparator);
                 // create ordered queue
 
-                for (File logFile : eventLogFileDirList) {
-                    processLogFiles.addFirst(logFile);
+                for (File log : logFileDirList) {
+                    processLogFiles.addFirst(log);
                 }
             }
 
-            processLogFiles.addFirst(eventLogFile);
+            processLogFiles.addFirst(logFile);
 
 
         } else {
-            throw new Exception("LogReader: Logging directory " + eventLogFilePath + " either does not exist or cannot be read!");
+            throw new Exception("EventLogReader: Logging directory " + logFilePath + " either does not exist or cannot be read!");
         }
 
         return processLogFiles;
@@ -242,20 +246,20 @@ public class LogReader {
     }
 
     public String getEventLogFileName() {
-        return eventLogFileName;
+        return logFileName;
     }
 
-    public void setEventLogFileName(String eventLogFileName) {
-        this.eventLogFileName = eventLogFileName;
+    public void setEventLogFileName(String logFileName) {
+        this.logFileName = logFileName;
 
     }
 
     public String getEventLogFilePath() {
-        return eventLogFilePath;
+        return logFilePath;
     }
 
-    public void setEventLogFilePath(String eventLogFilePath) {
-        this.eventLogFilePath = eventLogFilePath;
+    public void setEventLogFilePath(String logFilePath) {
+        this.logFilePath = logFilePath;
     }
 
     public Map<String, Map<String, String>> getMergeQueue() {

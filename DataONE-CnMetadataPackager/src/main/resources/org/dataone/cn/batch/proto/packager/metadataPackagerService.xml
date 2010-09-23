@@ -21,7 +21,7 @@
         <property name="eventLogFilePersistDataName" value="${synchronize.logFilePersistDataName}" />
    </bean>
 
-    <bean id="logReader" class="org.dataone.cn.batch.proto.packager.LogReader">
+    <bean id="eventLogReader" class="org.dataone.cn.batch.proto.packager.EventLogReader">
         <property name="eventLogFileName" value="${synchronize.metacatEventLogFileName}" />
         <property name="eventLogFilePath" value="${synchronize.metacatEventLogFileDirectory}"/>
         <property name="metadataPackageAccess" ref="metadataPackageAccess" />

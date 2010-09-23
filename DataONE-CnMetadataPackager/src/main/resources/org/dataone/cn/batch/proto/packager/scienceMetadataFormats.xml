@@ -46,13 +46,13 @@
         <entry key="INCITS 453-2009" value="INCITS_453_2009"/>
         <entry key="http://www.unidata.ucar.edu/namespaces/netcdf/ncml-2.2" value="NCML_2_2"/>
         <entry key="CF-1.0" value="CF_1_0"/>
-        <entry key="CF-1.1" value=" CF_1_1"/>
+        <entry key="CF-1.1" value="CF_1_1"/>
         <entry key="CF-1.2" value="CF_1_2"/>
         <entry key="CF-1.3" value="CF_1_3"/>
         <entry key="CF-1.4" value="CF_1_4"/>
         <entry key="http://www.cuahsi.org/waterML/1.0/" value="WATER_ML_1_0"/>
         <entry key="http://www.cuahsi.org/waterML/1.1/" value="WATER_ML_1_1"/>
-        <entry key="DSPACE METS SIP Profile 1.0" value="DSPACE_METS_SIP_1_0"/>
+        <entry key="http://www.loc.gov/METS/" value="DSPACE_METS_SIP_1_0"/>
         <entry key="netCDF-3" value="NET_CDF_3"/>
         <entry key="netCDF-4" value="NET_CDF_4"/>
         <entry key="http://rs.tdwg.org/dwc/xsd/simpledarwincore/" value="SIMPLE_DARWIN_CORE"/>

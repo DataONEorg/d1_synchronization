@@ -43,19 +43,19 @@
    <bean id="metadataPackageEventAccess" class="org.dataone.cn.batch.utils.MetadataPackageAccess">
         <property name="logFilePersistAccessDataPath" ref="testPackageHarvestDirectoryString"/>
         <property name="logFilePersistAccessDataName" ref="testLogFilePersistDataName" />
+        <property name="logFilePersistPendingDataName" ref="testLogFileReplicationDataName" />
+        <property name="logFilePersistPendingDataPath" ref="testPackageHarvestDirectoryString" />
    </bean>
-    <bean id="testEventLogReader" class="org.dataone.cn.batch.proto.packager.EventLogReader">
-        <property name="eventLogFileName" value="test-event1.log" />
+   
+    <bean id="replicationLogReader" class="org.dataone.cn.batch.proto.packager.ReplicationLogReader">
+        <property name="eventLogFileName" value="test-replication.log" />
         <property name="eventLogFilePath" ref="testPackageHarvestDirectoryString"/>
         <property name="metadataPackageAccess" ref="metadataPackageEventAccess" />
     </bean>
-    <bean id="testEvent2" class="java.lang.String">
-        <constructor-arg value="test-event2.log" />
-    </bean>
-    <bean id="testEvent3" class="java.lang.String">
-        <constructor-arg value="test-event3.log" />
-    </bean>
     <bean id="testLogFilePersistDataName" class="java.lang.String">
-        <constructor-arg value="persistent1.cache" />
+        <constructor-arg value="persistent2.cache" />
+    </bean>
+    <bean id="testLogFileReplicationDataName" class="java.lang.String">
+        <constructor-arg value="replication.index" />
     </bean>
 </beans>

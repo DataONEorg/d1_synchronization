@@ -8,7 +8,9 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
@@ -45,13 +47,27 @@ public class MetadataPackageWriter {
     public void writePackages() throws FileNotFoundException, JiBXException, IOException, ParserConfigurationException, SAXException, Exception {
         logger.info("start write for " + readQueue.keySet().size() + " number of packages");
         int writtenPackages = 0;
-        for (String key : readQueue.keySet()) {
+        // Copy into a new set or else receive nasty error
+        Set<String> readSetQueue = new HashSet<String>(readQueue.keySet());
+        for (String key : readSetQueue) {
             Map<String, String> mergeFiles = readQueue.get(key);
-            logger.info("found: scimetadata: " + mergeFiles.get("SCIMETA") + ": sysmetadata: " + mergeFiles.get("SYSMETA"));
-            if (this.writePackage(mergeFiles.get("SCIMETA"), mergeFiles.get("SYSMETA"))) {
-                ++writtenPackages;
+            if (mergeFiles.containsKey("SCIMETA") && mergeFiles.containsKey("SYSMETA")) {
+                logger.info("found: scimetadata: " + mergeFiles.get("SCIMETA") + ": sysmetadata: " + mergeFiles.get("SYSMETA"));
+                if (this.writePackage(mergeFiles.get("SCIMETA"), mergeFiles.get("SYSMETA"))) {
+                    ++writtenPackages;
+                }
+                logger.info("wrote: scimetadata: " + mergeFiles.get("SCIMETA") + ": sysmetadata: " + mergeFiles.get("SYSMETA"));
+                readQueue.remove(key);
+            } else {
+                logger.warn("GUID: " + key + " is not yet complete!");
+                if (mergeFiles.containsKey("COUNT")) {
+                    Integer countInt  = Integer.parseInt(mergeFiles.get("COUNT"));
+                    ++countInt;
+                    mergeFiles.put("COUNT", countInt.toString());
+                } else {
+                    mergeFiles.put("COUNT", Integer.toString(1));
+                }
             }
-            logger.info("wrote: scimetadata: " + mergeFiles.get("SCIMETA") + ": sysmetadata: " + mergeFiles.get("SYSMETA"));
         }
         metadataPackageAccess.writePersistentData();
         logger.info("ending wrote " + writtenPackages + " number of packages");
