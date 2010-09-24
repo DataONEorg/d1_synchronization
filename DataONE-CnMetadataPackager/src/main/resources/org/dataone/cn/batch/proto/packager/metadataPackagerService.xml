@@ -17,8 +17,10 @@
        http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util-3.0.xsd">
 
    <bean id="metadataPackageAccess" class="org.dataone.cn.batch.utils.MetadataPackageAccess">
-        <property name="eventLogFilePersistDataPath" value="${synchronize.logFilePersistDataPath}"/>
-        <property name="eventLogFilePersistDataName" value="${synchronize.logFilePersistDataName}" />
+        <property name="logFilePersistAccessDataPath" value="${synchronize.logFilePersistAccessDataPath}"/>
+        <property name="logFilePersistAccessDataName" value="${synchronize.logFilePersistAccessDataName}" />
+        <property name="logFilePersistPendingDataPath" value="${synchronize.logFilePersistPendingDataPath}"/>
+        <property name="logFilePersistPendingDataName" value="${synchronize.logFilePersistPendingDataName}" />
    </bean>
 
     <bean id="eventLogReader" class="org.dataone.cn.batch.proto.packager.EventLogReader">
