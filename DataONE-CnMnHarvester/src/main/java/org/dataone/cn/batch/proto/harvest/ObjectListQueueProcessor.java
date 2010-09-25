@@ -96,6 +96,7 @@ public class ObjectListQueueProcessor {
                 // or just leave it as the authoritative node
                 //
                 systemMetadata.setOriginMemberNode(nodeReference);
+                systemMetadata.setAuthoritativeMemberNode(nodeReference);
                 writeQueue.put( objectInfo.getIdentifier(), systemMetadata);
                 hasException = false;
             } catch (InvalidToken ex) {

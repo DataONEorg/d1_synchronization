@@ -112,8 +112,9 @@ public class ObjectListQueueWriter {
                 // need a mapping between objectformat and objectType
                 //
                 SystemMetadata systemMetadata = readQueue.get(identifier);
-                logger.debug("Writing systemMetadata to metacat: " + systemMetadata.getIdentifier().getValue());
                 ObjectFormat objectFormat = systemMetadata.getObjectFormat();
+                logger.debug("Writing systemMetadata to metacat: " + systemMetadata.getIdentifier().getValue() + " with Format of " + objectFormat.name());
+                
                 if (validSciMetaObjectFormats.contains(objectFormat)) {
                     sciMetaStream = mnReader.get(null, identifier);
                 } else {
