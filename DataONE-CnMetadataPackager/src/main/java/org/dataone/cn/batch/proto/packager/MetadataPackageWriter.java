@@ -9,6 +9,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.xml.parsers.DocumentBuilder;
@@ -23,6 +24,7 @@ import javax.xml.transform.stream.StreamResult;
 import org.apache.log4j.Logger;
 import org.dataone.cn.batch.utils.MetadataPackageAccess;
 import org.dataone.cn.batch.utils.NodeReference;
+import org.dataone.service.types.ObjectFormat;
 import org.jibx.runtime.JiBXException;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -44,6 +46,7 @@ public class MetadataPackageWriter {
     private HashMap<String, File> mergedMetaDir = new HashMap<String, File>();
     NodeReference nodeReferenceUtility;
     private MetadataPackageAccess metadataPackageAccess;
+    private List<ObjectFormat> validSciMetaObjectFormats;
     public void writePackages() throws FileNotFoundException, JiBXException, IOException, ParserConfigurationException, SAXException, Exception {
         logger.info("start write for " + readQueue.keySet().size() + " number of packages");
         int writtenPackages = 0;
@@ -79,18 +82,18 @@ public class MetadataPackageWriter {
 
             DocumentBuilderFactory documentBuilderFactory = DocumentBuilderFactory.newInstance();
             DocumentBuilder parser = documentBuilderFactory.newDocumentBuilder();
-            Document sciMeta;
-            Document sysMeta;
+            Document sciMeta = null;
+            Document sysMeta = null;
+            
             try {
-                sciMeta = parser.parse(new File(readMetacatDirectory + File.separator + scienceMetadataFile));
                 sysMeta = parser.parse(new File(readMetacatDirectory + File.separator + systemMetadataFile));
             } catch (Exception ex) {
                 logger.error(ex.getMessage(), ex);
-                return false;
+                throw ex;
             }
             Element mercury = null;
             String objectFormat = "";
-            Element root = sciMeta.getDocumentElement();
+            
             Element sysMetaRoot = sysMeta.getDocumentElement();
             NodeList sysNodeList = sysMetaRoot.getElementsByTagName("objectFormat");
             for (int i = 0; i < sysNodeList.getLength(); ++i) {
@@ -99,7 +102,25 @@ public class MetadataPackageWriter {
             if (objectFormat.isEmpty()) {
                 throw new Exception("ObjectFormat:" + objectFormat + ": of file " + systemMetadataFile + " is not valid");
             }
+            ObjectFormat objectFormatEnum = ObjectFormat.convert(objectFormat);
+            if ((objectFormatEnum != null)  && validSciMetaObjectFormats.contains(ObjectFormat.convert(objectFormat))) {
+              try {
+                sciMeta = parser.parse(new File(readMetacatDirectory + File.separator + scienceMetadataFile));
+               } catch (Exception ex) {
+                logger.error(ex.getMessage(), ex);
+                throw ex;
+               }
+            } else {
+                if (objectFormatEnum == null) {
+                    System.out.println("ObjectFormat:" + objectFormat + " is missing from ObjectFormat Enumeration!!!!");
+                    logger.error("ObjectFormat:" + objectFormat + " is missing from ObjectFormat Enumeration!!!!");
+                } else {
+                    logger.warn("ObjectFormat:" + objectFormat + " can not be indexed");
+                }
+                return false;
+            }
 
+            Element root = sciMeta.getDocumentElement();
             NodeList mercuryNodeList = root.getElementsByTagName("mercury");
             if (mercuryNodeList.getLength() > 0) {
                 mercury = (Element) mercuryNodeList.item(mercuryNodeList.getLength() - 1);
@@ -217,5 +238,11 @@ public class MetadataPackageWriter {
     public void setMetadataPackageAccess(MetadataPackageAccess metadataPackageAccess) {
         this.metadataPackageAccess = metadataPackageAccess;
     }
+    public List<ObjectFormat> getValidSciMetaObjectFormats() {
+        return validSciMetaObjectFormats;
+    }
 
+    public void setValidSciMetaObjectFormats(List<ObjectFormat> validSciMetaObjectFormats) {
+        this.validSciMetaObjectFormats = validSciMetaObjectFormats;
+    }
 }

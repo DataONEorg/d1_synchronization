@@ -104,6 +104,7 @@
         <property name="writeDirectory" ref="testPackageSamplesDirectoryString" />
         <property name="scienceMetadataFormatPathMap" ref="scienceMetadataFormatPathMap"/>
         <property name="metadataPackageAccess" ref="metadataPackageEventAccess" />
+        <property name="validSciMetaObjectFormats" ref="validScienceMetadataFormats" />
     </bean>
     <bean id="testEventError" class="java.lang.String">
         <constructor-arg value="test-eventMergeError.log" />

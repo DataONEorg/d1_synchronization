@@ -16,6 +16,7 @@
        http://www.springframework.org/schema/beans/spring-beans-3.0.xsd
        http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util-3.0.xsd">
 
+
    <bean id="metadataPackageAccess" class="org.dataone.cn.batch.utils.MetadataPackageAccess">
         <property name="logFilePersistAccessDataPath" value="${synchronize.logFilePersistAccessDataPath}"/>
         <property name="logFilePersistAccessDataName" value="${synchronize.logFilePersistAccessDataName}" />
