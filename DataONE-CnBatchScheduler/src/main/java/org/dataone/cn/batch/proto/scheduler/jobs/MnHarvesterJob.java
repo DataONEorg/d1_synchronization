@@ -12,9 +12,9 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import org.apache.log4j.Logger;
-import org.dataone.client.D1Client;
 import org.dataone.cn.batch.proto.harvest.*;
 import org.dataone.cn.jjigae.BiBimBob;
+import org.dataone.service.cn.CoordinatingNodeAuthorization;
 import org.dataone.service.types.AuthToken;
 import org.dataone.service.types.Identifier;
 import org.dataone.service.types.ObjectInfo;
@@ -28,7 +28,7 @@ public class MnHarvesterJob {
     static Logger logger = Logger.getLogger(MnHarvesterJob.class.getName());
     BiBimBob bob;
     AuthToken cnToken;
-    D1Client cnClient;
+    CoordinatingNodeAuthorization cnClient;
     List<String> bi;
     ObjectListQueueBuilder queueBuilder;
     ObjectListQueueProcessor queueProcessor;
@@ -75,11 +75,11 @@ public class MnHarvesterJob {
         this.bob = bob;
     }
 
-    public D1Client getCnClient() {
+    public CoordinatingNodeAuthorization getCnClient() {
         return cnClient;
     }
 
-    public void setCnClient(D1Client cnClient) {
+    public void setCnClient(CoordinatingNodeAuthorization cnClient) {
         this.cnClient = cnClient;
     }
 

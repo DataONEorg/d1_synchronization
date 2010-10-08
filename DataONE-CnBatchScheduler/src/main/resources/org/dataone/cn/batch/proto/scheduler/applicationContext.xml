@@ -77,27 +77,46 @@
         <property name="cronExpression" value="0 0/5 * * * ?" />
     </bean>
 
-    <bean name="packagerJob" class="org.dataone.cn.batch.proto.scheduler.jobs.PackagerJob">
+    <bean name="eventPackagerJob" class="org.dataone.cn.batch.proto.scheduler.jobs.PackagerJob">
         <property name="logReader" ref="eventLogReader" />
         <property name="packageWriter" ref="metadataPackagerWriter" />
     </bean>
 
-    <bean id="runMnPackagerJob" class="org.springframework.scheduling.quartz.MethodInvokingJobDetailFactoryBean">
-      <property name="targetObject" ref="packagerJob" />
+    <bean id="runEventPackagerJob" class="org.springframework.scheduling.quartz.MethodInvokingJobDetailFactoryBean">
+      <property name="targetObject" ref="eventPackagerJob" />
       <property name="targetMethod" value="packageMetadata" />
       <property name="concurrent" value="false" />
     </bean>
 
-    <bean id="cronMnPackagerBean" class="org.springframework.scheduling.quartz.CronTriggerBean">
-        <property name="jobDetail" ref="runMnPackagerJob" />
+    <bean id="cronEventPackagerBean" class="org.springframework.scheduling.quartz.CronTriggerBean">
+        <property name="jobDetail" ref="runEventPackagerJob" />
         <!-- run at every hour of every day -->
         <property name="cronExpression" value="0 1/5 * * * ?" />
     </bean>
-    
+   
+       <bean name="replicationPackagerJob" class="org.dataone.cn.batch.proto.scheduler.jobs.PackagerJob">
+        <property name="logReader" ref="replicationLogReader" />
+        <property name="packageWriter" ref="metadataPackagerWriter" />
+    </bean>
+
+    <bean id="runReplicationPackagerJob" class="org.springframework.scheduling.quartz.MethodInvokingJobDetailFactoryBean">
+      <property name="targetObject" ref="replicationPackagerJob" />
+      <property name="targetMethod" value="packageMetadata" />
+      <property name="concurrent" value="false" />
+    </bean>
+
+    <bean id="cronReplicationPackagerBean" class="org.springframework.scheduling.quartz.CronTriggerBean">
+        <property name="jobDetail" ref="runReplicationPackagerJob" />
+        <!-- run at every hour of every day -->
+        <property name="cronExpression" value="0 2/5 * * * ?" />
+    </bean>
+
+
     <bean id="scheduler" class="org.springframework.scheduling.quartz.SchedulerFactoryBean">
         <property name="triggers">
             <list>
-                <ref bean="cronMnPackagerBean" />
+                <ref bean="cronEventPackagerBean" />
+                <ref bean="cronReplicationPackagerBean" />
                 <ref bean="cronMnHarvesterBean" />
             </list>
         </property>
