@@ -16,10 +16,11 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
-import java.util.logging.Level;
 import org.apache.log4j.Logger;
 import org.dataone.cn.batch.utils.NodeListAccess;
 import org.dataone.cn.batch.utils.NodeReference;
+import org.dataone.service.cn.CoordinatingNodeCrud;
+import org.dataone.service.cn.CoordinatingNodeAuthorization;
 import org.dataone.service.exceptions.IdentifierNotUnique;
 import org.dataone.service.exceptions.InsufficientResources;
 import org.dataone.service.exceptions.InvalidSystemMetadata;
@@ -84,7 +85,8 @@ public class ObjectListQueueWriter {
      */
     Logger logger = Logger.getLogger(ObjectListQueueWriter.class.getName());
     private MemberNodeCrud mnReader;
-    private MemberNodeCrud cnWriter;
+    private CoordinatingNodeCrud cnWriter;
+    private CoordinatingNodeAuthorization cnAuthorization;
     private Map<Identifier, SystemMetadata> readQueue;
     private List<ObjectFormat> validSciMetaObjectFormats;
     private NodeReference nodeReferenceUtility;
@@ -209,7 +211,7 @@ public class ObjectListQueueWriter {
              logger.error("d1client.create:\n" + ex.serialize(ex.FMT_XML));
         }
         if (d1Identifier != null) {
-            cnWriter.setAccess(token, guid, "public", "read", "allow", "allowFirst");
+            cnAuthorization.setAccess(token, guid, "public", "read", "allow", "allowFirst");
             logger.info("create success, id returned is " + d1Identifier.getValue());
         }
     }
@@ -252,11 +254,11 @@ public class ObjectListQueueWriter {
         this.readQueue = readQueue;
     }
 
-    public MemberNodeCrud getCnWriter() {
+    public CoordinatingNodeCrud getCnWriter() {
         return cnWriter;
     }
 
-    public void setCnWriter(MemberNodeCrud cnWriter) {
+    public void setCnWriter(CoordinatingNodeCrud cnWriter) {
         this.cnWriter = cnWriter;
     }
 
@@ -291,4 +293,14 @@ public class ObjectListQueueWriter {
     public void setNodeListAccess(NodeListAccess nodeListAccess) {
         this.nodeListAccess = nodeListAccess;
     }
+
+    public CoordinatingNodeAuthorization getCnAuthorization() {
+        return cnAuthorization;
+    }
+
+    public void setCnAuthorization(CoordinatingNodeAuthorization cnAuthorization) {
+        this.cnAuthorization = cnAuthorization;
+    }
+
+
 }

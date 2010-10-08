@@ -19,16 +19,16 @@
 
     <bean id="biBimBob" class="org.dataone.cn.jjigae.BiBimBob" />
 
-    <bean id="cnClient" class="org.dataone.client.D1Client">
-        <property name="contextRootUrl" value="${cnClient.contextRootUrl}" />
+    <bean id="cnClient" class="org.dataone.client.CNode">
+        <constructor-arg type="java.lang.String" value="${cnClient.contextRootUrl}" />
     </bean>
 
     <bean id="mnNodeBaseUrl"
       factory-bean="mnNodeReferenceUtility"
       factory-method="getNodeBaseURL"/>
 
-    <bean id="mnClient" class="org.dataone.client.D1Client">
-        <property name="contextRootUrl" ref="mnNodeBaseUrl" />
+    <bean id="mnClient" class="org.dataone.client.MNode">
+        <constructor-arg type="java.lang.String" ref="mnNodeBaseUrl" />
     </bean>
 
     <bean id="cnToken"  class="org.dataone.service.types.AuthToken" />
@@ -51,6 +51,7 @@
     <bean id="objectListWriter" class="org.dataone.cn.batch.proto.harvest.ObjectListQueueWriter">
         <property name="mnReader" ref="mnClient" />
         <property name="cnWriter" ref="cnClient" />
+        <property name="cnAuthorization" ref="cnClient" />
         <property name="token" ref="cnToken" />
         <property name="validSciMetaObjectFormats" ref="validScienceMetadataFormats" />
         <property name="nodeReferenceUtility" ref="mnNodeReferenceUtility" />
