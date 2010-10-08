@@ -29,13 +29,18 @@
         <property name="eventLogFilePath" value="${synchronize.metacatEventLogFileDirectory}"/>
         <property name="metadataPackageAccess" ref="metadataPackageAccess" />
     </bean>
-
+    <bean id="replicationLogReader" class="org.dataone.cn.batch.proto.packager.ReplicationLogReader">
+        <property name="replicationLogFileName" value="${synchronize.metacatReplicationLogFileName}" />
+        <property name="replicationLogFilePath" value="${synchronize.metacatReplicationLogFileDirectory}"/>
+        <property name="metadataPackageAccess" ref="metadataPackageAccess" />
+    </bean>
     <bean id="metadataPackagerWriter" class="org.dataone.cn.batch.proto.packager.MetadataPackageWriter">
         <property name="readMetacatDirectory" value="${synchronize.metacatDocumentDirectory}" />
         <property name="nodeReferenceUtility" ref="mnNodeReferenceUtility" />
         <property name="writeDirectory" value="${synchronize.mercuryDatanetDirectory}" />
         <property name="scienceMetadataFormatPathMap" ref="scienceMetadataFormatPathMap"/>
         <property name="metadataPackageAccess" ref="metadataPackageAccess" />
+        <property name="validSciMetaObjectFormats" ref="validScienceMetadataFormats" />
     </bean>
 
 </beans>

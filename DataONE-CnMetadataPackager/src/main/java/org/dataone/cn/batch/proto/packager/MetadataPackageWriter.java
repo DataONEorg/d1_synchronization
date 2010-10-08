@@ -103,7 +103,7 @@ public class MetadataPackageWriter {
                 throw new Exception("ObjectFormat:" + objectFormat + ": of file " + systemMetadataFile + " is not valid");
             }
             ObjectFormat objectFormatEnum = ObjectFormat.convert(objectFormat);
-            if ((objectFormatEnum != null)  && validSciMetaObjectFormats.contains(ObjectFormat.convert(objectFormat))) {
+            if ((objectFormatEnum != null)  && validSciMetaObjectFormats.contains(objectFormatEnum)) {
               try {
                 sciMeta = parser.parse(new File(readMetacatDirectory + File.separator + scienceMetadataFile));
                } catch (Exception ex) {
