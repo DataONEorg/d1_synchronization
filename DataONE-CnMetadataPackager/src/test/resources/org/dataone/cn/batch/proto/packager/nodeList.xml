@@ -9,66 +9,110 @@
 -->
 
 <ns1:nodeList  xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance'
-   xmlns:ns1='http://dataone.org/service/types/NodeList/0.1'
-   xsi:schemaLocation='http://dataone.org/service/types/NodeList/0.1 https://repository.dataone.org/software/cicore/trunk/schemas/nodelist.xsd'>
+   xmlns:ns1='http://dataone.org/service/types/NodeList/0.5'
+   xsi:schemaLocation='http://dataone.org/service/types/NodeList/0.5 https://repository.dataone.org/software/cicore/tags/D1_SCHEMA_0_5/nodelist.xsd'>
     <node replicate="true" synchronize="true" type="mn">
         <identifier>http://cn-rpw</identifier>
         <name>DataONESamples</name>
+        <description>this is a description</description>
         <baseURL>http://cn-rpw/mn</baseURL>
         <services>
-            <service api="mn_crud" method="get" rest="object/${GUID}" available="true"    datechecked="2010-06-07T23:55:10Z" />
-            <service api="mn_crud" method="getSystemMetadata" rest="meta/${GUID}" available="true"     datechecked="2010-06-07T23:55:10Z" />
-            <service api="mn_replicate" method="listObjects" rest="object" available="true"    datechecked="2010-06-07T23:55:10Z" />
+            <service version="0.5" available="true">
+                <name>mn_crud</name>
+                <method name="get" rest="object/${GUID}" implemented="true" />
+                <method name="getSystemMetadata" rest="meta/${GUID}" implemented="true"/>
+            </service>
+            <service version="0.5" available="true">
+                <name>mn_replicate</name>
+                <method name="listObjects" rest="object" implemented="true" />
+            </service>
         </services>
         <synchronization>
             <schedule sec="00" min="00" hour="12" mday="*"  mon="*" wday="*" year="*" />
             <lastHarvested>2010-06-07T23:55:10Z</lastHarvested>
             <lastCompleteHarvest>2010-06-07T23:55:10Z</lastCompleteHarvest>
         </synchronization>
+        <health state="up">
+                <ping success="true" lastSuccess="2010-08-23T11:11:11.123456"/>
+                <status dateChecked="2010-08-23T11:11:11.123456" success="false"/>
+        </health>
     </node>
     <node replicate="true" synchronize="true" type="mn">
         <identifier>http://dev-dryad-mn.dataone.org</identifier>
         <name>dryad</name>
+        <description>this is a description</description>
         <baseURL>http://dev-dryad-mn.dataone.org/mn</baseURL>
         <services>
-            <service api="mn_crud" method="get" rest="object/${GUID}" available="true"    datechecked="2010-06-07T23:55:10Z" />
-            <service api="mn_crud" method="getSystemMetadata" rest="meta/${GUID}" available="true"     datechecked="2010-06-07T23:55:10Z" />
-            <service api="mn_replicate" method="listObjects" rest="object" available="true"    datechecked="2010-06-07T23:55:10Z" />
+            <service version="0.5" available="true">
+                <name>mn_crud</name>
+                <method name="get" rest="object/${GUID}" implemented="true" />
+                <method name="getSystemMetadata" rest="meta/${GUID}" implemented="true"/>
+            </service>
+            <service version="0.5" available="true">
+                <name>mn_replicate</name>
+                <method name="listObjects" rest="object" implemented="true" />
+            </service>
         </services>
         <synchronization>
             <schedule sec="00" min="00" hour="12" mday="*"  mon="*" wday="*" year="*" />
             <lastHarvested>2010-06-07T23:55:10Z</lastHarvested>
             <lastCompleteHarvest>2010-06-07T23:55:10Z</lastCompleteHarvest>
         </synchronization>
+        <health state="up">
+                <ping success="true" lastSuccess="2010-08-23T11:11:11.123456"/>
+                <status dateChecked="2010-08-23T11:11:11.123456" success="false"/>
+        </health>
     </node>
     <node replicate="true" synchronize="true" type="mn">
         <identifier>http://daac-mn.dataone.org</identifier>
         <name>daac</name>
+        <description>this is a description</description>
         <baseURL>http://daac-mn.dataone.org/mn</baseURL>
         <services>
-            <service api="mn_crud" method="get" rest="object/${GUID}" available="true"    datechecked="2010-06-07T23:55:10Z" />
-            <service api="mn_crud" method="getSystemMetadata" rest="meta/${GUID}" available="true"     datechecked="2010-06-07T23:55:10Z" />
-            <service api="mn_replicate" method="listObjects" rest="object" available="true"    datechecked="2010-06-07T23:55:10Z" />
+            <service version="0.5" available="true">
+                <name>mn_crud</name>
+                <method name="get" rest="object/${GUID}" implemented="true" />
+                <method name="getSystemMetadata" rest="meta/${GUID}" implemented="true"/>
+            </service>
+            <service version="0.5" available="true">
+                <name>mn_replicate</name>
+                <method name="listObjects" rest="object" implemented="true" />
+            </service>
         </services>
         <synchronization>
             <schedule sec="00" min="00" hour="12" mday="*"  mon="*" wday="*" year="*" />
             <lastHarvested>2010-06-07T23:55:10Z</lastHarvested>
             <lastCompleteHarvest>2010-06-07T23:55:10Z</lastCompleteHarvest>
         </synchronization>
+        <health state="up">
+                <ping success="true" lastSuccess="2010-08-23T11:11:11.123456"/>
+                <status dateChecked="2010-08-23T11:11:11.123456" success="false"/>
+        </health>
     </node>
     <node replicate="true" synchronize="true" type="mn">
         <identifier>http://knb-mn.dataone.org</identifier>
         <name>knb</name>
+        <description>this is a description</description>
         <baseURL>http://knb-mn.dataone.org/mn</baseURL>
         <services>
-            <service api="mn_crud" method="get" rest="object/${GUID}" available="true"    datechecked="2010-06-07T23:55:10Z" />
-            <service api="mn_crud" method="getSystemMetadata" rest="meta/${GUID}" available="true"     datechecked="2010-06-07T23:55:10Z" />
-            <service api="mn_replicate" method="listObjects" rest="object" available="true"    datechecked="2010-06-07T23:55:10Z" />
+            <service version="0.5" available="true">
+                <name>mn_crud</name>
+                <method name="get" rest="object/${GUID}" implemented="true" />
+                <method name="getSystemMetadata" rest="meta/${GUID}" implemented="true"/>
+            </service>
+            <service version="0.5" available="true">
+                <name>mn_replicate</name>
+                <method name="listObjects" rest="object" implemented="true" />
+            </service>
         </services>
         <synchronization>
             <schedule sec="00" min="00" hour="12" mday="*"  mon="*" wday="*" year="*" />
             <lastHarvested>2010-06-07T23:55:10Z</lastHarvested>
             <lastCompleteHarvest>2010-06-07T23:55:10Z</lastCompleteHarvest>
         </synchronization>
+        <health state="up">
+                <ping success="true" lastSuccess="2010-08-23T11:11:11.123456"/>
+                <status dateChecked="2010-08-23T11:11:11.123456" success="false"/>
+        </health>
     </node>
 </ns1:nodeList>
