@@ -5,13 +5,13 @@
 
   <groupId>org.dataone</groupId>
   <artifactId>dataone-cnhoksihangukbuniseyo</artifactId>
-  <version>0.4.0</version>
+  <version>0.5.0</version>
   <name>DataONE-CnHoksiHangukbuniseyo</name>
   <url>http://dataone.org</url>
     <parent>
         <groupId>org.dataone</groupId>
         <artifactId>cn-mnsynchronization</artifactId>
-        <version>0.4.0</version>
+        <version>0.5.0</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
   <build>
@@ -19,7 +19,6 @@
     <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
-        <version>2.0.2</version>
         <configuration>
             <source>1.6</source>
             <target>1.6</target>
