@@ -4,13 +4,13 @@
     <groupId>org.dataone</groupId>
     <artifactId>cn-batchscheduler</artifactId>
     <name>DataONE-CnBatchScheduler</name>
-    <version>0.4.0</version>
+    <version>0.5.0</version>
     <description>Cn Synchronization Batch Scheduler</description>
     <url>http://dataone.org</url>
     <parent>
         <groupId>org.dataone</groupId>
         <artifactId>cn-mnsynchronization</artifactId>
-        <version>0.4.0</version>
+        <version>0.5.0</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
     <properties>
@@ -22,7 +22,6 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>2.0.2</version>
                 <configuration>
                     <source>1.6</source>
                     <target>1.6</target>
@@ -32,11 +31,9 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jar-plugin</artifactId>
-                <version>2.2</version>
             </plugin>
             <plugin>
                 <artifactId>maven-assembly-plugin</artifactId>
-                <version>2.2-beta-5</version>
 
                 <configuration>
                     <finalName>${artifactId}</finalName>
@@ -152,7 +149,7 @@
         <dependency>
             <groupId>org.dataone</groupId>
             <artifactId>dataone-service-api</artifactId>
-            <version>0.4.0</version>
+            <version>0.5.0</version>
             <type>jar</type>
             <optional>false</optional>
             <scope>compile</scope>
@@ -160,7 +157,7 @@
         <dependency>
             <groupId>org.dataone</groupId>
             <artifactId>d1-java-client</artifactId>
-            <version>0.4.0</version>
+            <version>0.5.0</version>
             <type>jar</type>
             <optional>false</optional>
             <scope>compile</scope>
@@ -168,7 +165,7 @@
         <dependency>
            <groupId>org.dataone</groupId>
            <artifactId>dataone-cnhoksihangukbuniseyo</artifactId>
-           <version>0.4.0</version>
+           <version>0.5.0</version>
            <type>jar</type>
            <optional>false</optional>
            <scope>compile</scope>
@@ -176,13 +173,13 @@
         <dependency>
             <groupId>org.dataone</groupId>
             <artifactId>dataone-cn-packager</artifactId>
-            <version>0.4.0</version>
+            <version>0.5.0</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>org.dataone</groupId>
             <artifactId>dataone-cn-mnharvester</artifactId>
-            <version>0.4.0</version>
+            <version>0.5.0</version>
             <scope>compile</scope>
         </dependency>
           
