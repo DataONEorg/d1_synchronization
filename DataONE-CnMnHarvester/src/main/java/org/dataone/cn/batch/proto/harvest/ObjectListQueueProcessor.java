@@ -20,8 +20,8 @@ import org.dataone.service.types.Identifier;
 import org.dataone.service.types.NodeReference;
 import org.dataone.service.types.ObjectInfo;
 import org.dataone.service.types.SystemMetadata;
-import org.dataone.service.types.SystemMetadata.Replica;
-import org.dataone.service.types.SystemMetadata.Replica.ReplicationStatus;
+import org.dataone.service.types.Replica;
+import org.dataone.service.types.ReplicationStatus;
 
 /**
  *
