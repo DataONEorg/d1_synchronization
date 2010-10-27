@@ -148,7 +148,7 @@
         </dependency>
         <dependency>
             <groupId>org.dataone</groupId>
-            <artifactId>dataone-service-api</artifactId>
+            <artifactId>d1_common_java</artifactId>
             <version>0.5.0</version>
             <type>jar</type>
             <optional>false</optional>
