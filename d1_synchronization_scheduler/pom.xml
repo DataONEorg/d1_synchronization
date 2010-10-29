@@ -2,14 +2,14 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <groupId>org.dataone</groupId>
-    <artifactId>cn-batchscheduler</artifactId>
-    <name>DataONE-CnBatchScheduler</name>
+    <artifactId>d1_synchronization_scheduler</artifactId>
+    <name>DataONE_Synchronization_Scheduler</name>
     <version>0.5.0</version>
     <description>Cn Synchronization Batch Scheduler</description>
     <url>http://dataone.org</url>
     <parent>
         <groupId>org.dataone</groupId>
-        <artifactId>cn-mnsynchronization</artifactId>
+        <artifactId>d1_synchronization</artifactId>
         <version>0.5.0</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
@@ -164,7 +164,7 @@
         </dependency>
         <dependency>
            <groupId>org.dataone</groupId>
-           <artifactId>dataone-cnhoksihangukbuniseyo</artifactId>
+           <artifactId>hoksihangukbuniseyo</artifactId>
            <version>0.5.0</version>
            <type>jar</type>
            <optional>false</optional>
@@ -172,13 +172,13 @@
         </dependency>
         <dependency>
             <groupId>org.dataone</groupId>
-            <artifactId>dataone-cn-packager</artifactId>
+            <artifactId>d1_metadata_packager</artifactId>
             <version>0.5.0</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>org.dataone</groupId>
-            <artifactId>dataone-cn-mnharvester</artifactId>
+            <artifactId>d1_mn_harvester</artifactId>
             <version>0.5.0</version>
             <scope>compile</scope>
         </dependency>

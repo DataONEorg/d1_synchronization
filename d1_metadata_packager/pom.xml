@@ -2,16 +2,16 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <groupId>org.dataone</groupId>
-    <artifactId>dataone-cn-packager</artifactId>
+    <artifactId>d1_metadata_packager</artifactId>
     <packaging>jar</packaging>
-    <name>DataONE-CnMetadataPackager</name>
+    <name>DataONE_Metadata_Packager</name>
     <version>0.5.0</version>
-    <description>Cn Metadata Packager Prototype</description>
+    <description>Cn Metadata Packager</description>
     <url>http://dataone.org</url>
  
     <parent>
         <groupId>org.dataone</groupId>
-        <artifactId>cn-mnsynchronization</artifactId>
+        <artifactId>cn_mnsynchronization</artifactId>
         <version>0.5.0</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
@@ -84,7 +84,7 @@
         </dependency>
         <dependency>
            <groupId>org.dataone</groupId>
-           <artifactId>dataone-cnhoksihangukbuniseyo</artifactId>
+           <artifactId>hoksihangukbuniseyo</artifactId>
            <version>0.5.0</version>
            <type>jar</type>
            <optional>false</optional>
