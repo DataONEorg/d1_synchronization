@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<groupId>org.dataone</groupId>
+	<artifactId>cn-mnsynchronization</artifactId>
+	<packaging>pom</packaging>
+	<name>DataONE-CnMnSynchronization</name>
+	<version>0.5.0</version>
+	<description>Cn Member Node Synchronization</description>
+        <url>http://dataone.org</url>
+	<modules>
+		<module>DataONE-CnMetadataPackager</module>
+		<module>DataONE-CnMnHarvester</module>
+		<module>DataONE-CnHoksiHangukbuniseyo</module>
+                <module>DataONE-CnMercuryIndexer</module>
+                <module>DataONE-CnMercuryDbHarvester</module>
+                <module>DataONE-CnBatchScheduler</module>
+                <module>DataONE-CnMercuryScheduler</module>
+        </modules>
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<version>2.0.2</version>
+				<configuration>
+					<source>1.6</source>
+					<target>1.6</target>
+				</configuration>
+			</plugin>
+		</plugins>
+	</build>
+	<dependencies>
+	<!--  we are going to remember to test all of this, right? -->
+	<dependency>
+		<groupId>junit</groupId>
+		<artifactId>junit</artifactId>
+		<version>4.7</version>
+		<type>jar</type>
+		<scope>compile</scope>
+	</dependency>
+</dependencies>
+</project>

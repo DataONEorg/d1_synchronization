@@ -1,0 +1,152 @@
+<!-- public DTD generated 9/29/2006 from -->
+<!-- Generic Mercury Metadata Editor DTD, version 3.1 -->
+
+<!ELEMENT x_tags (Creation_datetime?, Creation_IP?, DTD_version?, OME_version?, File_revision?, Data_Originator, Data_Set_Information, Data_Access_Information, Alternate_Data_Access*, Search_Text_Link*, Other_Link*, Guide_Document_Information?)>
+<!ELEMENT Creation_datetime (#PCDATA)>
+<!ELEMENT Creation_IP (#PCDATA)>
+<!ELEMENT DTD_version (#PCDATA)>
+<!ELEMENT OME_version (#PCDATA)>
+<!ELEMENT File_revision (#PCDATA)>
+<!ELEMENT Search_Text_Link (URL?, Label?)>
+<!ELEMENT Other_Link (URL?, Label?)>
+<!ELEMENT Data_Originator (Investigator+, Metadata_Author)>
+<!ELEMENT Data_Set_Information (Data_Set_Title?, Project*, Site_Information*, Time_Period?, Parameter_Description*, Spatial_Reference_Method*, Keywords*, Abstract?)>
+<!ELEMENT Data_Access_Information (Data_Set_Status, Data_Set_Restrictions, Data_Set_Location?, Data_Contact_Person*, Data_Center_URL?, Data_Set_Citation?, Data_Set_Link*)>
+<!ELEMENT Alternate_Data_Access (Data_Set_Status, Data_Set_Restrictions, Data_Set_Location?, Data_Contact_Person*, Data_Center_URL?, Data_Set_Citation?, Data_Set_Link*)>
+<!ELEMENT Site_Information (Site?, Westernmost_Longitude?, Easternmost_Longitude?, Northernmost_Latitude?, Southernmost_Latitude?)>
+<!ELEMENT Parameter_Description (Topic?, Term?, Parameter, Sensor?, Source?)>
+<!ELEMENT Abstract (#PCDATA)>
+<!ELEMENT Data_Center_URL (#PCDATA)>
+<!ELEMENT Data_Set_Citation (#PCDATA)>
+<!ELEMENT Data_Set_Status (#PCDATA)>
+<!ELEMENT Data_Set_Restrictions (#PCDATA)>
+<!ELEMENT Data_Set_Location (#PCDATA)>
+<!ELEMENT Data_Set_Title (#PCDATA)>
+<!ELEMENT URL (#PCDATA)>
+<!ELEMENT Easternmost_Longitude (#PCDATA)>
+<!ELEMENT Email (#PCDATA)>
+<!ELEMENT End_Date (#PCDATA)>
+<!ELEMENT Keywords (#PCDATA)>
+<!ELEMENT Name (#PCDATA)>
+<!ELEMENT Northernmost_Latitude (#PCDATA)>
+<!ELEMENT Parameter (#PCDATA)>
+<!ELEMENT Phone (#PCDATA)>
+<!ELEMENT Metadata_Author (Name, Email?, Phone?)>
+<!ELEMENT Investigator (Name, Email)>
+<!ELEMENT Data_Contact_Person (Name, Email, Phone)>
+<!ELEMENT Data_Set_Link (URL, Label, Link_Note?)>
+<!ELEMENT Link_Note (#PCDATA)>
+<!ELEMENT Project (#PCDATA)>
+<!ELEMENT Site (#PCDATA)>
+<!ELEMENT Sensor (#PCDATA)>
+<!ELEMENT Source (#PCDATA)>
+<!ELEMENT Southernmost_Latitude (#PCDATA)>
+<!ELEMENT Spatial_Reference_Method (#PCDATA)>
+<!ELEMENT Start_Date (#PCDATA)>
+<!ELEMENT Time_Period (Temporal_Coverage, Temporal_Resolution*)>
+<!ELEMENT Temporal_Coverage (Start_Date, End_Date?)>
+<!ELEMENT Temporal_Resolution (#PCDATA)>
+<!ELEMENT Term (#PCDATA)>
+<!ELEMENT Topic (#PCDATA)>
+<!ELEMENT Label (#PCDATA)>
+<!ELEMENT Westernmost_Longitude (#PCDATA)>
+<!ELEMENT Guide_Document_Information (Abstract_Guide_Document, Full_Guide_Document,
+           References?, Web_Page_Information*)>
+<!ELEMENT Abstract_Guide_Document (Data_Format?)>
+<!ELEMENT Data_Format (#PCDATA)>
+<!ELEMENT Web_Page_Information (Gdoc_creation_datetime?, URL?, Org_Center?, Entry_ID?)>
+<!ELEMENT Gdoc_creation_datetime (#PCDATA)>
+<!ELEMENT Org_Center (#PCDATA)>
+<!ELEMENT Entry_ID (#PCDATA)>
+<!ELEMENT Full_Guide_Document (Data_Set_Overview?, Data_Characteristics?, Data_Application_and_Derivation?, Quality_Assessment?, Data_Acquisition_Materials_and_Methods?, Glossary?, Acronyms?)>
+<!ELEMENT Data_Set_Overview (Data_Set_Contents?, Related_Data_Sets?, Title_of_Investigation?, Technical_Contact*, Future_Modifications_and_Plans?)>
+<!ELEMENT Data_Set_Contents (#PCDATA)>
+<!ELEMENT Related_Data_Sets (#PCDATA)>
+<!ELEMENT Title_of_Investigation (#PCDATA)>
+<!ELEMENT Technical_Contact (Name?, Email?, Phone?)>
+<!ELEMENT Future_Modifications_and_Plans (#PCDATA)>
+<!ELEMENT Data_Characteristics (Study_Area?, Additional_Temporal_Information?, Data_Organization?)>
+<!ELEMENT Data_Organization (Data_Granule*)>
+<!ELEMENT Data_Granule (Granule_Name_or_Description?, Granule_Data_Format?, Sample_Data_Record?, Variable_Characteristics*)>
+<!ELEMENT Granule_Name_or_Description (#PCDATA)>
+<!ELEMENT Granule_Data_Format (#PCDATA)>
+<!ELEMENT Sample_Data_Record (#PCDATA)>
+<!ELEMENT Variable_Characteristics (Variable_Name?, Variable_Description?, Unit_of_Measurement?, Instrument?, Variable_Range?, Footnote?)>
+<!ELEMENT Variable_Name (#PCDATA)>
+<!ELEMENT Variable_Description (#PCDATA)>
+<!ELEMENT Unit_of_Measurement (#PCDATA)>
+<!ELEMENT Instrument (#PCDATA)>
+<!ELEMENT Variable_Range (#PCDATA)>
+<!ELEMENT Study_Area (Free_Form_Style_Spatial_Description | Structured_Style_Spatial_Description)>
+<!ELEMENT Free_Form_Style_Spatial_Description (#PCDATA)>
+<!ELEMENT Structured_Style_Spatial_Description (Spatial_Coverage?, Spatial_Resolution?, Projection?, Grid_Description?)>
+<!ELEMENT Spatial_Coverage (#PCDATA)>
+<!ELEMENT Spatial_Resolution (#PCDATA)>
+<!ELEMENT Projection (#PCDATA)>
+<!ELEMENT Grid_Description (#PCDATA)>
+<!ELEMENT Additional_Temporal_Information (Free_Form_Style_Temporal_Description | Structured_Style_Temporal_Description)>
+<!ELEMENT Free_Form_Style_Temporal_Description (#PCDATA)>
+<!ELEMENT Structured_Style_Temporal_Description (Temporal_Coverage_Figure?, Discussion_of_Temporal_Resolution?)>
+<!ELEMENT Temporal_Coverage_Figure (URL, Label, Link_Note?)>
+<!ELEMENT Footnote (#PCDATA)>
+<!ELEMENT Discussion_of_Temporal_Resolution (#PCDATA)>
+<!ELEMENT Principles_of_Operation (#PCDATA)>
+<!ELEMENT Sensor_or_Instrument_Measurement_Geom (#PCDATA)>
+<!ELEMENT Manufacturer_of_Sensor_or_Instrument (#PCDATA)>
+<!ELEMENT Calibration (Specifications?, Tolerance?, Frequency_of_Calibration?, Other_Calibration_Information?)>
+<!ELEMENT Specifications (#PCDATA)>
+<!ELEMENT Tolerance (#PCDATA)>
+<!ELEMENT Frequency_of_Calibration (#PCDATA)>
+<!ELEMENT Other_Calibration_Information (#PCDATA)>
+<!ELEMENT Data_Application_and_Derivation (Typical_Application_of_Data?, Theory_of_Measurements?, Derivation_Techniques_and_Algorithms?)>
+<!ELEMENT Typical_Application_of_Data (#PCDATA)>
+<!ELEMENT Theory_of_Measurements (#PCDATA)>
+<!ELEMENT Derivation_Techniques_and_Algorithms (Free_Form_Style_Technique_Description | Structured_Style_Technique_Description)>
+<!ELEMENT Free_Form_Style_Technique_Description (#PCDATA)>
+<!ELEMENT Structured_Style_Technique_Description (Formulae?, Processing_Steps?, Processing_Changes?, Special_Corrections_and_Adjustments?, Calculated_Variables?, Graphs_and_Plots?)>
+<!ELEMENT Formulae (#PCDATA)>
+<!ELEMENT Processing_Steps (#PCDATA)>
+<!ELEMENT Processing_Changes (#PCDATA)>
+<!ELEMENT Special_Corrections_and_Adjustments (#PCDATA)>
+<!ELEMENT Calculated_Variables (#PCDATA)>
+<!ELEMENT Graphs_and_Plots (URL, Label, Link_Note?)>
+<!ELEMENT Quality_Assessment (Data_Usage_Guidance?, Quality_Assessment_Activities?, Other_Relevant_Info_about_the_Study?)>
+<!ELEMENT Data_Usage_Guidance (Free_Form_Style_Data_Usage_Guidance | Structured_Style_Data_Usage_Guidance)>
+<!ELEMENT Free_Form_Style_Data_Usage_Guidance (#PCDATA)>
+<!ELEMENT Structured_Style_Data_Usage_Guidance (Error_Sources?, Limitations_of_the_Data?, Known_Problems_with_the_Data?)>
+<!ELEMENT Error_Sources (#PCDATA)>
+<!ELEMENT Limitations_of_the_Data (#PCDATA)>
+<!ELEMENT Known_Problems_with_the_Data (#PCDATA)>
+<!ELEMENT Quality_Assessment_Activities (Free_Form_Style_QA_Activities | Structured_Style_QA_Activities)>
+<!ELEMENT Free_Form_Style_QA_Activities (#PCDATA)>
+<!ELEMENT Structured_Style_QA_Activities (Validation_by_Submitter_of_Data?, Confidence_Level_or_Accuracy_Judgement?, Measurement_Error_for_Parameters?, Additional_Quality_Assessments?, Verification_by_Data_Center?)>
+<!ELEMENT Validation_by_Submitter_of_Data (#PCDATA)>
+<!ELEMENT Confidence_Level_or_Accuracy_Judgement (#PCDATA)>
+<!ELEMENT Measurement_Error_for_Parameters (#PCDATA)>
+<!ELEMENT Additional_Quality_Assessments (#PCDATA)>
+<!ELEMENT Verification_by_Data_Center (#PCDATA)>
+<!ELEMENT Other_Relevant_Info_about_the_Study (#PCDATA)>
+<!ELEMENT Data_Acquisition_Materials_and_Methods (Field | Remote_Sensing)>
+<!ELEMENT Field (Field_Collection_Environment?, Field_Campaign_Mission_Objectives?, Field_Campaign_Program_Management?, Sensor_or_Instrument_Descriptions?, Field_Notes?)>
+<!ELEMENT Field_Collection_Environment (#PCDATA)>
+<!ELEMENT Field_Campaign_Mission_Objectives (#PCDATA)>
+<!ELEMENT Field_Campaign_Program_Management (#PCDATA)>
+<!ELEMENT Sensor_or_Instrument_Descriptions (Key_Variables?, Principles_of_Operation?, Sensor_or_Instrument_Measurement_Geom?, Manufacturer_of_Sensor_or_Instrument?, Calibration?)>
+<!ELEMENT Field_Notes (#PCDATA)>
+<!ELEMENT Key_Variables (#PCDATA)>
+<!ELEMENT Remote_Sensing (Source_or_Platform_Environment?, Source_or_Platform_Program_Management?, Source_or_Platform_Mission_Objectives?, Ground_Segment_Information?, Sensor_or_Instrument_Descriptions?, Data_Acquisition_Methods?, Data_Notes?)>
+<!ELEMENT Source_or_Platform_Environment (#PCDATA)>
+<!ELEMENT Source_or_Platform_Program_Management (#PCDATA)>
+<!ELEMENT Source_or_Platform_Mission_Objectives (Source_Coverage_Information?, Attitude_Characteristics?, Data_Collection_System?, Communication_Links?)>
+<!ELEMENT Source_Coverage_Information (#PCDATA)>
+<!ELEMENT Attitude_Characteristics (#PCDATA)>
+<!ELEMENT Data_Collection_System (#PCDATA)>
+<!ELEMENT Communication_Links (#PCDATA)>
+<!ELEMENT Ground_Segment_Information (Data_Acquisition_and_Processing?, Latitude_Crossing_Times?)>
+<!ELEMENT Data_Acquisition_and_Processing (#PCDATA)>
+<!ELEMENT Latitude_Crossing_Times (#PCDATA)>
+<!ELEMENT Data_Acquisition_Methods (#PCDATA)>
+<!ELEMENT Data_Notes (#PCDATA)>
+<!ELEMENT References (#PCDATA)>
+<!ELEMENT Glossary (#PCDATA)>
+<!ELEMENT Acronyms (#PCDATA)>

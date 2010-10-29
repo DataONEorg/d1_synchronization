@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!--
+    Document   : LogReaderTestCase-context.xml
+    Created on : June 4, 2010, 1:58 AM
+    Author     : rwaltz
+    Description:
+        Purpose of the document follows.
+-->
+
+<beans  default-init-method="init" xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:util="http://www.springframework.org/schema/util"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+       http://www.springframework.org/schema/beans/spring-beans-3.0.xsd
+       http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util-3.0.xsd">
+
+     <bean id="log4jInitialization"
+     class="org.springframework.beans.factory.config.MethodInvokingFactoryBean">
+     <property name="targetClass"
+      value="org.springframework.util.Log4jConfigurer" />
+       <property name="targetMethod" value="initLogging" />
+        <property name="arguments">
+        <list>
+          <value>classpath:org/dataone/cn/batch/proto/packager/log4j.properties</value>
+         </list>
+       </property>
+      </bean>
+
+    <import resource="/scienceMetadataFormats.xml" />
+    <bean id="properties" class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
+        <property name="location">
+            <value>classpath:/org/dataone/cn/batch/proto/packager/packaging.properties</value>
+        </property>
+    </bean>
+
+    <bean id="testPackageHarvestDirectoryResource" class="org.springframework.core.io.ClassPathResource">
+        <constructor-arg value="/org/dataone/cn/batch/proto/packager"/>
+    </bean>
+    <bean id="testPackageHarvestDirectoryFile"
+      factory-bean="testPackageHarvestDirectoryResource"
+      factory-method="getFile"/>
+
+    <bean id="testPackageHarvestDirectoryString"
+        factory-bean="testPackageHarvestDirectoryFile"
+        factory-method="getAbsolutePath" />
+
+    <bean id="testPackageSamplesDirectoryResource" class="org.springframework.core.io.ClassPathResource">
+        <constructor-arg value="/org/dataone/cn/batch/proto/samples"/>
+    </bean>
+    <bean id="testPackageSamplesDirectoryFile"
+      factory-bean="testPackageSamplesDirectoryResource"
+      factory-method="getFile"/>
+
+    <bean id="testPackageSamplesDirectoryString"
+        factory-bean="testPackageSamplesDirectoryFile"
+        factory-method="getAbsolutePath" />
+
+
+    <bean id="testNodeListLocationResource" class="org.springframework.core.io.ClassPathResource">
+        <constructor-arg value="/org/dataone/cn/batch/proto/packager/nodeList.xml"/>
+    </bean>
+    <bean id="testNodeListLocationFile"
+      factory-bean="testNodeListLocationResource"
+      factory-method="getFile"/>
+
+    <bean id="testNodeListLocationString"
+        factory-bean="testNodeListLocationFile"
+        factory-method="getAbsolutePath" />
+
+    <bean id="testNodeListAccess" class="org.dataone.cn.batch.utils.NodeListAccess">
+        <constructor-arg ref="testNodeListLocationString"/>
+    </bean>
+
+    <bean id="testNodeList" class="org.dataone.service.types.NodeList"
+        factory-bean="testNodeListAccess"
+        factory-method="getNodeList" />
+<!--
+   <bean id="testPackageHarvestDirectory" class="org.springframework.core.io.ClassPathResource">
+       <constructor-arg value="/org/dataone/cn/batch/proto/packager/persistant.cache"/>
+   </bean>   -->
+    <bean id="metadataPackageEventAccess" class="org.dataone.cn.batch.utils.MetadataPackageAccess">
+        <property name="logFilePersistAccessDataPath" ref="testPackageHarvestDirectoryString"/>
+        <property name="logFilePersistAccessDataName" ref="testEventLogFilePersistDataName" />
+    </bean>
+    <bean id="testEventLogReader" class="org.dataone.cn.batch.proto.packager.EventLogReader">
+        <property name="eventLogFileName" value="test-eventMerge.log" />
+        <property name="eventLogFilePath" ref="testPackageHarvestDirectoryString"/>
+        <property name="metadataPackageAccess" ref="metadataPackageEventAccess" />
+    </bean>
+
+    <bean id="testEventLogFilePersistDataName" class="java.lang.String">
+        <constructor-arg value="persistent2.cache" />
+    </bean>
+
+    <bean id="testNodeReferenceUtility" class="org.dataone.cn.batch.utils.NodeReference">
+        <property name="mnNodeList" ref="testNodeList" />
+        <property name="mnNodeIdentifier" value="${mnNode.identifier}" />
+    </bean>
+
+    <bean id="testMetadataPackagerWriter" class="org.dataone.cn.batch.proto.packager.MetadataPackageWriter">
+        <property name="readMetacatDirectory" ref="testPackageSamplesDirectoryString" />
+        <property name="nodeReferenceUtility" ref="testNodeReferenceUtility" />
+        <property name="writeDirectory" ref="testPackageSamplesDirectoryString" />
+        <property name="scienceMetadataFormatPathMap" ref="scienceMetadataFormatPathMap"/>
+        <property name="metadataPackageAccess" ref="metadataPackageEventAccess" />
+        <property name="validSciMetaObjectFormats" ref="validScienceMetadataFormats" />
+    </bean>
+    <bean id="testEventError" class="java.lang.String">
+        <constructor-arg value="test-eventMergeError.log" />
+    </bean>
+</beans>
