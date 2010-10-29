@@ -2,16 +2,16 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <groupId>org.dataone</groupId>
-    <artifactId>dataone-cn-mnharvester</artifactId>
+    <artifactId>d1_mn_harvester</artifactId>
     <packaging>jar</packaging>
-    <name>DataONE-CnMnHarvester</name>
+    <name>DataONE_Mn_Harvester</name>
     <version>0.5.0</version>
     <description>Cn Member Node Harvester Prototype</description>
     <url>http://dataone.org</url>
  
     <parent>
         <groupId>org.dataone</groupId>
-        <artifactId>cn-mnsynchronization</artifactId>
+        <artifactId>d1_synchronization</artifactId>
         <version>0.5.0</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
@@ -79,7 +79,7 @@
         </dependency>
         <dependency>
            <groupId>org.dataone</groupId>
-           <artifactId>dataone-cnhoksihangukbuniseyo</artifactId>
+           <artifactId>hoksihangukbuniseyo</artifactId>
            <version>0.5.0</version>
            <type>jar</type>
            <optional>false</optional>
