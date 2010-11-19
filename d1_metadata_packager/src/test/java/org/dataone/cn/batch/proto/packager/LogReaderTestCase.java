@@ -7,7 +7,6 @@ package org.dataone.cn.batch.proto.packager;
 import java.io.File;
 import java.util.Map;
 import javax.annotation.Resource;
-import org.dataone.cn.batch.utils.MetadataPackageAccess;
 import org.junit.*;
 import org.junit.runner.RunWith;
 import org.springframework.test.context.ContextConfiguration;
@@ -33,7 +32,7 @@ public class LogReaderTestCase {
     String testLogFilePersistDataName;
     String testEvent2;
     String testEvent3;
-    MetadataPackageAccess metadataPackageAccess;
+    EventPersistence eventPersistence;
     @Resource
     public void setTestLogFilePersistDataName(String testLogFilePersistDataName) {
         this.testLogFilePersistDataName = testLogFilePersistDataName;
@@ -59,15 +58,15 @@ public class LogReaderTestCase {
         this.testEvent3 = testEvent3;
     }
     @Resource
-    public void setMetadataPackageAccess(MetadataPackageAccess metadataPackageAccess) {
-        this.metadataPackageAccess = metadataPackageAccess;
+    public void setEventPersistence(EventPersistence eventPersistence) {
+        this.eventPersistence = eventPersistence;
     }
 
     @Test
     public void testLogReader() throws Exception {
         eventLogReader.readLogfile();
-        Map<String, Map<String, String>> results = eventLogReader.getMergeQueue();
-        metadataPackageAccess.writePersistentData();
+        Map<String, Map<String, String>> results = eventLogReader.getMergeMap();
+        eventPersistence.writePersistentData();
 /*        System.out.println("sucess");
         for (String key : results.keySet()) {
             System.out.println("found GUID " + key);
@@ -81,9 +80,9 @@ public class LogReaderTestCase {
     @Test
     public void testLogReaderWithAdditionalLogging() throws Exception {
 
-        eventLogReader.setEventLogFileName(testEvent2);
+        eventLogReader.setLogFileName(testEvent2);
         eventLogReader.readLogfile();
-        Map<String, Map<String, String>> results = eventLogReader.getMergeQueue();
+        Map<String, Map<String, String>> results = eventLogReader.getMergeMap();
 /*        for (String key : results.keySet()) {
             System.out.println("found GUID " + key);
             Map<String, String> mergeFiles = results.get(key);
@@ -98,10 +97,10 @@ public class LogReaderTestCase {
     @Test
     public void testLogReaderWithDosNewlines() throws Exception {
         eventLogReader.newline = "\r\n";
-        metadataPackageAccess.init();
-        eventLogReader.setEventLogFileName(testEvent3);
+        eventPersistence.init();
+        eventLogReader.setLogFileName(testEvent3);
         eventLogReader.readLogfile();
-        Map<String, Map<String, String>> results = eventLogReader.getMergeQueue();
+        Map<String, Map<String, String>> results = eventLogReader.getMergeMap();
 /*        for (String key : results.keySet()) {
             System.out.println("found GUID " + key);
             Map<String, String> mergeFiles = results.get(key);

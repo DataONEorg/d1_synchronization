@@ -28,7 +28,7 @@ public class MetadataPackageWriterTestCase {
     String testPackageHarvestDirectoryString;
     String testEventLogFilePersistDataName;
     String testEventError;
-    MetadataPackageAccess metadataPackageAccess;
+    EventPersistence metadataPackageAccess;
     @Resource
     public void setTestEventLogFilePersistDataName(String testEventLogFilePersistDataName) {
         this.testEventLogFilePersistDataName = testEventLogFilePersistDataName;
@@ -52,13 +52,13 @@ public class MetadataPackageWriterTestCase {
         this.testEventError = testEventError;
     }
     @Resource
-    public void setMetadataPackageAccess(MetadataPackageAccess metadataPackageAccess) {
+    public void setMetadataPackageAccess(EventPersistence metadataPackageAccess) {
         this.metadataPackageAccess = metadataPackageAccess;
     }
     @Test
     public void testPackagingMetadataMergeQueue() throws Exception {
         eventLogReader.readLogfile();
-        packageWriter.setReadQueue(eventLogReader.getMergeQueue());
+        packageWriter.setReadQueue(eventLogReader.getMergeMap());
         packageWriter.writePackages();
 /*      
         System.out.println("sucess");
@@ -75,9 +75,9 @@ public class MetadataPackageWriterTestCase {
     @Test
     public void testPackagingMetadataMergeQueueFailure() throws Exception {
         metadataPackageAccess.init();
-        eventLogReader.setEventLogFileName(this.testEventError);
+        eventLogReader.setLogFileName(this.testEventError);
         eventLogReader.readLogfile();
-        packageWriter.setReadQueue(eventLogReader.getMergeQueue());
+        packageWriter.setReadQueue(eventLogReader.getMergeMap());
         try {
             packageWriter.writePackages();
         } catch (FileNotFoundException ex) {

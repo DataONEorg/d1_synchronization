@@ -40,14 +40,14 @@
 <!--   <bean id="testPackageHarvestDirectory" class="org.springframework.core.io.ClassPathResource">
        <constructor-arg value="/org/dataone/cn/batch/proto/packager/persistant.cache"/>
    </bean> -->
-   <bean id="metadataPackageEventAccess" class="org.dataone.cn.batch.utils.MetadataPackageAccess">
-        <property name="logFilePersistAccessDataPath" ref="testPackageHarvestDirectoryString"/>
-        <property name="logFilePersistAccessDataName" ref="testLogFilePersistDataName" />
+   <bean id="eventPersistence" class="org.dataone.cn.batch.proto.packager.EventPersistence">
+        <property name="persistentDataFileNamePath" ref="testPackageHarvestDirectoryString"/>
+        <property name="persistentDataFileName" ref="testLogFilePersistDataName" />
    </bean>
-    <bean id="testEventLogReader" class="org.dataone.cn.batch.proto.packager.EventLogReader">
-        <property name="eventLogFileName" value="test-event1.log" />
-        <property name="eventLogFilePath" ref="testPackageHarvestDirectoryString"/>
-        <property name="metadataPackageAccess" ref="metadataPackageEventAccess" />
+    <bean id="eventLogReader" class="org.dataone.cn.batch.proto.packager.EventLogReader">
+        <property name="logFileName" value="test-event1.log" />
+        <property name="logFilePath" ref="testPackageHarvestDirectoryString"/>
+        <property name="eventPersistence" ref="eventPersistence" />
     </bean>
     <bean id="testEvent2" class="java.lang.String">
         <constructor-arg value="test-event2.log" />
