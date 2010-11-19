@@ -9,8 +9,8 @@
 -->
 
 <ns1:nodeList  xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance'
-   xmlns:ns1='http://dataone.org/service/types/NodeList/0.5'
-   xsi:schemaLocation='http://dataone.org/service/types/NodeList/0.5 https://repository.dataone.org/software/cicore/tags/D1_SCHEMA_0_5/nodelist.xsd'>
+   xmlns:ns1='http://dataone.org/service/types/0.5.1'
+   xsi:schemaLocation='http://dataone.org/service/types/0.5.1 https://repository.dataone.org/software/cicore/tags/D1_SCHEMA_0_5_1/dataoneTypes.xsd'>
     <node replicate="true" synchronize="true" type="mn">
         <identifier>http://cn-rpw</identifier>
         <name>DataONESamples</name>

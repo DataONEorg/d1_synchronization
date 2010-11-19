@@ -40,22 +40,23 @@
 <!--   <bean id="testPackageHarvestDirectory" class="org.springframework.core.io.ClassPathResource">
        <constructor-arg value="/org/dataone/cn/batch/proto/packager/persistant.cache"/>
    </bean> -->
-   <bean id="metadataPackageEventAccess" class="org.dataone.cn.batch.utils.MetadataPackageAccess">
-        <property name="logFilePersistAccessDataPath" ref="testPackageHarvestDirectoryString"/>
-        <property name="logFilePersistAccessDataName" ref="testLogFilePersistDataName" />
-        <property name="logFilePersistPendingDataName" ref="testLogFileReplicationDataName" />
-        <property name="logFilePersistPendingDataPath" ref="testPackageHarvestDirectoryString" />
+   <bean id="metadataReplicationPersistence" class="org.dataone.cn.batch.proto.packager.ReplicationPersistence">
+        <property name="persistentDataFileNamePath" ref="testPackageHarvestDirectoryString"/>
+        <property name="persistentDataFileName" ref="testLogFilePersistDataName" />
    </bean>
    
     <bean id="replicationLogReader" class="org.dataone.cn.batch.proto.packager.ReplicationLogReader">
-        <property name="eventLogFileName" value="test-replication.log" />
-        <property name="eventLogFilePath" ref="testPackageHarvestDirectoryString"/>
-        <property name="metadataPackageAccess" ref="metadataPackageEventAccess" />
+        <property name="logFileName" value="test-replication.log" />
+        <property name="logFilePath" ref="testPackageHarvestDirectoryString"/>
+        <property name="replicationPersistence" ref="metadataReplicationPersistence" />
     </bean>
+    
     <bean id="testLogFilePersistDataName" class="java.lang.String">
-        <constructor-arg value="persistent2.cache" />
+        <constructor-arg value="persistentReplication.cache" />
     </bean>
-    <bean id="testLogFileReplicationDataName" class="java.lang.String">
-        <constructor-arg value="replication.index" />
+
+    <bean id="testReplicationLogFile2" class="java.lang.String">
+        <constructor-arg value="test-replication2.log" />
     </bean>
+
 </beans>

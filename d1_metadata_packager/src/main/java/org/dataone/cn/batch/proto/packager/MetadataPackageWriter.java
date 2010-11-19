@@ -22,7 +22,7 @@ import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 import org.apache.log4j.Logger;
-import org.dataone.cn.batch.utils.MetadataPackageAccess;
+import org.dataone.cn.batch.proto.packager.types.MergeMap;
 import org.dataone.cn.batch.utils.NodeReference;
 import org.dataone.service.types.ObjectFormat;
 import org.jibx.runtime.JiBXException;
@@ -41,39 +41,50 @@ public class MetadataPackageWriter {
     Logger logger = Logger.getLogger(MetadataPackageWriter.class.getName());
     private String readMetacatDirectory;
     private String writeDirectory;
-    private Map<String, Map<String, String>> readQueue;
+    private MergeMap readMap;
     private Map<String, String> scienceMetadataFormatPathMap;
     private HashMap<String, File> mergedMetaDir = new HashMap<String, File>();
     NodeReference nodeReferenceUtility;
-    private MetadataPackageAccess metadataPackageAccess;
+    private DataPersistenceWriter dataPersistenceWriter;
     private List<ObjectFormat> validSciMetaObjectFormats;
     public void writePackages() throws FileNotFoundException, JiBXException, IOException, ParserConfigurationException, SAXException, Exception {
-        logger.info("start write for " + readQueue.keySet().size() + " number of packages");
+        logger.info("start write for " + readMap.keySet().size() + " number of packages");
         int writtenPackages = 0;
         // Copy into a new set or else receive nasty error
-        Set<String> readSetQueue = new HashSet<String>(readQueue.keySet());
+        Set<String> readSetQueue = new HashSet<String>(readMap.keySet());
         for (String key : readSetQueue) {
-            Map<String, String> mergeFiles = readQueue.get(key);
+            Map<String, String> mergeFiles = readMap.get(key);
             if (mergeFiles.containsKey("SCIMETA") && mergeFiles.containsKey("SYSMETA")) {
-                logger.info("found: scimetadata: " + mergeFiles.get("SCIMETA") + ": sysmetadata: " + mergeFiles.get("SYSMETA"));
+                logger.debug("found: scimetadata: " + mergeFiles.get("SCIMETA") + ": sysmetadata: " + mergeFiles.get("SYSMETA"));
                 if (this.writePackage(mergeFiles.get("SCIMETA"), mergeFiles.get("SYSMETA"))) {
                     ++writtenPackages;
                 }
-                logger.info("wrote: scimetadata: " + mergeFiles.get("SCIMETA") + ": sysmetadata: " + mergeFiles.get("SYSMETA"));
-                readQueue.remove(key);
+                logger.debug("wrote: scimetadata: " + mergeFiles.get("SCIMETA") + ": sysmetadata: " + mergeFiles.get("SYSMETA"));
+                readMap.remove(key);
             } else {
-                logger.warn("GUID: " + key + " is not yet complete!");
                 if (mergeFiles.containsKey("COUNT")) {
                     Integer countInt  = Integer.parseInt(mergeFiles.get("COUNT"));
+                    if (countInt < 10) {
+                        logger.warn("GUID: " + key + " is not yet complete!");
+                    } else if ((countInt > 10) && (countInt <= 20)) {
+                        logger.error("GUID: " + key + " HAS FAILED " + countInt.toString() + " TIMES!");
+                    }
                     ++countInt;
+
                     mergeFiles.put("COUNT", countInt.toString());
+                    if (countInt > 20) {
+                        logger.fatal("GUID: " + key + " HAS FAILED " + countInt.toString() + " TIMES !!! DELETING RECORD. THIS SHOULD BE REPORTED TO THE AUTHORITIES");
+                        readMap.remove(key);
+                    }
+                    
                 } else {
+                    logger.info("GUID: " + key + " is not yet complete!");
                     mergeFiles.put("COUNT", Integer.toString(1));
                 }
             }
         }
-        metadataPackageAccess.writePersistentData();
-        logger.info("ending wrote " + writtenPackages + " number of packages");
+        dataPersistenceWriter.writePersistentData();
+        logger.info("wrote " + writtenPackages + " number of packages");
     }
 
     private boolean writePackage(String scienceMetadataFile, String systemMetadataFile) throws JiBXException, IOException, ParserConfigurationException, SAXException, Exception {
@@ -207,12 +218,12 @@ public class MetadataPackageWriter {
         this.writeDirectory = writeDirectory;
     }
 
-    public Map<String, Map<String, String>> getReadQueue() {
-        return readQueue;
+    public MergeMap getReadQueue() {
+        return readMap;
     }
 
-    public void setReadQueue(Map<String, Map<String, String>> readQueue) {
-        this.readQueue = readQueue;
+    public void setReadQueue(MergeMap readMap) {
+        this.readMap = readMap;
     }
 
     public Map<String, String> getScienceMetadataFormatPathMap() {
@@ -231,12 +242,12 @@ public class MetadataPackageWriter {
         this.nodeReferenceUtility = nodeReferenceUtility;
     }
 
-    public MetadataPackageAccess getMetadataPackageAccess() {
-        return metadataPackageAccess;
+    public DataPersistenceWriter getMetadataPackageAccess() {
+        return dataPersistenceWriter;
     }
 
-    public void setMetadataPackageAccess(MetadataPackageAccess metadataPackageAccess) {
-        this.metadataPackageAccess = metadataPackageAccess;
+    public void setMetadataPackageAccess(DataPersistenceWriter dataPersistenceWriter) {
+        this.dataPersistenceWriter = dataPersistenceWriter;
     }
     public List<ObjectFormat> getValidSciMetaObjectFormats() {
         return validSciMetaObjectFormats;
