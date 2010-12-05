@@ -22,7 +22,7 @@ public class ReplicationPackagerJob {
     public void packageMetadata()  {
         try {
             logReader.readLogfile();
-            packageWriter.setReadQueue(logReader.getMergeQueue());
+            packageWriter.setReadQueue(logReader.getMergeMap());
             packageWriter.writePackages();
         } catch (FileNotFoundException ex) {
             logger.error(ex.getMessage(),ex);

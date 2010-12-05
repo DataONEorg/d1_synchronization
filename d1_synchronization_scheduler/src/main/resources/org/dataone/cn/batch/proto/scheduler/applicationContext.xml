@@ -1,4 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<beans default-init-method="init" xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:util="http://www.springframework.org/schema/util"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+       http://www.springframework.org/schema/beans/spring-beans-3.0.xsd
+       http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util-3.0.xsd">
 
 <!--
     Document   : applicationContext.xml
@@ -7,15 +13,6 @@
     Description:
         Purpose of the document follows.
 -->
-
-
-<beans default-init-method="init" xmlns="http://www.springframework.org/schema/beans"
-       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-       xmlns:util="http://www.springframework.org/schema/util"
-       xsi:schemaLocation="http://www.springframework.org/schema/beans
-       http://www.springframework.org/schema/beans/spring-beans-3.0.xsd
-       http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util-3.0.xsd">
-
     <bean id="log4jInitialization"
      class="org.springframework.beans.factory.config.MethodInvokingFactoryBean">
      <property name="targetClass"
@@ -38,11 +35,11 @@
       </property>
    </bean>
 
-   <bean id="nodeListAccess" class="org.dataone.cn.batch.utils.NodeListAccess">
-       <constructor-arg value="${access.nodeListFileLocation}"/>
-   </bean>
-
-   <bean id="nodeList" class="org.dataone.service.types.NodeList"
+    <bean id="nodeListAccess" class="org.dataone.cn.batch.utils.NodeListAccess">
+        <constructor-arg value="${access.nodeListFileLocation}"/>
+    </bean>
+    
+    <bean id="nodeList" class="org.dataone.service.types.NodeList"
         factory-bean="nodeListAccess"
         factory-method="getNodeList" />
 
@@ -79,7 +76,7 @@
 
     <bean name="eventPackagerJob" class="org.dataone.cn.batch.proto.scheduler.jobs.PackagerJob">
         <property name="logReader" ref="eventLogReader" />
-        <property name="packageWriter" ref="metadataPackagerWriter" />
+        <property name="packageWriter" ref="metadataPackagerEventWriter" />
     </bean>
 
     <bean id="runEventPackagerJob" class="org.springframework.scheduling.quartz.MethodInvokingJobDetailFactoryBean">
@@ -94,9 +91,9 @@
         <property name="cronExpression" value="0 1/5 * * * ?" />
     </bean>
    
-       <bean name="replicationPackagerJob" class="org.dataone.cn.batch.proto.scheduler.jobs.PackagerJob">
+    <bean name="replicationPackagerJob" class="org.dataone.cn.batch.proto.scheduler.jobs.PackagerJob">
         <property name="logReader" ref="replicationLogReader" />
-        <property name="packageWriter" ref="metadataPackagerWriter" />
+        <property name="packageWriter" ref="metadataPackagerReplicationWriter" />
     </bean>
 
     <bean id="runReplicationPackagerJob" class="org.springframework.scheduling.quartz.MethodInvokingJobDetailFactoryBean">

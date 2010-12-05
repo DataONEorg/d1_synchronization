@@ -23,7 +23,7 @@ public class PackagerJob {
     public void packageMetadata()  {
         try {
             eventLogReader.readLogfile();
-            packageWriter.setReadQueue(eventLogReader.getMergeQueue());
+            packageWriter.setReadQueue(eventLogReader.getMergeMap());
             packageWriter.writePackages();
         } catch (FileNotFoundException ex) {
             logger.error(ex.getMessage(),ex);
