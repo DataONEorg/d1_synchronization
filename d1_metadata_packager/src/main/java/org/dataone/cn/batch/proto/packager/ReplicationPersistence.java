@@ -11,6 +11,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.log4j.Logger;
 import org.dataone.cn.batch.proto.packager.types.DataPersistenceKeys;
 import org.dataone.cn.batch.proto.packager.types.EventMap;
@@ -25,6 +27,7 @@ public class ReplicationPersistence extends DataPersistence implements DataPersi
     Logger logger = Logger.getLogger(ReplicationPersistence.class.getName());
     private MergeMap persistMergeMap;
     private EventMap persistEventMap;
+
     public void init() throws FileNotFoundException, IOException, ClassNotFoundException, Exception {
 
         if (this.getPersistentDataFileNamePath() != null && this.getPersistentDataFileName() != null) {
@@ -36,20 +39,20 @@ public class ReplicationPersistence extends DataPersistence implements DataPersi
                     fis = new FileInputStream(this.getPersistentDataFile());
                     ObjectInputStream ois = new ObjectInputStream(fis);
                     Object obj = null;
-
-                    while ((obj = ois.readObject()) != null) {
-
+                    // ois.readObject() does not return a null, it throws and EOF exception instead
+                    // therefore, keep track of  number of objects processed
+                    int numberOfObjects = 0;
+                    while ( (numberOfObjects < 2) && (obj = ois.readObject()) != null) {
                         if (obj instanceof EventMap) {
-                            persistEventMap = (EventMap)obj;
+                            persistEventMap = (EventMap) obj;
                         } else if (obj instanceof MergeMap) {
-                            persistMergeMap = (MergeMap)obj;
+                            persistMergeMap = (MergeMap) obj;
                         } else {
                             throw new Exception(this.getPersistentDataFileName() + " does not contain deserializable data");
                         }
-
+                        ++numberOfObjects;
                     }
                     fis.close();
-
                 } else {
                     throw new Exception("LogFilePendingData file " + this.getPersistentDataFileName() + " either does not exist or cannot be read!");
                 }
@@ -61,7 +64,6 @@ public class ReplicationPersistence extends DataPersistence implements DataPersi
                 this.getPersistentDataFile().createNewFile();
             }
         }
-
     }
 
     @Override
@@ -91,6 +93,4 @@ public class ReplicationPersistence extends DataPersistence implements DataPersi
     public void setPersistMergeMap(MergeMap persistMergeMap) {
         this.persistMergeMap = persistMergeMap;
     }
-
-
 }

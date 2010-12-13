@@ -94,7 +94,7 @@ public class MergeMap extends HashMap implements Map, Serializable {
     }
 
     @Override
-    public Set keySet() {
+    public Set<String> keySet() {
         return mergeMap.keySet();
     }
 
