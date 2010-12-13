@@ -11,6 +11,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Resource;
+import org.dataone.cn.batch.proto.packager.types.DataPersistenceKeys;
 import org.dataone.cn.batch.proto.packager.types.MergeMap;
 import org.junit.*;
 import static org.junit.Assert.*;
@@ -91,7 +92,7 @@ public class ReplicationLogReaderTestCase {
 
     @Test
     public void testLogPersistence() throws Exception {
-
+        replicationPersistence.init();
         MergeMap results = replicationPersistence.getPersistMergeMap();
         ArrayList<String> keyset = new ArrayList<String>(results.keySet());
         Collections.sort(keyset);
@@ -109,6 +110,7 @@ public class ReplicationLogReaderTestCase {
 
     @Test
     public void testReplicationPersistenceWithDuplicateLogEntries() throws Exception {
+        replicationPersistence.init();
         MergeMap replicationMap = replicationPersistence.getPersistMergeMap();
         Map<String, Map<String, String>> duplicateMap = replicationMap.getMap();
         System.out.println("\treplicate Size: " + duplicateMap.keySet().size());
@@ -134,7 +136,36 @@ public class ReplicationLogReaderTestCase {
             System.out.println("deleted persistent Data File " + replicationPersistence.getPersistentDataFileName());
         }
     }
+    @Test
+    public void testReplicationPersistenceWithEmpty() throws Exception {
+        replicationPersistence.init();
+        long x = 100;
+        long y = 100;
+        replicationPersistence.getPersistEventMap().put(DataPersistenceKeys.SKIP_IN_LOG_FIELD.toString(), new Long(x));
+        replicationPersistence.getPersistEventMap().put(DataPersistenceKeys.DATE_TIME_LAST_ACCESSED_FIELD.toString(), new Long(y));
+         System.out.println("\ntestReplicationPersistenceWithEmpty");
+//        MergeMap replicationMap = replicationPersistence.getPersistMergeMap();
+//        replicationMap.clear();
+        replicationPersistence.writePersistentData();
 
+    }
+    @Test
+    public void testReplicationPersistenceFailWithEmpty() throws Exception {
+        try {
+            System.out.println("\ntestReplicationPersistenceFailWithEmpty");
+            replicationPersistence.init();
+            MergeMap replicationMap = replicationPersistence.getPersistMergeMap();
+            for (String key: replicationMap.keySet()) {
+                System.out.println(key);
+            }
+        } catch (Exception e) {
+            System.out.println("testReplicationPersistenceFailWithEmpty");
+            e.printStackTrace();
+        }
+        if (replicationPersistence.getPersistentDataFile().delete()) {
+            System.out.println("deleted persistent Data File " + replicationPersistence.getPersistentDataFileName());
+        }
+    }
 //    @Test
     public void testLogReaderWithDosNewlines() throws Exception {
         replicationLogReader.newline = "\r\n";
