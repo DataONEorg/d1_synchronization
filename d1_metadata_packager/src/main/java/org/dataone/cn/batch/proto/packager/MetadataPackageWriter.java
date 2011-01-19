@@ -23,6 +23,7 @@ import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 import org.apache.log4j.Logger;
 import org.dataone.cn.batch.proto.packager.types.MergeMap;
+import org.dataone.cn.batch.proto.packager.types.DataPersistenceKeys;
 import org.dataone.cn.batch.utils.NodeReference;
 import org.dataone.service.types.ObjectFormat;
 import org.jibx.runtime.JiBXException;
@@ -54,12 +55,12 @@ public class MetadataPackageWriter {
         Set<String> readSetQueue = new HashSet<String>(readMap.keySet());
         for (String key : readSetQueue) {
             Map<String, String> mergeFiles = readMap.get(key);
-            if (mergeFiles.containsKey("SCIMETA") && mergeFiles.containsKey("SYSMETA")) {
-                logger.debug("found: scimetadata: " + mergeFiles.get("SCIMETA") + ": sysmetadata: " + mergeFiles.get("SYSMETA"));
-                if (this.writePackage(mergeFiles.get("SCIMETA"), mergeFiles.get("SYSMETA"))) {
+            if (mergeFiles.containsKey(DataPersistenceKeys.SCIMETA.toString()) && mergeFiles.containsKey(DataPersistenceKeys.SYSMETA.toString())) {
+                logger.debug("found: scimetadata: " + mergeFiles.get(DataPersistenceKeys.SCIMETA.toString()) + ": sysmetadata: " + mergeFiles.get(DataPersistenceKeys.SYSMETA.toString()));
+                if (this.writePackage(mergeFiles.get(DataPersistenceKeys.SCIMETA.toString()), mergeFiles.get(DataPersistenceKeys.SYSMETA.toString()))) {
                     ++writtenPackages;
                 }
-                logger.debug("wrote: scimetadata: " + mergeFiles.get("SCIMETA") + ": sysmetadata: " + mergeFiles.get("SYSMETA"));
+                logger.debug("wrote: scimetadata: " + mergeFiles.get(DataPersistenceKeys.SCIMETA.toString()) + ": sysmetadata: " + mergeFiles.get(DataPersistenceKeys.SYSMETA.toString()));
                 readMap.remove(key);
             } else {
                 if (mergeFiles.containsKey("COUNT")) {
