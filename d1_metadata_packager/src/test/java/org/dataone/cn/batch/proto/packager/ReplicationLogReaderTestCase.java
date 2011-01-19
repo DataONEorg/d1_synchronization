@@ -75,6 +75,15 @@ public class ReplicationLogReaderTestCase {
         MergeMap results = replicationLogReader.getMergeMap();
         replicationPersistence.writePersistentData();
         System.out.println("testLogReader success with " + results.size()  +" entries");
+    }
+
+    @Test
+    public void testAdditonalLogReader() throws Exception {
+        replicationLogReader.setLogFileName(this.testReplicationLogFile2);
+        replicationLogReader.readLogfile();
+        MergeMap results = replicationLogReader.getMergeMap();
+        replicationPersistence.writePersistentData();
+        System.out.println("testLogReader success with " + results.size()  +" entries");
         ArrayList<String> keyset = new ArrayList<String>(results.keySet());
         Collections.sort(keyset);
         for (String key : keyset) {
@@ -82,14 +91,15 @@ public class ReplicationLogReaderTestCase {
             results1Buffer.append(key);
 
             Map<String, String> mergeFiles = results.get(key);
-            for (String keyMerge : mergeFiles.keySet()) {
+            ArrayList<String> mergedkeyset =  new ArrayList<String>(mergeFiles.keySet());
+            Collections.sort(mergedkeyset);
+            for (String keyMerge : mergedkeyset) {
                 results1Buffer.append(keyMerge);
                 results1Buffer.append(mergeFiles.get(keyMerge));
                 System.out.println("\tfound " + keyMerge + " for " + mergeFiles.get(keyMerge));
             }
         }
     }
-
     @Test
     public void testLogPersistence() throws Exception {
         replicationPersistence.init();
@@ -99,42 +109,17 @@ public class ReplicationLogReaderTestCase {
         for (String key : keyset) {
             results2Buffer.append(key);
             Map<String, String> mergeFiles = results.get(key);
-            for (String keyMerge : mergeFiles.keySet()) {
+            ArrayList<String> mergedkeyset =  new ArrayList<String>(mergeFiles.keySet());
+            Collections.sort(mergedkeyset);
+            for (String keyMerge : mergedkeyset) {
                 results2Buffer.append(keyMerge);
                 results2Buffer.append(mergeFiles.get(keyMerge));
             }
         }
         System.out.println("results1Buffer:" + results1Buffer.toString() + "\nresults2Buffer:" + results2Buffer.toString());
         assertTrue(results1Buffer.toString().contentEquals(results2Buffer.toString()));
-    }
-
-    @Test
-    public void testReplicationPersistenceWithDuplicateLogEntries() throws Exception {
-        replicationPersistence.init();
-        MergeMap replicationMap = replicationPersistence.getPersistMergeMap();
-        Map<String, Map<String, String>> duplicateMap = replicationMap.getMap();
-        System.out.println("\treplicate Size: " + duplicateMap.keySet().size());
-        replicationMap = new MergeMap();
-        
-        replicationPersistence.setPersistMergeMap(replicationMap);
-        replicationLogReader.setLogFileName(this.testReplicationLogFile2);
-
-        replicationLogReader.readLogfile();
-        MergeMap results = replicationLogReader.getMergeMap();
-        System.out.println("\tresults size: " + results.keySet().size() + " replicate Size: " + duplicateMap.keySet().size());
-        assertTrue(results.keySet().size() == duplicateMap.keySet().size());
-
-        for (String key : (Set<String>)results.keySet()) {
-            System.out.println("found GUID " + key);
-            Map<String, String> mergeFiles = results.get(key);
-            for (String keyMerge : mergeFiles.keySet()) {
-                System.out.println("\tfound " +keyMerge + " for " + mergeFiles.get(keyMerge));
-                assertTrue(results.get(key).get(keyMerge).contentEquals(duplicateMap.get(key).get(keyMerge)));
-            }
-        } 
-        if (replicationPersistence.getPersistentDataFile().delete()) {
-            System.out.println("deleted persistent Data File " + replicationPersistence.getPersistentDataFileName());
-        }
+        File testLogFilePersistDataNameFile = new File(this.testPackageHarvestDirectoryString + File.separator + this.testLogFilePersistDataName);
+        testLogFilePersistDataNameFile.delete();
     }
     @Test
     public void testReplicationPersistenceWithEmpty() throws Exception {
@@ -162,25 +147,6 @@ public class ReplicationLogReaderTestCase {
             System.out.println("testReplicationPersistenceFailWithEmpty");
             e.printStackTrace();
         }
-        if (replicationPersistence.getPersistentDataFile().delete()) {
-            System.out.println("deleted persistent Data File " + replicationPersistence.getPersistentDataFileName());
-        }
-    }
-//    @Test
-    public void testLogReaderWithDosNewlines() throws Exception {
-        replicationLogReader.newline = "\r\n";
-        replicationPersistence.init();
-        replicationLogReader.setLogFileName(testReplicate3);
-        replicationLogReader.readLogfile();
-        Map<String, Map<String, String>> results = replicationLogReader.getMergeMap();
-/*        for (String key : results.keySet()) {
-            System.out.println("found GUID " + key);
-            Map<String, String> mergeFiles = results.get(key);
-            for (String keyMerge : mergeFiles.keySet()) {
-                System.out.println("\tfound " + keyMerge + " for " + mergeFiles.get(keyMerge));
-            }
-        } */
-//        File testLogFilePersistDataNameFile = new File(this.testPackageHarvestDirectoryString + File.separator + this.testLogFilePersistDataName);
         if (replicationPersistence.getPersistentDataFile().delete()) {
             System.out.println("deleted persistent Data File " + replicationPersistence.getPersistentDataFileName());
         }

@@ -84,31 +84,39 @@ public class ReplicationLogReader extends EventLogReader {
         //knb 20100718-16:22:00: [INFO]: create D1GUID:knb:testid:201019913220178:D1SCIMETADATA:autogen.20101991322022.1:D1SYSMETA:autogen.20101991322039.1:
         while ((logEntry = bufferedReader.readLine()) != null) {
             logger.trace(logEntry);
-            if (logEntry.contains("replicate") && logEntry.contains(EventLogReader.GUIDTOKEN)) {
+            if (logEntry.contains("replicate") && logEntry.contains(GUIDTOKEN)) {
                 
-                String entryType = null;
+                String entryToken = null;
+                DataPersistenceKeys entryKey = null;
                 Map<String, String> sciSysMetaHashMap = null;
-                String[] findIdFields = logEntry.split(EventLogReader.GUIDTOKEN, 2);
-                if (findIdFields[1].contains(EventLogReader.SCIDATATOKEN) ) {
+                String[] findIdFields = logEntry.split(GUIDTOKEN, 2);
+                if (findIdFields[1].contains(SCIDATATOKEN) ) {
 
-                    entryType = EventLogReader.SCIDATATOKEN;
-                } else if (findIdFields[1].contains(EventLogReader.SYSDATATOKEN) ) {
-                    entryType = EventLogReader.SYSDATATOKEN;
+                    entryToken = SCIDATATOKEN;
+                    entryKey = DataPersistenceKeys.SCIMETA;
+                } else if (findIdFields[1].contains(SYSDATATOKEN) ) {
+                    entryToken = SYSDATATOKEN;
+                    entryKey = DataPersistenceKeys.SYSMETA;
                 } else {
                     logger.error("Non Exception Error: Unable to determine intent of the following log entry" + newline + logEntry);
                     continue;
                 }
-                
-                int guidMarker = findIdFields[1].lastIndexOf(entryType);
+                logger.trace("found entryToken of " + entryToken );
+                int guidEndMarker = findIdFields[1].lastIndexOf(entryToken);
 
-                String guid = findIdFields[1].substring(0, guidMarker);
+                String guid = findIdFields[1].substring(0, guidEndMarker);
+                logger.trace("guid is " + guid);
                 if (this.getMergeMap().containsKey(guid)) {
                     sciSysMetaHashMap = (Map<String, String>)this.getMergeMap().get(guid);
+                    logger.trace("guid exists in hashmap");
                 } else {
                     sciSysMetaHashMap = new HashMap<String, String>();
                     ++readlines;
+                    logger.trace("guid does not exist, create new hashmap");
                 }
-                sciSysMetaHashMap.put(entryType, findIdFields[1].substring(guidMarker + SCIDATATOKEN.length(), findIdFields[1].lastIndexOf(":")));
+                String entry = findIdFields[1].substring(guidEndMarker + entryToken.length(), findIdFields[1].lastIndexOf(":"));
+                logger.trace("value of " + entryToken + " is " +entry);
+                sciSysMetaHashMap.put(entryKey.toString(), entry);
                 this.getMergeMap().put(guid, sciSysMetaHashMap);
             }
         }
