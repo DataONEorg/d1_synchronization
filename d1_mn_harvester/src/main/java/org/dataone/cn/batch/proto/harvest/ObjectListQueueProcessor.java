@@ -65,6 +65,7 @@ public class ObjectListQueueProcessor {
      *
      *
      */
+    private static final int MAX_OBJECT_TO_PROCESS = 1000;
     Logger logger = Logger.getLogger(ObjectListQueueProcessor.class.getName());
     private MemberNodeCrud mnReader;
     private List<ObjectInfo> readQueue;
@@ -72,15 +73,34 @@ public class ObjectListQueueProcessor {
     private AuthToken token;
     private String mnIdentifier; // This is only a temporary solution
 //    public void processQueue(Node node) { XXX future call i think, because we will be processing this for specific nodes
-    public void processQueue() {
-        boolean hasException;
-        for (ObjectInfo objectInfo : readQueue) {
-            hasException = true;
+    public boolean processQueue() {
+
+
+        boolean continueProcessing = false;
+
+        // do not process if queue is empty or queue is not initialized
+        if ((readQueue == null) || readQueue.isEmpty()) {
+            return continueProcessing;
+        }
+
+        //
+        // only process 1000 at a time so as not to blow out memory contraints on
+        // massive synchronization attempts
+        //
+        List<ObjectInfo> processQueue = null;
+        if (readQueue.size() > MAX_OBJECT_TO_PROCESS) {
+            processQueue = readQueue.subList(0, MAX_OBJECT_TO_PROCESS);
+            continueProcessing = true;
+        } else {
+            processQueue = readQueue;
+        }
+        for (ObjectInfo objectInfo : processQueue) {
             try {
     //            sciMetaFile = this.writeScienceMetadataToFile(objectInfo);
-                logger.debug("Retrieve SystemMetadata for " + objectInfo.getIdentifier().getValue());
-                SystemMetadata systemMetadata = mnReader.getSystemMetadata(null, objectInfo.getIdentifier());
-                logger.debug("Found SystemMetadata " + systemMetadata.getIdentifier().getValue() +  " for Identifier " + objectInfo.getIdentifier().getValue());
+                Identifier pid = new Identifier();
+                pid.setValue(objectInfo.getIdentifier().getValue());
+                SystemMetadata systemMetadata = mnReader.getSystemMetadata(null,  pid);
+                logger.debug("Retrieved SystemMetadata Identifier:" + systemMetadata.getIdentifier().getValue() +  " for ObjectInfo Identifier " + pid.getValue());
                 NodeReference nodeReference = new NodeReference();
 
                 nodeReference.setValue(mnIdentifier); //XXX get this from the identifier of the node that is being synchronized
@@ -97,8 +117,8 @@ public class ObjectListQueueProcessor {
                 //
                 systemMetadata.setOriginMemberNode(nodeReference);
                 systemMetadata.setAuthoritativeMemberNode(nodeReference);
-                writeQueue.put( objectInfo.getIdentifier(), systemMetadata);
-                hasException = false;
+                writeQueue.put( pid, systemMetadata);
+                
             } catch (InvalidToken ex) {
                 logger.error(ex.serialize(ex.FMT_XML));
             } catch (ServiceFailure ex) {
@@ -113,7 +133,12 @@ public class ObjectListQueueProcessor {
                 logger.error(ex.serialize(ex.FMT_XML));
             }
         }
-        readQueue.clear();
+        if (continueProcessing) {
+            readQueue.subList(0, MAX_OBJECT_TO_PROCESS).clear();
+        } else {
+            readQueue.clear();
+        }
+        return continueProcessing;
     }
 
     public MemberNodeCrud getMnReader() {
