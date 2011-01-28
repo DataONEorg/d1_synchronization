@@ -2,7 +2,6 @@
  * To change this template, choose Tools | Templates
  * and open the template in the editor.
  */
-
 package org.dataone.cn.batch.proto.scheduler.jobs;
 
 import java.io.FileNotFoundException;
@@ -25,6 +24,7 @@ import org.dataone.service.types.SystemMetadata;
  * @author rwaltz
  */
 public class MnHarvesterJob {
+
     static Logger logger = Logger.getLogger(MnHarvesterJob.class.getName());
     BiBimBob bob;
     AuthToken cnToken;
@@ -33,6 +33,7 @@ public class MnHarvesterJob {
     ObjectListQueueBuilder queueBuilder;
     ObjectListQueueProcessor queueProcessor;
     ObjectListQueueWriter queueWriter;
+
     public void init() {
         try {
             bi = bob.bapMeogeureoGaja();
@@ -45,7 +46,8 @@ public class MnHarvesterJob {
 
         }
     }
-    public void harvestMetadata()  {
+
+    public void harvestMetadata() {
         try {
             ArrayList<ObjectInfo> objectInfoList = new ArrayList<ObjectInfo>();
             // Need the LinkedHashMap to preserver insertion order
@@ -56,14 +58,17 @@ public class MnHarvesterJob {
             queueBuilder.setWriteQueue(objectInfoList);
             queueProcessor.setWriteQueue(writeQueue);
             /* XXX Could make this a very generic and configurable pipeline
-             See: http://userweb.cs.utexas.edu/users/vin/pub/pdf/plop96.pdf */
+            See: http://userweb.cs.utexas.edu/users/vin/pub/pdf/plop96.pdf */
             queueBuilder.buildQueue();
             queueProcessor.setReadQueue(queueBuilder.getWriteQueue());
             queueProcessor.processQueue();
-            queueWriter.setReadQueue(queueProcessor.getWriteQueue());
-            queueWriter.writeQueue();
+            do {
+                queueWriter.setReadQueue(queueProcessor.getWriteQueue());
+                queueWriter.writeQueue();
+            } while (queueProcessor.processQueue());
+
         } catch (Exception ex) {
-            logger.error(ex.getMessage(),ex);
+            logger.error(ex.getMessage(), ex);
         }
     }
 
@@ -114,5 +119,4 @@ public class MnHarvesterJob {
     public void setQueueWriter(ObjectListQueueWriter queueWriter) {
         this.queueWriter = queueWriter;
     }
-
 }
