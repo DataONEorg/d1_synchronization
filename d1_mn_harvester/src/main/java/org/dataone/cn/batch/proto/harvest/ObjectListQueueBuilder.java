@@ -32,6 +32,8 @@ public class ObjectListQueueBuilder {
     private MemberNodeReplication mnReader;
     private List<ObjectInfo> writeQueue;
     private NodeReference nodeReferenceUtility;
+    private int objectRetrievalCount = 1000;
+
     AuthToken token;
     
     static final Comparator<ObjectInfo> LAST_MOFIDIED_ORDER =
@@ -45,7 +47,6 @@ public class ObjectListQueueBuilder {
 
     public void buildQueue() {
         int start = 0;
-        int count = 10;
         Date startTime;
         Node mnNode = nodeReferenceUtility.getMnNode();
         ObjectList objectList = null;
@@ -53,7 +54,7 @@ public class ObjectListQueueBuilder {
         Date lastHarvestDate = mnNode.getSynchronization().getLastHarvested();
         try {
             do {
-                objectList = mnReader.listObjects(token, lastHarvestDate, now, null, true, start, count);
+                objectList = mnReader.listObjects(token, lastHarvestDate, now, null, true, start, objectRetrievalCount);
                 if (objectList == null || objectList.getTotal() == 0) {
                     break;
                 }
@@ -71,7 +72,12 @@ public class ObjectListQueueBuilder {
         } catch (InvalidToken ex) {
             logger.error( ex.serialize(ex.FMT_XML));
         }
-        Collections.sort(writeQueue, LAST_MOFIDIED_ORDER);
+        // TODO get sorting sorted out
+        // Sorting the collection is very important to ensure processing of all
+        // but do to time constraints, this will have to be re-added in
+        // and refactored later. SpringBatch may be the way to go in the
+        // next iteration
+//        Collections.sort(writeQueue, LAST_MOFIDIED_ORDER);
     }
 
     public MemberNodeReplication getMnReader() {
@@ -106,5 +112,12 @@ public class ObjectListQueueBuilder {
         this.nodeReferenceUtility = nodeReferenceUtility;
     }
 
+    public int getObjectRetrievalCount() {
+        return objectRetrievalCount;
+    }
+
+    public void setObjectRetrievalCount(int objectRetrievalCount) {
+        this.objectRetrievalCount = objectRetrievalCount;
+    }
 
 }

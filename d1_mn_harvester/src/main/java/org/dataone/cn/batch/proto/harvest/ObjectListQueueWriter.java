@@ -102,6 +102,15 @@ public class ObjectListQueueWriter {
         Node mnNode = nodeReferenceUtility.getMnNode();
         Date lastMofidiedDate = nodeReferenceUtility.getMnNode().getSynchronization().getLastHarvested();
 
+        if (readQueue == null) {
+            throw new Exception("readQueue is null!!!!!");
+        }
+        if (readQueue.keySet() == null) {
+            throw new Exception("readQueue KeySet is null!!!!!");
+        }
+        if (readQueue.keySet().iterator() == null) {
+            throw new Exception("readQueue KeySet iterator is null!!!!!");
+        }
         try {
             for (Iterator<Identifier> it = readQueue.keySet().iterator(); it.hasNext();) {
 
@@ -124,8 +133,12 @@ public class ObjectListQueueWriter {
                 }
 
                 // Verify that the ordering is correct or blow up
-                if ((systemMetadata.getDateSysMetadataModified().getTime() < lastMofidiedDate.getTime()) ) {
-                    throw new Exception("Dates are not ordered correctly! " + convertDateToGMT(systemMetadata.getDateSysMetadataModified()) + " " + systemMetadata.getDateSysMetadataModified().getTime()+ "of record: " + identifier + " is before previous lastModifieddate of " + convertDateToGMT(lastMofidiedDate) + " " + lastMofidiedDate.getTime());
+                // Dates can not be ordered correctly now because
+                // we are only processing X # of items per batch
+                // from a returned fetch
+                if ((systemMetadata.getDateSysMetadataModified().getTime() > lastMofidiedDate.getTime()) ) {
+                    lastMofidiedDate = systemMetadata.getDateSysMetadataModified();
+//                  throw new Exception("Dates are not ordered correctly! " + convertDateToGMT(systemMetadata.getDateSysMetadataModified()) + " " + systemMetadata.getDateSysMetadataModified().getTime()+ "of record: " + identifier + " is before previous lastModifieddate of " + convertDateToGMT(lastMofidiedDate) + " " + lastMofidiedDate.getTime());
                 }
 
                 this.writeToMetacat(sciMetaStream, systemMetadata);
@@ -135,26 +148,17 @@ public class ObjectListQueueWriter {
                 logger.info("Sent metacat " + identifier.getValue() + " with DateSysMetadataModified of " +  convertDateToGMT(systemMetadata.getDateSysMetadataModified()) + " with sci meta? ");
                 logger.info(sciMetaStream == null ? "no" : "yes");
                 hasException = false;
-                lastMofidiedDate = systemMetadata.getDateSysMetadataModified();
-                     try {
-                        if (sciMetaStream != null) {
-                            sciMetaStream.close();
-                            sciMetaStream = null;
-                        }
-
-                    } catch (IOException ex) {
-                        logger.error(ex.getMessage(), ex);
+                try {
+                    if (sciMetaStream != null) {
+                        sciMetaStream.close();
+                        sciMetaStream = null;
                     }
+
+                } catch (IOException ex) {
+                    logger.error(ex.getMessage(), ex);
+                }
             }
 
-        } catch (IdentifierNotUnique ex) {
-            logger.error(ex.serialize(ex.FMT_XML));
-        } catch (UnsupportedType ex) {
-            logger.error(ex.serialize(ex.FMT_XML));
-        } catch (InsufficientResources ex) {
-            logger.error(ex.serialize(ex.FMT_XML));
-        } catch (InvalidSystemMetadata ex) {
-            logger.error(ex.serialize(ex.FMT_XML));
         } catch (InvalidToken ex) {
             logger.error(ex.serialize(ex.FMT_XML));
         } catch (ServiceFailure ex) {
@@ -182,8 +186,8 @@ public class ObjectListQueueWriter {
             nodeReferenceUtility.getMnNode().getSynchronization().setLastHarvested(lastMofidiedDate);
             nodeListAccess.setNodeList(nodeReferenceUtility.getMnNodeList());
             nodeListAccess.persistNodeListToFileSystem();
-
         }
+        readQueue.clear();
     }
 
     public void writeToMetacat(InputStream objectInputStream, SystemMetadata sysmeta) throws ServiceFailure  {
