@@ -20,9 +20,11 @@ import org.apache.log4j.Logger;
 import org.dataone.cn.batch.utils.NodeListAccess;
 import org.dataone.cn.batch.utils.NodeReference;
 import org.dataone.service.cn.CoordinatingNodeCrud;
+import org.dataone.service.cn.CoordinatingNodeAuthentication;
 import org.dataone.service.cn.CoordinatingNodeAuthorization;
 import org.dataone.service.exceptions.IdentifierNotUnique;
 import org.dataone.service.exceptions.InsufficientResources;
+import org.dataone.service.exceptions.InvalidRequest;
 import org.dataone.service.exceptions.InvalidSystemMetadata;
 import org.dataone.service.exceptions.InvalidToken;
 import org.dataone.service.exceptions.NotAuthorized;
@@ -190,7 +192,7 @@ public class ObjectListQueueWriter {
         readQueue.clear();
     }
 
-    public void writeToMetacat(InputStream objectInputStream, SystemMetadata sysmeta) throws ServiceFailure  {
+    public void writeToMetacat(InputStream objectInputStream, SystemMetadata sysmeta) throws ServiceFailure, InvalidToken, NotFound, NotAuthorized, NotImplemented, InvalidRequest  {
         Identifier guid = new Identifier();
 // get the system metadata from the system
         Identifier d1Identifier = null;
