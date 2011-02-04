@@ -20,7 +20,6 @@ import org.apache.log4j.Logger;
 import org.dataone.cn.batch.utils.NodeListAccess;
 import org.dataone.cn.batch.utils.NodeReference;
 import org.dataone.service.cn.CoordinatingNodeCrud;
-import org.dataone.service.cn.CoordinatingNodeAuthentication;
 import org.dataone.service.cn.CoordinatingNodeAuthorization;
 import org.dataone.service.exceptions.IdentifierNotUnique;
 import org.dataone.service.exceptions.InsufficientResources;
@@ -96,7 +95,7 @@ public class ObjectListQueueWriter {
     private AuthToken token;
 
     public void writeQueue() throws Exception {
-        boolean hasException;
+
         //    File sciMetaFile = null;
         InputStream sciMetaStream = null;
         File sysMetaFile = null;
@@ -118,47 +117,54 @@ public class ObjectListQueueWriter {
 
                 Identifier identifier = it.next();
                 logger.debug("Write " + identifier.getValue() + " to metacat");
-                hasException = true;
+
 
                 // is the object format a data object or a scimetadata object
-                // tag in system metadata object we are using the objectFormat,
-                // need a mapping between objectformat and objectType
+                //
+                // we are using the objectFormat to determine if object is scimeta or scidata
+                //
+                // XXX we need a better mapping between objectformat and objectType
+                // currenly it is static xml file, should be a service somewhere
                 //
                 SystemMetadata systemMetadata = readQueue.get(identifier);
                 ObjectFormat objectFormat = systemMetadata.getObjectFormat();
                 logger.debug("Writing systemMetadata to metacat: " + systemMetadata.getIdentifier().getValue() + " with Format of " + objectFormat.name());
-                
+
                 if (validSciMetaObjectFormats.contains(objectFormat)) {
                     sciMetaStream = mnReader.get(null, identifier);
                 } else {
                     sciMetaStream = null;
                 }
 
+                // TODO figure out the problem below
                 // Verify that the ordering is correct or blow up
+                // oh no!!!
                 // Dates can not be ordered correctly now because
                 // we are only processing X # of items per batch
                 // from a returned fetch
-                if ((systemMetadata.getDateSysMetadataModified().getTime() > lastMofidiedDate.getTime()) ) {
+                if ((systemMetadata.getDateSysMetadataModified().getTime() > lastMofidiedDate.getTime())) {
                     lastMofidiedDate = systemMetadata.getDateSysMetadataModified();
 //                  throw new Exception("Dates are not ordered correctly! " + convertDateToGMT(systemMetadata.getDateSysMetadataModified()) + " " + systemMetadata.getDateSysMetadataModified().getTime()+ "of record: " + identifier + " is before previous lastModifieddate of " + convertDateToGMT(lastMofidiedDate) + " " + lastMofidiedDate.getTime());
                 }
 
-                this.writeToMetacat(sciMetaStream, systemMetadata);
+                if (this.writeToMetacat(sciMetaStream, systemMetadata)) {
 
-                // XXX IN THE FUTURE TO VERIFY THAT EVERYTHING
-                // is printed write to a discrete log file?
-                logger.info("Sent metacat " + identifier.getValue() + " with DateSysMetadataModified of " +  convertDateToGMT(systemMetadata.getDateSysMetadataModified()) + " with sci meta? ");
-                logger.info(sciMetaStream == null ? "no" : "yes");
-                hasException = false;
+                    // XXX IN THE FUTURE TO VERIFY THAT EVERYTHING
+                    // is printed write to a discrete log file?
+                    logger.info("Sent metacat " + identifier.getValue() + " with DateSysMetadataModified of " + convertDateToGMT(systemMetadata.getDateSysMetadataModified()) + " with sci meta? ");
+                    logger.info(sciMetaStream == null ? "no" : "yes");
+                } else {
+                    logger.warn("Metacat rejected object");
+                }
                 try {
                     if (sciMetaStream != null) {
                         sciMetaStream.close();
                         sciMetaStream = null;
                     }
-
                 } catch (IOException ex) {
                     logger.error(ex.getMessage(), ex);
                 }
+
             }
 
         } catch (InvalidToken ex) {
@@ -184,7 +190,7 @@ public class ObjectListQueueWriter {
             }
         }
         if (lastMofidiedDate.after(mnNode.getSynchronization().getLastHarvested())) {
-            lastMofidiedDate.setTime(lastMofidiedDate.getTime() + (1000 -(lastMofidiedDate.getTime()%1000)));
+            lastMofidiedDate.setTime(lastMofidiedDate.getTime() + (1000 - (lastMofidiedDate.getTime() % 1000)));
             nodeReferenceUtility.getMnNode().getSynchronization().setLastHarvested(lastMofidiedDate);
             nodeListAccess.setNodeList(nodeReferenceUtility.getMnNodeList());
             nodeListAccess.persistNodeListToFileSystem();
@@ -192,34 +198,42 @@ public class ObjectListQueueWriter {
         readQueue.clear();
     }
 
-    public void writeToMetacat(InputStream objectInputStream, SystemMetadata sysmeta) throws ServiceFailure, InvalidToken, NotFound, NotAuthorized, NotImplemented, InvalidRequest  {
-        Identifier guid = new Identifier();
+    private boolean writeToMetacat(InputStream objectInputStream, SystemMetadata sysmeta) throws ServiceFailure, InvalidToken, NotFound, NotAuthorized, NotImplemented, InvalidRequest {
+        Identifier pid = new Identifier();
+        boolean status = false;
 // get the system metadata from the system
         Identifier d1Identifier = null;
-        guid.setValue(sysmeta.getIdentifier().getValue());
+        pid.setValue(sysmeta.getIdentifier().getValue());
         try {
-            d1Identifier = cnWriter.create(token, guid, objectInputStream, sysmeta);
+            d1Identifier = cnWriter.create(token, pid, objectInputStream, sysmeta);
         } catch (InvalidToken ex) {
             logger.error("d1client.create:\n" + ex.serialize(ex.FMT_XML));
         } catch (ServiceFailure ex) {
-             logger.error("d1client.create:\n" + ex.serialize(ex.FMT_XML));
+            logger.error("d1client.create:\n" + ex.serialize(ex.FMT_XML));
         } catch (NotAuthorized ex) {
-             logger.error("d1client.create:\n" + ex.serialize(ex.FMT_XML));
+            logger.error("d1client.create:\n" + ex.serialize(ex.FMT_XML));
         } catch (IdentifierNotUnique ex) {
-             logger.error("d1client.create:\n" + ex.serialize(ex.FMT_XML));
+            logger.error("d1client.create:\n" + ex.serialize(ex.FMT_XML));
         } catch (UnsupportedType ex) {
             logger.error("d1client.create:\n" + ex.serialize(ex.FMT_XML));
         } catch (InsufficientResources ex) {
-             logger.error("d1client.create:\n" + ex.serialize(ex.FMT_XML));
+            logger.error("d1client.create:\n" + ex.serialize(ex.FMT_XML));
         } catch (InvalidSystemMetadata ex) {
-             logger.error("d1client.create:\n" + ex.serialize(ex.FMT_XML));
+            logger.error("d1client.create:\n" + ex.serialize(ex.FMT_XML));
         } catch (NotImplemented ex) {
-             logger.error("d1client.create:\n" + ex.serialize(ex.FMT_XML));
+            logger.error("d1client.create:\n" + ex.serialize(ex.FMT_XML));
         }
         if (d1Identifier != null) {
-            cnAuthorization.setAccess(token, guid, "public", "read", "allow", "allowFirst");
-            logger.info("create success, id returned is " + d1Identifier.getValue());
+            if (cnAuthorization.setAccess(token, pid, "public", "read", "allow", "allowFirst")) {
+                status = true;
+                logger.info("create success, id returned is " + d1Identifier.getValue());
+            } else {
+                logger.error("setAccess failed for pid: " + pid.getValue());
+            }
+        } else {
+            logger.error("create failed for pid:" + pid.getValue());
         }
+        return status;
     }
 
     private File writeSystemMetadataToFile(SystemMetadata systemMetadata, String filenamePath) throws JiBXException, FileNotFoundException {
@@ -237,13 +251,14 @@ public class ObjectListQueueWriter {
         }
         return outputFile;
     }
-    private String convertDateToGMT(Date d)
-    {
+
+    private String convertDateToGMT(Date d) {
         DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ");
         dateFormat.setTimeZone(TimeZone.getTimeZone("GMT-0"));
         String s = dateFormat.format(d);
         return s;
     }
+
     public MemberNodeCrud getMnReader() {
         return mnReader;
     }
@@ -307,6 +322,4 @@ public class ObjectListQueueWriter {
     public void setCnAuthorization(CoordinatingNodeAuthorization cnAuthorization) {
         this.cnAuthorization = cnAuthorization;
     }
-
-
 }
