@@ -10,6 +10,7 @@ import java.util.Date;
 import java.util.List;
 
 import org.apache.log4j.*;
+import org.dataone.client.MNode;
 import org.dataone.cn.batch.utils.NodeReference;
 
 import org.dataone.service.exceptions.InvalidRequest;
@@ -17,7 +18,6 @@ import org.dataone.service.exceptions.InvalidToken;
 import org.dataone.service.exceptions.NotAuthorized;
 import org.dataone.service.exceptions.NotImplemented;
 import org.dataone.service.exceptions.ServiceFailure;
-import org.dataone.service.mn.MemberNodeReplication;
 import org.dataone.service.types.AuthToken;
 import org.dataone.service.types.Node;
 import org.dataone.service.types.ObjectInfo;
@@ -29,10 +29,10 @@ import org.dataone.service.types.ObjectList;
  */
 public class ObjectListQueueBuilder {
     Logger logger = Logger.getLogger(ObjectListQueueBuilder.class.getName());
-    private MemberNodeReplication mnReader;
+    private MNode mnReader;
     private List<ObjectInfo> writeQueue;
     private NodeReference nodeReferenceUtility;
-    private int objectRetrievalCount = 1000;
+    private Integer objectRetrievalCount = 1000;
 
     AuthToken token;
     
@@ -46,7 +46,7 @@ public class ObjectListQueueBuilder {
     };
 
     public void buildQueue() {
-        int start = 0;
+        Integer start = 0;
         Date startTime;
         Node mnNode = nodeReferenceUtility.getMnNode();
         ObjectList objectList = null;
@@ -81,11 +81,11 @@ public class ObjectListQueueBuilder {
 //        Collections.sort(writeQueue, LAST_MOFIDIED_ORDER);
     }
 
-    public MemberNodeReplication getMnReader() {
+    public MNode getMnReader() {
         return mnReader;
     }
 
-    public void setMnReader(MemberNodeReplication mnReader) {
+    public void setMnReader(MNode mnReader) {
         this.mnReader = mnReader;
     }
 
