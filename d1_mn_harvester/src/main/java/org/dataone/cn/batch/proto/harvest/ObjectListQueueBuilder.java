@@ -50,11 +50,12 @@ public class ObjectListQueueBuilder {
         Date startTime;
         Node mnNode = nodeReferenceUtility.getMnNode();
         ObjectList objectList = null;
+        Boolean replicationStatus = null;
         Date now = new Date();
         Date lastHarvestDate = mnNode.getSynchronization().getLastHarvested();
         try {
             do {
-                objectList = mnReader.listObjects(token, lastHarvestDate, now, null, true, start, objectRetrievalCount);
+                objectList = mnReader.listObjects(token, lastHarvestDate, now, null, replicationStatus, start, objectRetrievalCount);
                 if (objectList == null || objectList.getTotal() == 0) {
                     break;
                 }
