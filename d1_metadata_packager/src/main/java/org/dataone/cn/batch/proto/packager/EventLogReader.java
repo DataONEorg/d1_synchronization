@@ -9,6 +9,8 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.text.DateFormat;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Map;
@@ -57,9 +59,11 @@ public class EventLogReader extends LogReader {
 
         // process the files in order
         skipInLogFile = persistentMapping.get(DataPersistenceKeys.SKIP_IN_LOG_FIELD.toString()).longValue();
-        logger.debug("number of logfiles on queue = " + processLogFiles.size() + " number of bytes to skip = " + skipInLogFile);
+        logger.debug("number of logfiles on queue = " + processLogFiles.size() + " number of bytes to skip = " + skipInLogFile +
+                "Date Log last Accessed: " + DateFormat.getDateInstance().format(new Date(persistentMapping.get(DataPersistenceKeys.DATE_TIME_LAST_ACCESSED_FIELD.toString()))));
         while (!processLogFiles.isEmpty()) {
             File processFile = processLogFiles.removeLast();
+
             // record the lastModfiedDateTime of the file
             // TODO There maybe more data written to this file before it is opened and read, need to read that date
             // after the buffer has been completely read
