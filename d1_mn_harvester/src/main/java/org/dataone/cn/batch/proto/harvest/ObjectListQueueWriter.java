@@ -97,8 +97,6 @@ public class ObjectListQueueWriter {
     public void writeQueue() throws Exception {
 
         //    File sciMetaFile = null;
-        InputStream sciMetaStream = null;
-        File sysMetaFile = null;
 
         Node mnNode = nodeReferenceUtility.getMnNode();
         Date lastMofidiedDate = nodeReferenceUtility.getMnNode().getSynchronization().getLastHarvested();
@@ -112,8 +110,9 @@ public class ObjectListQueueWriter {
         if (readQueue.keySet().iterator() == null) {
             throw new Exception("readQueue KeySet iterator is null!!!!!");
         }
-        try {
-            for (Iterator<Identifier> it = readQueue.keySet().iterator(); it.hasNext();) {
+        InputStream sciMetaStream = null;
+        for (Iterator<Identifier> it = readQueue.keySet().iterator(); it.hasNext();) {
+            try {
 
                 Identifier identifier = it.next();
                 logger.debug("Write " + identifier.getValue() + " to metacat");
@@ -138,10 +137,14 @@ public class ObjectListQueueWriter {
 
                 // TODO figure out the problem below
                 // Verify that the ordering is correct or blow up
-                // oh no!!!
+                // XXX
                 // Dates can not be ordered correctly now because
                 // we are only processing X # of items per batch
                 // from a returned fetch
+                // THIS now causes a problem with how to deal with errors.
+                // maybe re-write this as a map and track errors in that
+                // manner rather than as a list
+                //
                 if ((systemMetadata.getDateSysMetadataModified().getTime() > lastMofidiedDate.getTime())) {
                     lastMofidiedDate = systemMetadata.getDateSysMetadataModified();
 //                  throw new Exception("Dates are not ordered correctly! " + convertDateToGMT(systemMetadata.getDateSysMetadataModified()) + " " + systemMetadata.getDateSysMetadataModified().getTime()+ "of record: " + identifier + " is before previous lastModifieddate of " + convertDateToGMT(lastMofidiedDate) + " " + lastMofidiedDate.getTime());
@@ -164,31 +167,31 @@ public class ObjectListQueueWriter {
                 } catch (IOException ex) {
                     logger.error(ex.getMessage(), ex);
                 }
+            } catch (InvalidToken ex) {
+                logger.error(ex.serialize(ex.FMT_XML));
+            } catch (ServiceFailure ex) {
+                logger.error(ex.serialize(ex.FMT_XML));
+            } catch (NotAuthorized ex) {
+                logger.error(ex.serialize(ex.FMT_XML));
+            } catch (NotFound ex) {
+                logger.error(ex.serialize(ex.FMT_XML));
+            } catch (NotImplemented ex) {
+                logger.error(ex.serialize(ex.FMT_XML));
+                //        } catch (Exception ex) {
+                //            logger.error(ex.getMessage(), ex);
+            } finally {
+                try {
+                    if (sciMetaStream != null) {
+                        sciMetaStream.close();
+                    }
 
-            }
-
-        } catch (InvalidToken ex) {
-            logger.error(ex.serialize(ex.FMT_XML));
-        } catch (ServiceFailure ex) {
-            logger.error(ex.serialize(ex.FMT_XML));
-        } catch (NotAuthorized ex) {
-            logger.error(ex.serialize(ex.FMT_XML));
-        } catch (NotFound ex) {
-            logger.error(ex.serialize(ex.FMT_XML));
-        } catch (NotImplemented ex) {
-            logger.error(ex.serialize(ex.FMT_XML));
-        } catch (Exception ex) {
-            logger.error(ex.getMessage(), ex);
-        } finally {
-            try {
-                if (sciMetaStream != null) {
-                    sciMetaStream.close();
+                } catch (IOException ex) {
+                    logger.error(ex.getMessage(), ex);
                 }
-
-            } catch (IOException ex) {
-                logger.error(ex.getMessage(), ex);
             }
         }
+
+
         if (lastMofidiedDate.after(mnNode.getSynchronization().getLastHarvested())) {
             lastMofidiedDate.setTime(lastMofidiedDate.getTime() + (1000 - (lastMofidiedDate.getTime() % 1000)));
             nodeReferenceUtility.getMnNode().getSynchronization().setLastHarvested(lastMofidiedDate);
