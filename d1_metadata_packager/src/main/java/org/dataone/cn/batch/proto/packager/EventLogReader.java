@@ -57,7 +57,7 @@ public class EventLogReader extends LogReader {
 
         // process the files in order
         skipInLogFile = persistentMapping.get(DataPersistenceKeys.SKIP_IN_LOG_FIELD.toString()).longValue();
-
+        logger.debug("number of logfiles on queue = " + processLogFiles.size() + " number of bytes to skip = " + skipInLogFile);
         while (!processLogFiles.isEmpty()) {
             File processFile = processLogFiles.removeLast();
             // record the lastModfiedDateTime of the file
