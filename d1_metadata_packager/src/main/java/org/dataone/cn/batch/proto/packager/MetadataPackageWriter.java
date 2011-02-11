@@ -48,6 +48,7 @@ public class MetadataPackageWriter {
     NodeReference nodeReferenceUtility;
     private DataPersistenceWriter dataPersistenceWriter;
     private List<ObjectFormat> validSciMetaObjectFormats;
+
     public void writePackages() throws FileNotFoundException, JiBXException, IOException, ParserConfigurationException, SAXException, Exception {
         logger.info("start write for " + readMap.keySet().size() + " number of packages");
         int writtenPackages = 0;
@@ -64,7 +65,7 @@ public class MetadataPackageWriter {
                 readMap.remove(key);
             } else {
                 if (mergeFiles.containsKey("COUNT")) {
-                    Integer countInt  = Integer.parseInt(mergeFiles.get("COUNT"));
+                    Integer countInt = Integer.parseInt(mergeFiles.get("COUNT"));
                     if (countInt < 10) {
                         logger.warn("GUID: " + key + " is not yet complete!");
                     } else if ((countInt > 10) && (countInt <= 20)) {
@@ -77,7 +78,7 @@ public class MetadataPackageWriter {
                         logger.fatal("GUID: " + key + " HAS FAILED " + countInt.toString() + " TIMES !!! DELETING RECORD. THIS SHOULD BE REPORTED TO THE AUTHORITIES");
                         readMap.remove(key);
                     }
-                    
+
                 } else {
                     logger.info("GUID: " + key + " is not yet complete!");
                     mergeFiles.put("COUNT", Integer.toString(1));
@@ -92,95 +93,129 @@ public class MetadataPackageWriter {
 
 // TODO code application logic here
 
-            DocumentBuilderFactory documentBuilderFactory = DocumentBuilderFactory.newInstance();
-            DocumentBuilder parser = documentBuilderFactory.newDocumentBuilder();
-            Document sciMeta = null;
-            Document sysMeta = null;
-            
+        DocumentBuilderFactory documentBuilderFactory = DocumentBuilderFactory.newInstance();
+        DocumentBuilder parser = documentBuilderFactory.newDocumentBuilder();
+        Document sciMeta = null;
+        Document sysMeta = null;
+        org.dataone.service.types.Node d1Node = null;
+        try {
+            sysMeta = parser.parse(new File(readMetacatDirectory + File.separator + systemMetadataFile));
+        } catch (Exception ex) {
+            logger.error(ex.getMessage(), ex);
+            throw ex;
+        }
+        Element mercury = null;
+        String objectFormat = "";
+
+        // Object Format is needed for producing subdirectories under the project directory
+        Element sysMetaRoot = sysMeta.getDocumentElement();
+        NodeList sysNodeList = sysMetaRoot.getElementsByTagName("objectFormat");
+        for (int i = 0; i < sysNodeList.getLength(); ++i) {
+            objectFormat = sysNodeList.item(i).getTextContent();
+        }
+        if (objectFormat.isEmpty()) {
+            throw new Exception("ObjectFormat:" + objectFormat + ": of file " + systemMetadataFile + " is not valid");
+        }
+        ObjectFormat objectFormatEnum = ObjectFormat.convert(objectFormat);
+        if ((objectFormatEnum != null) && validSciMetaObjectFormats.contains(objectFormatEnum)) {
             try {
-                sysMeta = parser.parse(new File(readMetacatDirectory + File.separator + systemMetadataFile));
+                sciMeta = parser.parse(new File(readMetacatDirectory + File.separator + scienceMetadataFile));
             } catch (Exception ex) {
                 logger.error(ex.getMessage(), ex);
                 throw ex;
             }
-            Element mercury = null;
-            String objectFormat = "";
-            
-            Element sysMetaRoot = sysMeta.getDocumentElement();
-            NodeList sysNodeList = sysMetaRoot.getElementsByTagName("objectFormat");
-            for (int i = 0; i < sysNodeList.getLength(); ++i) {
-                objectFormat = sysNodeList.item(i).getTextContent();
-            }
-            if (objectFormat.isEmpty()) {
-                throw new Exception("ObjectFormat:" + objectFormat + ": of file " + systemMetadataFile + " is not valid");
-            }
-            ObjectFormat objectFormatEnum = ObjectFormat.convert(objectFormat);
-            if ((objectFormatEnum != null)  && validSciMetaObjectFormats.contains(objectFormatEnum)) {
-              try {
-                sciMeta = parser.parse(new File(readMetacatDirectory + File.separator + scienceMetadataFile));
-               } catch (Exception ex) {
-                logger.error(ex.getMessage(), ex);
-                throw ex;
-               }
+        } else {
+            if (objectFormatEnum == null) {
+                System.out.println("ObjectFormat:" + objectFormat + " is missing from ObjectFormat Enumeration!!!!");
+                logger.error("ObjectFormat:" + objectFormat + " is missing from ObjectFormat Enumeration!!!!");
             } else {
-                if (objectFormatEnum == null) {
-                    System.out.println("ObjectFormat:" + objectFormat + " is missing from ObjectFormat Enumeration!!!!");
-                    logger.error("ObjectFormat:" + objectFormat + " is missing from ObjectFormat Enumeration!!!!");
-                } else {
-                    logger.warn("ObjectFormat:" + objectFormat + " can not be indexed");
-                }
-                return false;
+                logger.warn("ObjectFormat:" + objectFormat + " can not be indexed");
             }
-
-            Element root = sciMeta.getDocumentElement();
-            NodeList mercuryNodeList = root.getElementsByTagName("mercury");
-            if (mercuryNodeList.getLength() > 0) {
-                mercury = (Element) mercuryNodeList.item(mercuryNodeList.getLength() - 1);
-            } else {
-                mercury = sciMeta.createElement("mercury");
+            return false;
+        }
+        // Mercury has this idea of Projects by which it groups metadata
+        // currently, our translation of a project is the 
+        // originating membernode of the data is the 'project' that 
+        // metadata should be grouped into
+        // XXX THE ABOVE ASSUMPTION SHOULD BE REVIEWED
+        //
+        String originMemberNode = "";  // this should be a node identifier
+        sysNodeList = sysMetaRoot.getElementsByTagName("originMemberNode");
+        for (int i = 0; i < sysNodeList.getLength(); ++i) {
+            originMemberNode = sysNodeList.item(i).getTextContent();
+        }
+        if (objectFormat.isEmpty()) {
+            throw new Exception("ObjectFormat:" + objectFormat + ": of file " + systemMetadataFile + " is not valid");
+        }
+        // Harzards of Languange we decided to use, Node/NodeList objects
+        // in two different packages
+        org.dataone.service.types.NodeList nodeList = nodeReferenceUtility.getMnNodeList();
+        List<org.dataone.service.types.Node> nodes = nodeList.getNodeList();
+        for (org.dataone.service.types.Node node : nodes) {
+            if (node.getIdentifier().getValue().contentEquals(originMemberNode)) {
+                d1Node = node;
+                break;
             }
+        }
+        if (d1Node == null) {
+            d1Node = nodeReferenceUtility.getMnNode();
+        }
 
-            Node adoptedMetadata = sciMeta.importNode(sysMeta.getDocumentElement(), true);
-            adoptedMetadata = sciMeta.renameNode(adoptedMetadata, "", "systemMetadata");
+        Node adoptedMetadata = sciMeta.importNode(sysMeta.getDocumentElement(), true);
+        adoptedMetadata = sciMeta.renameNode(adoptedMetadata, "", "systemMetadata");
+        Element root = sciMeta.getDocumentElement();
+        NodeList mercuryNodeList = root.getElementsByTagName("mercury");
+        if (mercuryNodeList.getLength() > 0) {
+            mercury = (Element) mercuryNodeList.item(mercuryNodeList.getLength() - 1);
             mercury.appendChild(adoptedMetadata);
-            // TODO this should only append the mercury element to the document root if the mercury element does not exist
+        } else {
+            mercury = sciMeta.createElement("mercury");
+            mercury.appendChild(adoptedMetadata);
             sciMeta.getDocumentElement().appendChild(mercury);
+        }
+
 //           sciMeta.normalizeDocument();
-            // need to retrieve the systemmetadata to get GUID and ObjectType to
-            // cross reference with the node to determine the directory path
-            String mergedMetadataDirPath = writeDirectory + File.separator
-                    + nodeReferenceUtility.getNodeListMergeDirPath() + File.separator
-                    + getScienceMetadataFormatPathMap().get(objectFormat);
-            if (!mergedMetaDir.containsKey(mergedMetadataDirPath)) {
-                File mergedMetadataDir = new File(mergedMetadataDirPath);
-                if (mergedMetadataDir.exists() && mergedMetadataDir.isDirectory()) {
-                    mergedMetaDir.put(mergedMetadataDirPath, mergedMetadataDir);
-                } else {
+        // the full path to place the merged metadata for mercury should be
+        // mercury base directory + project name + metadata type name (objectFormat)
+        //
+        // cross reference with the node to determine the directory path
+        String mergedMetadataDirPath = writeDirectory + File.separator
+                + d1Node.getName().replaceAll("[\\W]+", "-") + File.separator
+                + getScienceMetadataFormatPathMap().get(objectFormat);
 
-                    if (mergedMetadataDir.getParentFile().getParentFile().exists()) {
-                        if (!mergedMetadataDir.getParentFile().exists()) {
-                            if (mergedMetadataDir.getParentFile().mkdir()) {
-                                 logger.info("created " + mergedMetadataDir.getParentFile().getAbsolutePath());
-                            } else {
-                                 throw new Exception("Unable to create parent directory " + mergedMetadataDir.getParentFile());
-                            }
-                        }
-                        if (mergedMetadataDir.mkdir()) {
-                            logger.info("created " + mergedMetadataDirPath);
+        // this is all for optimization, if the directory path exists
+        // in this map, then we don't have to go through all the logic
+        // to determine if it has already been created, etc
+        if (!mergedMetaDir.containsKey(mergedMetadataDirPath)) {
+            File mergedMetadataDir = new File(mergedMetadataDirPath);
+            if (mergedMetadataDir.exists() && mergedMetadataDir.isDirectory()) {
+                mergedMetaDir.put(mergedMetadataDirPath, mergedMetadataDir);
+            } else {
+
+                if (mergedMetadataDir.getParentFile().getParentFile().exists()) {
+                    if (!mergedMetadataDir.getParentFile().exists()) {
+                        if (mergedMetadataDir.getParentFile().mkdir()) {
+                            logger.info("created " + mergedMetadataDir.getParentFile().getAbsolutePath());
                         } else {
-                            throw new Exception("Unable to create directory :" + mergedMetadataDirPath + ":");
+                            throw new Exception("Unable to create parent directory " + mergedMetadataDir.getParentFile());
                         }
-                    } else {
-                        throw new Exception("Top Level Metadata Merge directory :" + writeDirectory + ": does not exist");
                     }
-                    mergedMetaDir.put(mergedMetadataDirPath, mergedMetadataDir);
+                    if (mergedMetadataDir.mkdir()) {
+                        logger.info("created " + mergedMetadataDirPath);
+                    } else {
+                        throw new Exception("Unable to create directory :" + mergedMetadataDirPath + ":");
+                    }
+                } else {
+                    throw new Exception("Top Level Metadata Merge directory :" + writeDirectory + ": does not exist");
                 }
+                mergedMetaDir.put(mergedMetadataDirPath, mergedMetadataDir);
             }
+        }
+        // finally create the file in the correct directory with the correct name
+        String mergedMetadata = systemMetadataFile.concat("_MERGED.xml");
+        writeXmlFile(sciMeta, mergedMetadataDirPath + File.separator + mergedMetadata);
 
-            String mergedMetadata = systemMetadataFile.concat("_MERGED.xml");
-            writeXmlFile(sciMeta,  mergedMetadataDirPath + File.separator + mergedMetadata);
-
-            return true;
+        return true;
     }
 
     private void writeXmlFile(Document doc, String filename) {
@@ -197,9 +232,9 @@ public class MetadataPackageWriter {
             Transformer xformer = TransformerFactory.newInstance().newTransformer();
 
             xformer.transform(source, result);
-            
+
         } catch (Exception e) {
-            logger.error(e.getMessage(),e);
+            logger.error(e.getMessage(), e);
         }
     }
 
@@ -250,6 +285,7 @@ public class MetadataPackageWriter {
     public void setMetadataPackageAccess(DataPersistenceWriter dataPersistenceWriter) {
         this.dataPersistenceWriter = dataPersistenceWriter;
     }
+
     public List<ObjectFormat> getValidSciMetaObjectFormats() {
         return validSciMetaObjectFormats;
     }
