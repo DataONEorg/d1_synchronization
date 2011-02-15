@@ -72,6 +72,8 @@ public class ObjectListQueueProcessor {
     private Map<Identifier, SystemMetadata> writeQueue;
     private AuthToken token;
     private String mnIdentifier; // This is only a temporary solution
+    private String cnIdentifier; // This is only a temporary solution
+
 //    public void processQueue(Node node) { XXX future call i think, because we will be processing this for specific nodes
     public boolean processQueue() {
 
@@ -96,11 +98,32 @@ public class ObjectListQueueProcessor {
         }
         for (ObjectInfo objectInfo : processQueue) {
             try {
-    //            sciMetaFile = this.writeScienceMetadataToFile(objectInfo);
+                //            sciMetaFile = this.writeScienceMetadataToFile(objectInfo);
                 Identifier pid = new Identifier();
                 pid.setValue(objectInfo.getIdentifier().getValue());
-                SystemMetadata systemMetadata = mnReader.getSystemMetadata(null,  pid);
-                logger.debug("Retrieved SystemMetadata Identifier:" + systemMetadata.getIdentifier().getValue() +  " for ObjectInfo Identifier " + pid.getValue());
+                int tryAgain = 0;
+                boolean needSystemMetadata = true;
+                SystemMetadata systemMetadata = null;
+                do {
+                    try {
+                        systemMetadata = mnReader.getSystemMetadata(null, pid);
+                        needSystemMetadata = false;
+                    } catch (NotAuthorized ex) {
+                        if (tryAgain < 2) {
+                            ++tryAgain;
+                            logger.error(ex.serialize(ex.FMT_XML));
+                            try {
+                                Thread.sleep(5000L);
+                            } catch (InterruptedException ex1) {
+                                logger.warn(ex);
+                            }
+                        } else {
+                            // only way to get out of loop if NotAuthorized keeps getting thrown
+                            throw ex;
+                        }
+                    }
+                } while (needSystemMetadata);
+                logger.debug("Retrieved SystemMetadata Identifier:" + systemMetadata.getIdentifier().getValue() + " for ObjectInfo Identifier " + pid.getValue());
                 NodeReference nodeReference = new NodeReference();
 
                 nodeReference.setValue(mnIdentifier); //XXX get this from the identifier of the node that is being synchronized
@@ -110,6 +133,13 @@ public class ObjectListQueueProcessor {
                 originalReplica.setReplicaVerified(new Date());
                 systemMetadata.addReplica(originalReplica);
 
+                NodeReference cnReference = new NodeReference();
+                cnReference.setValue(cnIdentifier);
+                Replica cnReplica = new Replica();
+                cnReplica.setReplicaMemberNode(cnReference);
+                cnReplica.setReplicationStatus(ReplicationStatus.COMPLETED);
+                cnReplica.setReplicaVerified(new Date());
+                systemMetadata.addReplica(cnReplica);
                 //
                 // XXX  do we really want
                 // to add in the originating node as a Replica,
@@ -117,13 +147,12 @@ public class ObjectListQueueProcessor {
                 //
                 systemMetadata.setOriginMemberNode(nodeReference);
                 systemMetadata.setAuthoritativeMemberNode(nodeReference);
-                writeQueue.put( pid, systemMetadata);
-                
+                writeQueue.put(pid, systemMetadata);
+            } catch (NotAuthorized ex) {
+                logger.error(ex.serialize(ex.FMT_XML));
             } catch (InvalidToken ex) {
                 logger.error(ex.serialize(ex.FMT_XML));
             } catch (ServiceFailure ex) {
-                logger.error(ex.serialize(ex.FMT_XML));
-            } catch (NotAuthorized ex) {
                 logger.error(ex.serialize(ex.FMT_XML));
             } catch (NotFound ex) {
                 logger.error(ex.serialize(ex.FMT_XML));
@@ -181,4 +210,11 @@ public class ObjectListQueueProcessor {
         this.mnIdentifier = mnIdentifier;
     }
 
+    public String getCnIdentifier() {
+        return cnIdentifier;
+    }
+
+    public void setCnIdentifier(String cnIdentifier) {
+        this.cnIdentifier = cnIdentifier;
+    }
 }
