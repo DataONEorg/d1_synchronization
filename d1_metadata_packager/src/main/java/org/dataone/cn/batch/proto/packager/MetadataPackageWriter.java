@@ -180,7 +180,9 @@ public class MetadataPackageWriter {
         // This is needed for mercury to present the full page of the sci meta data
         // correctly to a user of mercury, is set to the 'web_url' field in solr
         Element metacatWebUrl = sciMeta.createElement("metacatWebUrl");
-        String webUrl = cnWebUrl + "/" + scienceMetadataFile + "/" + metacatObjectFormatSkin.get(objectFormat);
+        // XXX default is hardcoded
+        // String webUrl = cnWebUrl + "/" + scienceMetadataFile + "/" + metacatObjectFormatSkin.get(objectFormat);
+        String webUrl = cnWebUrl + "/" + scienceMetadataFile + "/default";
         metacatWebUrl.setTextContent(webUrl);
         sciMeta.getDocumentElement().appendChild(metacatWebUrl);
 
