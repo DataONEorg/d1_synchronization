@@ -130,7 +130,28 @@ public class ObjectListQueueWriter {
                 logger.debug("Writing systemMetadata to metacat: " + systemMetadata.getIdentifier().getValue() + " with Format of " + objectFormat.name());
 
                 if (validSciMetaObjectFormats.contains(objectFormat)) {
-                    sciMetaStream = mnReader.get(null, identifier);
+                    int tryAgain = 0;
+                    boolean needSciMetadata = true;
+                    do {
+                        try {
+                            sciMetaStream = mnReader.get(null, identifier);
+                            needSciMetadata = false;
+                        } catch (NotAuthorized ex) {
+                            if (tryAgain < 2) {
+                                ++tryAgain;
+                                logger.error(ex.serialize(ex.FMT_XML));
+                                try {
+                                    Thread.sleep(5000L);
+                                } catch (InterruptedException ex1) {
+                                    logger.warn(ex);
+                                }
+                            } else {
+                                // only way to get out of loop if NotAuthorized keeps getting thrown
+                                throw ex;
+                            }
+                        }
+                    } while (needSciMetadata);
+
                 } else {
                     sciMetaStream = null;
                 }

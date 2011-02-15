@@ -4,7 +4,6 @@
  */
 package org.dataone.cn.batch.proto.harvest;
 
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
@@ -28,22 +27,22 @@ import org.dataone.service.types.ObjectList;
  * @author rwaltz
  */
 public class ObjectListQueueBuilder {
+
     Logger logger = Logger.getLogger(ObjectListQueueBuilder.class.getName());
     private MNode mnReader;
     private List<ObjectInfo> writeQueue;
     private NodeReference nodeReferenceUtility;
     private Integer objectRetrievalCount = 1000;
-
     AuthToken token;
-    
     static final Comparator<ObjectInfo> LAST_MOFIDIED_ORDER =
-                                 new Comparator<ObjectInfo>() {
-        public int compare(ObjectInfo o1, ObjectInfo o2) {
-            Long o1Time = o1.getDateSysMetadataModified().getTime();
-            Long o2Time = o2.getDateSysMetadataModified().getTime();
-            return o1Time.compareTo(o2Time);
-        }
-    };
+            new Comparator<ObjectInfo>() {
+
+                public int compare(ObjectInfo o1, ObjectInfo o2) {
+                    Long o1Time = o1.getDateSysMetadataModified().getTime();
+                    Long o2Time = o2.getDateSysMetadataModified().getTime();
+                    return o1Time.compareTo(o2Time);
+                }
+            };
 
     public void buildQueue() {
         Integer start = 0;
@@ -63,15 +62,15 @@ public class ObjectListQueueBuilder {
                 writeQueue.addAll(objectList.getObjectInfoList());
             } while (start < objectList.getTotal());
         } catch (NotAuthorized ex) {
-            logger.error( ex.serialize(ex.FMT_XML));
+            logger.error(ex.serialize(ex.FMT_XML));
         } catch (InvalidRequest ex) {
-           logger.error( ex.serialize(ex.FMT_XML));
+            logger.error(ex.serialize(ex.FMT_XML));
         } catch (NotImplemented ex) {
-            logger.error( ex.serialize(ex.FMT_XML));
+            logger.error(ex.serialize(ex.FMT_XML));
         } catch (ServiceFailure ex) {
-            logger.error( ex.serialize(ex.FMT_XML));
+            logger.error(ex.serialize(ex.FMT_XML));
         } catch (InvalidToken ex) {
-            logger.error( ex.serialize(ex.FMT_XML));
+            logger.error(ex.serialize(ex.FMT_XML));
         }
         // TODO get sorting sorted out
         // Sorting the collection is very important to ensure processing of all
@@ -120,5 +119,4 @@ public class ObjectListQueueBuilder {
     public void setObjectRetrievalCount(int objectRetrievalCount) {
         this.objectRetrievalCount = objectRetrievalCount;
     }
-
 }

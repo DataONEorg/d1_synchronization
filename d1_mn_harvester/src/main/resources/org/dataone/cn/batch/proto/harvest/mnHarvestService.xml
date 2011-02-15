@@ -46,6 +46,7 @@
         <property name="mnReader" ref="mnClient" />
         <property name="token" ref="cnToken" />
         <property name="mnIdentifier" value="${synchronize.mnIdentifier}" />
+        <property name="cnIdentifier" value="http://cn.dataone.org/" />
     </bean>
     <bean id="objectListWriter" class="org.dataone.cn.batch.proto.harvest.ObjectListQueueWriter">
         <property name="mnReader" ref="mnClient" />
