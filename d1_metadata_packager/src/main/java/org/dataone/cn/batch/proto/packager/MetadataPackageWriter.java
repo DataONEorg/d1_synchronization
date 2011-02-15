@@ -48,6 +48,8 @@ public class MetadataPackageWriter {
     NodeReference nodeReferenceUtility;
     private DataPersistenceWriter dataPersistenceWriter;
     private List<ObjectFormat> validSciMetaObjectFormats;
+    private String cnWebUrl;
+    private Map<String, String> metacatObjectFormatSkin;
 
     public void writePackages() throws FileNotFoundException, JiBXException, IOException, ParserConfigurationException, SAXException, Exception {
         logger.info("start write for " + readMap.keySet().size() + " number of packages");
@@ -174,6 +176,14 @@ public class MetadataPackageWriter {
             sciMeta.getDocumentElement().appendChild(mercury);
         }
 
+        // XXX
+        // This is needed for mercury to present the full page of the sci meta data
+        // correctly to a user of mercury, is set to the 'web_url' field in solr
+        Element metacatWebUrl = sciMeta.createElement("metacatWebUrl");
+        String webUrl = cnWebUrl + "/" + scienceMetadataFile + "/" + metacatObjectFormatSkin.get(objectFormat);
+        metacatWebUrl.setTextContent(webUrl);
+        sciMeta.getDocumentElement().appendChild(metacatWebUrl);
+
 //           sciMeta.normalizeDocument();
         // the full path to place the merged metadata for mercury should be
         // mercury base directory + project name + metadata type name (objectFormat)
@@ -293,4 +303,21 @@ public class MetadataPackageWriter {
     public void setValidSciMetaObjectFormats(List<ObjectFormat> validSciMetaObjectFormats) {
         this.validSciMetaObjectFormats = validSciMetaObjectFormats;
     }
+
+    public String getCnWebUrl() {
+        return cnWebUrl;
+    }
+
+    public void setCnWebUrl(String cnWebUrl) {
+        this.cnWebUrl = cnWebUrl;
+    }
+
+    public Map<String, String> getMetacatObjectFormatSkin() {
+        return metacatObjectFormatSkin;
+    }
+
+    public void setMetacatObjectFormatSkin(Map<String, String> metacatObjectFormatSkin) {
+        this.metacatObjectFormatSkin = metacatObjectFormatSkin;
+    }
+    
 }

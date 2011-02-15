@@ -105,6 +105,8 @@
         <property name="scienceMetadataFormatPathMap" ref="scienceMetadataFormatPathMap"/>
         <property name="metadataPackageAccess" ref="metadataPackageEventAccess" />
         <property name="validSciMetaObjectFormats" ref="validScienceMetadataFormats" />
+        <property name="cnWebUrl" value="http://cn.dataone.org/knb/metacat"/>
+        <property name="metacatObjectFormatSkin" ref="metacatObjectFormatSkinMap" />
     </bean>
     <bean id="testEventError" class="java.lang.String">
         <constructor-arg value="test-eventMergeError.log" />
