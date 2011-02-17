@@ -119,7 +119,7 @@ public class ObjectListQueueWriter {
 
 
                 // is the object format a data object or a scimetadata object
-                //
+                // do not read data objects, only scimeta data
                 // we are using the objectFormat to determine if object is scimeta or scidata
                 //
                 // XXX we need a better mapping between objectformat and objectType
@@ -127,7 +127,8 @@ public class ObjectListQueueWriter {
                 //
                 SystemMetadata systemMetadata = readQueue.get(identifier);
                 ObjectFormat objectFormat = systemMetadata.getObjectFormat();
-                logger.debug("Writing systemMetadata to metacat: " + systemMetadata.getIdentifier().getValue() + " with Format of " + objectFormat.name());
+                logger.debug("Writing systemMetadata to metacat: " + systemMetadata.getIdentifier().getValue() + " with Format of " + objectFormat.toString());
+
 
                 if (validSciMetaObjectFormats.contains(objectFormat)) {
                     int tryAgain = 0;
