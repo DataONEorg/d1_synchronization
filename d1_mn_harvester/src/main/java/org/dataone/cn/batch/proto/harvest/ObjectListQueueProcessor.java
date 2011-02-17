@@ -18,6 +18,7 @@ import org.dataone.service.mn.MemberNodeCrud;
 import org.dataone.service.types.AuthToken;
 import org.dataone.service.types.Identifier;
 import org.dataone.service.types.NodeReference;
+import org.dataone.service.types.ObjectFormat;
 import org.dataone.service.types.ObjectInfo;
 import org.dataone.service.types.SystemMetadata;
 import org.dataone.service.types.Replica;
@@ -73,7 +74,7 @@ public class ObjectListQueueProcessor {
     private AuthToken token;
     private String mnIdentifier; // This is only a temporary solution
     private String cnIdentifier; // This is only a temporary solution
-
+    private List<ObjectFormat> validSciMetaObjectFormats;
 //    public void processQueue(Node node) { XXX future call i think, because we will be processing this for specific nodes
     public boolean processQueue() {
 
@@ -133,13 +134,17 @@ public class ObjectListQueueProcessor {
                 originalReplica.setReplicaVerified(new Date());
                 systemMetadata.addReplica(originalReplica);
 
-                NodeReference cnReference = new NodeReference();
-                cnReference.setValue(cnIdentifier);
-                Replica cnReplica = new Replica();
-                cnReplica.setReplicaMemberNode(cnReference);
-                cnReplica.setReplicationStatus(ReplicationStatus.COMPLETED);
-                cnReplica.setReplicaVerified(new Date());
-                systemMetadata.addReplica(cnReplica);
+                // data objects are not fully synchronized, only their metadata is
+                // synchronized, so do not set sys metadata as being replicated
+                if (validSciMetaObjectFormats.contains(systemMetadata.getObjectFormat())) {
+                    NodeReference cnReference = new NodeReference();
+                    cnReference.setValue(cnIdentifier);
+                    Replica cnReplica = new Replica();
+                    cnReplica.setReplicaMemberNode(cnReference);
+                    cnReplica.setReplicationStatus(ReplicationStatus.COMPLETED);
+                    cnReplica.setReplicaVerified(new Date());
+                    systemMetadata.addReplica(cnReplica);
+                }
                 //
                 // XXX  do we really want
                 // to add in the originating node as a Replica,
@@ -216,5 +221,12 @@ public class ObjectListQueueProcessor {
 
     public void setCnIdentifier(String cnIdentifier) {
         this.cnIdentifier = cnIdentifier;
+    }
+    public List<ObjectFormat> getValidSciMetaObjectFormats() {
+        return validSciMetaObjectFormats;
+    }
+
+    public void setValidSciMetaObjectFormats(List<ObjectFormat> validSciMetaObjectFormats) {
+        this.validSciMetaObjectFormats = validSciMetaObjectFormats;
     }
 }
