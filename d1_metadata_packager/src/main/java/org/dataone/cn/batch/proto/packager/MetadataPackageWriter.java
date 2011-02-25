@@ -7,6 +7,8 @@ package org.dataone.cn.batch.proto.packager;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.text.DateFormat;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -50,6 +52,8 @@ public class MetadataPackageWriter {
     private List<ObjectFormat> validSciMetaObjectFormats;
     private String cnWebUrl;
     private Map<String, String> metacatObjectFormatSkin;
+    //  number of hours to search for
+    private int hoursToExpire = 12;
 
     public void writePackages() throws FileNotFoundException, JiBXException, IOException, ParserConfigurationException, SAXException, Exception {
         logger.info("start write for " + readMap.keySet().size() + " number of packages");
@@ -58,35 +62,45 @@ public class MetadataPackageWriter {
         Set<String> readSetQueue = new HashSet<String>(readMap.keySet());
         for (String key : readSetQueue) {
             Map<String, String> mergeFiles = readMap.get(key);
+            // Determine if the record contains both SciMeta and SysMeta. if so, write out.
+            // if not, set or check expiration date of incomplete record
+
             if (mergeFiles.containsKey(DataPersistenceKeys.SCIMETA.toString()) && mergeFiles.containsKey(DataPersistenceKeys.SYSMETA.toString())) {
                 logger.debug("found: scimetadata: " + mergeFiles.get(DataPersistenceKeys.SCIMETA.toString()) + ": sysmetadata: " + mergeFiles.get(DataPersistenceKeys.SYSMETA.toString()));
                 if (this.writePackage(mergeFiles.get(DataPersistenceKeys.SCIMETA.toString()), mergeFiles.get(DataPersistenceKeys.SYSMETA.toString()))) {
                     ++writtenPackages;
+                    logger.debug("wrote: scimetadata: " + mergeFiles.get(DataPersistenceKeys.SCIMETA.toString()) + ": sysmetadata: " + mergeFiles.get(DataPersistenceKeys.SYSMETA.toString()));
                 }
-                logger.debug("wrote: scimetadata: " + mergeFiles.get(DataPersistenceKeys.SCIMETA.toString()) + ": sysmetadata: " + mergeFiles.get(DataPersistenceKeys.SYSMETA.toString()));
+                
+                // record has been written, remove from processing queue
                 readMap.remove(key);
             } else {
-                if (mergeFiles.containsKey("COUNT")) {
-                    Integer countInt = Integer.parseInt(mergeFiles.get("COUNT"));
-                    if (countInt < 10) {
-                        logger.warn("GUID: " + key + " is not yet complete!");
-                    } else if ((countInt > 10) && (countInt <= 20)) {
-                        logger.error("GUID: " + key + " HAS FAILED " + countInt.toString() + " TIMES!");
-                    }
-                    ++countInt;
-
-                    mergeFiles.put("COUNT", countInt.toString());
-                    if (countInt > 20) {
-                        logger.fatal("GUID: " + key + " HAS FAILED " + countInt.toString() + " TIMES !!! DELETING RECORD. THIS SHOULD BE REPORTED TO THE AUTHORITIES");
+                // Check the Expiration Date of the incomplete record
+                if (mergeFiles.containsKey("EXPIRE_DATE_LONG")) {
+                    Date now = new Date();
+                    Long expireDateLong = Long.parseLong(mergeFiles.get("EXPIRE_DATE_LONG"));
+                    Date expireDate = new Date(expireDateLong.longValue());
+                    if (now.after(expireDate)) {
+                        // Expiration Date has passed
+                        DateFormat df = DateFormat.getDateInstance(DateFormat.LONG);
+                        logger.fatal("GUID: " + key + " HAS FAILED: " + df.format(expireDate) + " is now past due !!! DELETING RECORD. THIS SHOULD BE REPORTED TO THE AUTHORITIES");
                         readMap.remove(key);
+                    } else {
+                        // Expiration Date has not passed
+                        logger.debug("GUID: " + key + " is not yet complete!");
                     }
 
                 } else {
-                    logger.info("GUID: " + key + " is not yet complete!");
-                    mergeFiles.put("COUNT", Integer.toString(1));
+                    // Create the Expiration Date of the incomplete record
+                    Date now = new Date();
+
+                    Long expireDateLong = new Long(now.getTime() + (hoursToExpire * 60 * 60 * 1000));
+                    logger.warn("GUID: " + key + " is not yet complete!");
+                    mergeFiles.put("EXPIRE_DATE_LONG", expireDateLong.toString());
                 }
             }
         }
+        // Save off state to check in future for completion of incomplete records
         dataPersistenceWriter.writePersistentData();
         logger.info("wrote " + writtenPackages + " number of packages");
     }
@@ -320,6 +334,14 @@ public class MetadataPackageWriter {
 
     public void setMetacatObjectFormatSkin(Map<String, String> metacatObjectFormatSkin) {
         this.metacatObjectFormatSkin = metacatObjectFormatSkin;
+    }
+
+    public int getHoursToExpire() {
+        return hoursToExpire;
+    }
+
+    public void setHoursToExpire(int hoursToExpire) {
+        this.hoursToExpire = hoursToExpire;
     }
     
 }
