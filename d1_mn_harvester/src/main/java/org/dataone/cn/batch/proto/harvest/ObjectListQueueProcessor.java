@@ -152,6 +152,7 @@ public class ObjectListQueueProcessor {
                 //
                 systemMetadata.setOriginMemberNode(nodeReference);
                 systemMetadata.setAuthoritativeMemberNode(nodeReference);
+                systemMetadata.setDateSysMetadataModified(new Date());
                 writeQueue.put(pid, systemMetadata);
             } catch (NotAuthorized ex) {
                 logger.error(ex.serialize(ex.FMT_XML));
