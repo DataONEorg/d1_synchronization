@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<d1:objectList xmlns:d1="http://dataone.org/service/types/0.5.1" count="3" start="0" total="3">
+	<objectInfo>
+		<identifier>MD_ORNLDAAC_787_03032010095920</identifier>
+		<objectFormat>FGDC-STD-001.1-1999</objectFormat>
+		<checksum algorithm="SHA-1">49fd46daad283f0cbd411e0297e0d68d56d001a4</checksum>
+		<dateSysMetadataModified>2011-02-18T21:40:56.318Z</dateSysMetadataModified>
+		<size>7938</size>
+	</objectInfo>
+	<objectInfo>
+		<identifier>MD_ORNLDAAC_122_03032010095920</identifier>
+		<objectFormat>FGDC-STD-001.1-1999</objectFormat>
+		<checksum algorithm="SHA-1">835c18118b489a4d68df958a1027c1ef</checksum>
+		<dateSysMetadataModified>2011-02-18T21:41:15.498Z</dateSysMetadataModified>
+		<size>6102</size>
+	</objectInfo>
+	<objectInfo>
+		<identifier>MD_ORNLDAAC_781_03032010095920</identifier>
+		<objectFormat>FGDC-STD-001.1-1999</objectFormat>
+		<checksum algorithm="SHA-1">f037f696f5b7c599f4a08b4e2639ccc3147c3c25</checksum>
+		<dateSysMetadataModified>2011-02-18T21:41:28.474Z</dateSysMetadataModified>
+		<size>7857</size>
+	</objectInfo>
+</d1:objectList>

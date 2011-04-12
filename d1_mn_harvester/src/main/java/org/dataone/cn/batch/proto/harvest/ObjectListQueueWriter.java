@@ -9,16 +9,12 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.text.DateFormat;
-import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.TimeZone;
 import org.apache.log4j.Logger;
-import org.dataone.cn.batch.utils.NodeListAccess;
-import org.dataone.cn.batch.utils.NodeReference;
+import org.dataone.cn.batch.proto.harvest.persist.NodeMapPersistence;
 import org.dataone.service.cn.CoordinatingNodeCrud;
 import org.dataone.service.cn.CoordinatingNodeAuthorization;
 import org.dataone.service.exceptions.IdentifierNotUnique;
@@ -34,9 +30,9 @@ import org.dataone.service.exceptions.UnsupportedType;
 import org.dataone.service.mn.MemberNodeCrud;
 import org.dataone.service.types.AuthToken;
 import org.dataone.service.types.Identifier;
-import org.dataone.service.types.Node;
 import org.dataone.service.types.ObjectFormat;
 import org.dataone.service.types.SystemMetadata;
+import org.dataone.service.types.util.ServiceTypeUtil;
 import org.jibx.runtime.BindingDirectory;
 import org.jibx.runtime.IBindingFactory;
 import org.jibx.runtime.IMarshallingContext;
@@ -90,16 +86,21 @@ public class ObjectListQueueWriter {
     private CoordinatingNodeAuthorization cnAuthorization;
     private Map<Identifier, SystemMetadata> readQueue;
     private List<ObjectFormat> validSciMetaObjectFormats;
-    private NodeReference nodeReferenceUtility;
-    private NodeListAccess nodeListAccess;
+    private String mnIdentifier;
+    private NodeMapPersistence nodeMapPersistance;
     private AuthToken token;
 
     public void writeQueue() throws Exception {
 
         //    File sciMetaFile = null;
 
-        Node mnNode = nodeReferenceUtility.getMnNode();
-        Date lastMofidiedDate = nodeReferenceUtility.getMnNode().getSynchronization().getLastHarvested();
+        Date lastHarvestDate = null;
+        Map<String, Long> nodeMap = nodeMapPersistance.getPersistMapping().getMap();
+        if (nodeMap.containsKey(mnIdentifier)) {
+            Long time = nodeMap.get(mnIdentifier);
+            lastHarvestDate = new Date(time.longValue());
+        }
+        Date lastMofidiedDate = lastHarvestDate;
 
         if (readQueue == null) {
             throw new Exception("readQueue is null!!!!!");
@@ -169,14 +170,14 @@ public class ObjectListQueueWriter {
                 //
                 if ((systemMetadata.getDateSysMetadataModified().getTime() > lastMofidiedDate.getTime())) {
                     lastMofidiedDate = systemMetadata.getDateSysMetadataModified();
-//                  throw new Exception("Dates are not ordered correctly! " + convertDateToGMT(systemMetadata.getDateSysMetadataModified()) + " " + systemMetadata.getDateSysMetadataModified().getTime()+ "of record: " + identifier + " is before previous lastModifieddate of " + convertDateToGMT(lastMofidiedDate) + " " + lastMofidiedDate.getTime());
+//                  throw new Exception("Dates are not ordered correctly! " + serializeDateToUTC(systemMetadata.getDateSysMetadataModified()) + " " + systemMetadata.getDateSysMetadataModified().getTime()+ "of record: " + identifier + " is before previous lastModifieddate of " + serializeDateToUTC(lastMofidiedDate) + " " + lastMofidiedDate.getTime());
                 }
 
                 if (this.writeToMetacat(sciMetaStream, systemMetadata)) {
 
                     // XXX IN THE FUTURE TO VERIFY THAT EVERYTHING
                     // is printed write to a discrete log file?
-                    logger.info("Sent metacat " + identifier.getValue() + " with DateSysMetadataModified of " + convertDateToGMT(systemMetadata.getDateSysMetadataModified()) + " with sci meta? ");
+                    logger.info("Sent metacat " + identifier.getValue() + " with DateSysMetadataModified of " + ServiceTypeUtil.serializeDateToUTC(systemMetadata.getDateSysMetadataModified()) + " with sci meta? ");
                     logger.info(sciMetaStream == null ? "no" : "yes");
                 } else {
                     logger.warn("Metacat rejected object");
@@ -213,12 +214,12 @@ public class ObjectListQueueWriter {
             }
         }
 
-
-        if (lastMofidiedDate.after(mnNode.getSynchronization().getLastHarvested())) {
+        logger.info("LastModifiedDate = " + lastMofidiedDate.getTime() + " LastHarvestedDate = " + lastHarvestDate.getTime());
+        if (lastMofidiedDate.after(lastHarvestDate)) {
+            logger.info(":)");
             lastMofidiedDate.setTime(lastMofidiedDate.getTime() + (1000 - (lastMofidiedDate.getTime() % 1000)));
-            nodeReferenceUtility.getMnNode().getSynchronization().setLastHarvested(lastMofidiedDate);
-            nodeListAccess.setNodeList(nodeReferenceUtility.getMnNodeList());
-            nodeListAccess.persistNodeListToFileSystem();
+            nodeMap.put(mnIdentifier, lastMofidiedDate.getTime());
+            nodeMapPersistance.writePersistentData();
         }
         readQueue.clear();
     }
@@ -230,6 +231,10 @@ public class ObjectListQueueWriter {
         Identifier d1Identifier = null;
         pid.setValue(sysmeta.getIdentifier().getValue());
         try {
+            // All though this should take place when the object is processsed, it needs to be
+            // performed here due to the way last DateSysMetadataModified is used to
+            // determine the next batch of records to retreive from a MemberNode
+            sysmeta.setDateSysMetadataModified(new Date());
             d1Identifier = cnWriter.create(token, pid, objectInputStream, sysmeta);
         } catch (InvalidToken ex) {
             logger.error("d1client.create:\n" + ex.serialize(ex.FMT_XML));
@@ -277,13 +282,6 @@ public class ObjectListQueueWriter {
         return outputFile;
     }
 
-    private String convertDateToGMT(Date d) {
-        DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ");
-        dateFormat.setTimeZone(TimeZone.getTimeZone("GMT-0"));
-        String s = dateFormat.format(d);
-        return s;
-    }
-
     public MemberNodeCrud getMnReader() {
         return mnReader;
     }
@@ -324,27 +322,27 @@ public class ObjectListQueueWriter {
         this.validSciMetaObjectFormats = validSciMetaObjectFormats;
     }
 
-    public NodeReference getNodeReferenceUtility() {
-        return nodeReferenceUtility;
-    }
-
-    public void setNodeReferenceUtility(NodeReference nodeReferenceUtility) {
-        this.nodeReferenceUtility = nodeReferenceUtility;
-    }
-
-    public NodeListAccess getNodeListAccess() {
-        return nodeListAccess;
-    }
-
-    public void setNodeListAccess(NodeListAccess nodeListAccess) {
-        this.nodeListAccess = nodeListAccess;
-    }
-
     public CoordinatingNodeAuthorization getCnAuthorization() {
         return cnAuthorization;
     }
 
     public void setCnAuthorization(CoordinatingNodeAuthorization cnAuthorization) {
         this.cnAuthorization = cnAuthorization;
+    }
+
+    public String getMnIdentifier() {
+        return mnIdentifier;
+    }
+
+    public void setMnIdentifier(String mnIdentifier) {
+        this.mnIdentifier = mnIdentifier;
+    }
+
+    public NodeMapPersistence getNodeMapPersistance() {
+        return nodeMapPersistance;
+    }
+
+    public void setNodeMapPersistance(NodeMapPersistence nodeMapPersistance) {
+        this.nodeMapPersistance = nodeMapPersistance;
     }
 }

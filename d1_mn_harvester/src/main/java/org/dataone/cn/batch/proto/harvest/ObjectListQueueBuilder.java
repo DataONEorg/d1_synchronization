@@ -7,18 +7,18 @@ package org.dataone.cn.batch.proto.harvest;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.log4j.*;
-import org.dataone.client.MNode;
-import org.dataone.cn.batch.utils.NodeReference;
+import org.dataone.cn.batch.proto.harvest.persist.NodeMapPersistence;
 
 import org.dataone.service.exceptions.InvalidRequest;
 import org.dataone.service.exceptions.InvalidToken;
 import org.dataone.service.exceptions.NotAuthorized;
 import org.dataone.service.exceptions.NotImplemented;
 import org.dataone.service.exceptions.ServiceFailure;
+import org.dataone.service.mn.MemberNodeReplication;
 import org.dataone.service.types.AuthToken;
-import org.dataone.service.types.Node;
 import org.dataone.service.types.ObjectInfo;
 import org.dataone.service.types.ObjectList;
 
@@ -29,11 +29,12 @@ import org.dataone.service.types.ObjectList;
 public class ObjectListQueueBuilder {
 
     Logger logger = Logger.getLogger(ObjectListQueueBuilder.class.getName());
-    private MNode mnReader;
+    private MemberNodeReplication mnReader;
     private List<ObjectInfo> writeQueue;
-    private NodeReference nodeReferenceUtility;
+    private String mnIdentifier;
     private Integer objectRetrievalCount = 1000;
-    AuthToken token;
+    private AuthToken token;
+    private NodeMapPersistence nodeMapPersistance;
     static final Comparator<ObjectInfo> LAST_MOFIDIED_ORDER =
             new Comparator<ObjectInfo>() {
 
@@ -47,11 +48,19 @@ public class ObjectListQueueBuilder {
     public void buildQueue() {
         Integer start = 0;
         Date startTime;
-        Node mnNode = nodeReferenceUtility.getMnNode();
         ObjectList objectList = null;
         Boolean replicationStatus = null;
         Date now = new Date();
-        Date lastHarvestDate = mnNode.getSynchronization().getLastHarvested();
+        Date lastHarvestDate;
+        Map<String, Long> nodeMap = nodeMapPersistance.getPersistMapping().getMap();
+        if (nodeMap.containsKey(mnIdentifier)) {
+            Long time = nodeMap.get(mnIdentifier);
+            lastHarvestDate = new Date(time.longValue());
+        } else {
+            Long longTimeAgo = new Long(-2208988800L);
+            lastHarvestDate = new Date(longTimeAgo.longValue()); // Mon, 01 Jan 1900 00:00:00 GMT
+            nodeMap.put(mnIdentifier, longTimeAgo.longValue());
+        }
         try {
             do {
                 objectList = mnReader.listObjects(token, lastHarvestDate, now, null, replicationStatus, start, objectRetrievalCount);
@@ -80,11 +89,11 @@ public class ObjectListQueueBuilder {
 //        Collections.sort(writeQueue, LAST_MOFIDIED_ORDER);
     }
 
-    public MNode getMnReader() {
+    public MemberNodeReplication getMnReader() {
         return mnReader;
     }
 
-    public void setMnReader(MNode mnReader) {
+    public void setMnReader(MemberNodeReplication mnReader) {
         this.mnReader = mnReader;
     }
 
@@ -104,19 +113,27 @@ public class ObjectListQueueBuilder {
         this.token = token;
     }
 
-    public NodeReference getNodeReferenceUtility() {
-        return nodeReferenceUtility;
-    }
-
-    public void setNodeReferenceUtility(NodeReference nodeReferenceUtility) {
-        this.nodeReferenceUtility = nodeReferenceUtility;
-    }
-
     public int getObjectRetrievalCount() {
         return objectRetrievalCount;
     }
 
     public void setObjectRetrievalCount(int objectRetrievalCount) {
         this.objectRetrievalCount = objectRetrievalCount;
+    }
+
+    public NodeMapPersistence getNodeMapPersistance() {
+        return nodeMapPersistance;
+    }
+
+    public void setNodeMapPersistance(NodeMapPersistence nodeMapPersistance) {
+        this.nodeMapPersistance = nodeMapPersistance;
+    }
+
+    public String getMnIdentifier() {
+        return mnIdentifier;
+    }
+
+    public void setMnIdentifier(String mnIdentifier) {
+        this.mnIdentifier = mnIdentifier;
     }
 }

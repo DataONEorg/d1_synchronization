@@ -72,10 +72,11 @@ public class ObjectListQueueProcessor {
     private List<ObjectInfo> readQueue;
     private Map<Identifier, SystemMetadata> writeQueue;
     private AuthToken token;
-    private String mnIdentifier; // This is only a temporary solution
-    private String cnIdentifier; // This is only a temporary solution
+    private String mnIdentifier; // XXX This is only a temporary solution
+    private String cnIdentifier; // XXX This is only a temporary solution
     private List<ObjectFormat> validSciMetaObjectFormats;
 //    public void processQueue(Node node) { XXX future call i think, because we will be processing this for specific nodes
+
     public boolean processQueue() {
 
 
@@ -152,7 +153,6 @@ public class ObjectListQueueProcessor {
                 //
                 systemMetadata.setOriginMemberNode(nodeReference);
                 systemMetadata.setAuthoritativeMemberNode(nodeReference);
-                systemMetadata.setDateSysMetadataModified(new Date());
                 writeQueue.put(pid, systemMetadata);
             } catch (NotAuthorized ex) {
                 logger.error(ex.serialize(ex.FMT_XML));
@@ -223,6 +223,7 @@ public class ObjectListQueueProcessor {
     public void setCnIdentifier(String cnIdentifier) {
         this.cnIdentifier = cnIdentifier;
     }
+
     public List<ObjectFormat> getValidSciMetaObjectFormats() {
         return validSciMetaObjectFormats;
     }
