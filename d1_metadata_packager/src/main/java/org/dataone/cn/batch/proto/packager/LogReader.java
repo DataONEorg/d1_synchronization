@@ -11,16 +11,11 @@ import java.io.File;
 import java.io.FileFilter;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.util.Arrays;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.LinkedList;
-import java.util.Map;
 import java.util.regex.Pattern;
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.log4j.Logger;
@@ -35,14 +30,11 @@ import org.dataone.cn.batch.proto.packager.types.MergeMap;
 public abstract class LogReader {
 
     Logger logger = Logger.getLogger(LogReader.class.getName());
-
     public static final String GUIDTOKEN = "D1GUID:";
     public static final String SCIDATATOKEN = ":D1SCIMETADATA:";
     public static final String SYSDATATOKEN = ":D1SYSMETADATA:";
-
     protected String logFileName;
     protected String logFilePath;
-
     public static String newline = System.getProperty("line.separator");
     private MergeMap mergeMap;
     //
@@ -91,7 +83,7 @@ public abstract class LogReader {
             // the remaining bytes not processed will be subtracted from totalbytes read, and processed next iteration
             // newline should only be a double character on dos
             int lastBufferIndex = bufferSize.intValue() - 1;
-            
+
 
             byte[] newlineArray = newline.getBytes();
             while (((lastBufferIndex - lastByteOffset) > 0)
@@ -151,6 +143,7 @@ public abstract class LogReader {
         return processLogFiles;
     }
     // TODO Need a better comparator, or at least test this one with 0-100 entries...
+
     class LogDirFilesComparator implements Comparator<File> {
 
         // Comparator interface requires defining compare method.
@@ -202,6 +195,4 @@ public abstract class LogReader {
     public void setMergeMap(MergeMap mergeMap) {
         this.mergeMap = mergeMap;
     }
-
-
 }

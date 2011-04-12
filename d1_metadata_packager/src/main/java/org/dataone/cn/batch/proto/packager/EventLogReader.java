@@ -13,11 +13,9 @@ import java.text.DateFormat;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedList;
-import java.util.Map;
 import org.apache.log4j.Logger;
 import org.dataone.cn.batch.proto.packager.types.EventMap;
 import org.dataone.cn.batch.proto.packager.types.MergeMap;
-
 
 /**
  *
@@ -26,7 +24,6 @@ import org.dataone.cn.batch.proto.packager.types.MergeMap;
 public class EventLogReader extends LogReader {
 
     Logger logger = Logger.getLogger(EventLogReader.class.getName());
-
     protected EventPersistence eventPersistence;
     //
     // this will be map of a map, the first key is GUID
@@ -36,7 +33,6 @@ public class EventLogReader extends LogReader {
     // while the second has a key of 'SYSMETA' (once again type needed)
     // with a value of the system metadata file name from the log
     //
-    
     private LogDirFilesComparator logDirFilesComparator = new LogDirFilesComparator();
 
     @Override
@@ -59,15 +55,15 @@ public class EventLogReader extends LogReader {
 
         // process the files in order
         skipInLogFile = persistentMapping.get(DataPersistenceKeys.SKIP_IN_LOG_FIELD.toString()).longValue();
-        logger.debug("number of logfiles on queue = " + processLogFiles.size() + " number of bytes to skip = " + skipInLogFile +
-                "Date Log last Accessed: " + DateFormat.getDateInstance().format(new Date(persistentMapping.get(DataPersistenceKeys.DATE_TIME_LAST_ACCESSED_FIELD.toString()))));
+        logger.debug("number of logfiles on queue = " + processLogFiles.size() + " number of bytes to skip = " + skipInLogFile
+                + "Date Log last Accessed: " + DateFormat.getDateInstance().format(new Date(persistentMapping.get(DataPersistenceKeys.DATE_TIME_LAST_ACCESSED_FIELD.toString()))));
         while (!processLogFiles.isEmpty()) {
             File processFile = processLogFiles.removeLast();
 
             // record the lastModfiedDateTime of the file
             // TODO There maybe more data written to this file before it is opened and read, need to read that date
             // after the buffer has been completely read
-            
+
             processingFileLastModified = processFile.lastModified();
             // pass in the skip bytes argument
             // return the total bytes read
@@ -115,5 +111,4 @@ public class EventLogReader extends LogReader {
     public void setEventPersistence(EventPersistence eventPersistence) {
         this.eventPersistence = eventPersistence;
     }
-
 }

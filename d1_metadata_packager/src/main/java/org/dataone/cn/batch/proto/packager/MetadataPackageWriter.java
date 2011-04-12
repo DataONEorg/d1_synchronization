@@ -26,7 +26,7 @@ import javax.xml.transform.stream.StreamResult;
 import org.apache.log4j.Logger;
 import org.dataone.cn.batch.proto.packager.types.MergeMap;
 import org.dataone.cn.batch.proto.packager.types.DataPersistenceKeys;
-import org.dataone.cn.batch.utils.NodeReference;
+import org.dataone.service.cn.CoordinatingNodeRegister;
 import org.dataone.service.types.ObjectFormat;
 import org.jibx.runtime.JiBXException;
 import org.w3c.dom.Document;
@@ -47,7 +47,8 @@ public class MetadataPackageWriter {
     private MergeMap readMap;
     private Map<String, String> scienceMetadataFormatPathMap;
     private HashMap<String, File> mergedMetaDir = new HashMap<String, File>();
-    NodeReference nodeReferenceUtility;
+    CoordinatingNodeRegister coordinatingNodeRegister;
+    org.dataone.service.types.NodeList nodeList;
     private DataPersistenceWriter dataPersistenceWriter;
     private List<ObjectFormat> validSciMetaObjectFormats;
     private String cnWebUrl;
@@ -66,12 +67,13 @@ public class MetadataPackageWriter {
             // if not, set or check expiration date of incomplete record
 
             if (mergeFiles.containsKey(DataPersistenceKeys.SCIMETA.toString()) && mergeFiles.containsKey(DataPersistenceKeys.SYSMETA.toString())) {
+                nodeList = coordinatingNodeRegister.listNodes(null);
                 logger.debug("found: scimetadata: " + mergeFiles.get(DataPersistenceKeys.SCIMETA.toString()) + ": sysmetadata: " + mergeFiles.get(DataPersistenceKeys.SYSMETA.toString()));
                 if (this.writePackage(mergeFiles.get(DataPersistenceKeys.SCIMETA.toString()), mergeFiles.get(DataPersistenceKeys.SYSMETA.toString()))) {
                     ++writtenPackages;
                     logger.debug("wrote: scimetadata: " + mergeFiles.get(DataPersistenceKeys.SCIMETA.toString()) + ": sysmetadata: " + mergeFiles.get(DataPersistenceKeys.SYSMETA.toString()));
                 }
-                
+
                 // record has been written, remove from processing queue
                 readMap.remove(key);
             } else {
@@ -165,7 +167,7 @@ public class MetadataPackageWriter {
         }
         // Harzards of Languange we decided to use, Node/NodeList objects
         // in two different packages
-        org.dataone.service.types.NodeList nodeList = nodeReferenceUtility.getMnNodeList();
+
         List<org.dataone.service.types.Node> nodes = nodeList.getNodeList();
         for (org.dataone.service.types.Node node : nodes) {
             if (node.getIdentifier().getValue().contentEquals(originMemberNode)) {
@@ -174,7 +176,7 @@ public class MetadataPackageWriter {
             }
         }
         if (d1Node == null) {
-            d1Node = nodeReferenceUtility.getMnNode();
+            throw new NullPointerException("Can not determine node with id: " + originMemberNode + " from NodeList");
         }
 
         Node adoptedMetadata = sciMeta.importNode(sysMeta.getDocumentElement(), true);
@@ -296,12 +298,12 @@ public class MetadataPackageWriter {
         this.scienceMetadataFormatPathMap = scienceMetadataFormatPathMap;
     }
 
-    public NodeReference getNodeReferenceUtility() {
-        return nodeReferenceUtility;
+    public CoordinatingNodeRegister getCoordinatingNodeRegister() {
+        return coordinatingNodeRegister;
     }
 
-    public void setNodeReferenceUtility(NodeReference nodeReferenceUtility) {
-        this.nodeReferenceUtility = nodeReferenceUtility;
+    public void setCoordinatingNodeRegister(CoordinatingNodeRegister coordinatingNodeRegister) {
+        this.coordinatingNodeRegister = coordinatingNodeRegister;
     }
 
     public DataPersistenceWriter getMetadataPackageAccess() {
@@ -343,5 +345,4 @@ public class MetadataPackageWriter {
     public void setHoursToExpire(int hoursToExpire) {
         this.hoursToExpire = hoursToExpire;
     }
-    
 }

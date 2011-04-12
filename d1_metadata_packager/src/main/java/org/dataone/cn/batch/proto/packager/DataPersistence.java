@@ -2,7 +2,6 @@
  * To change this template, choose Tools | Templates
  * and open the template in the editor.
  */
-
 package org.dataone.cn.batch.proto.packager;
 
 import java.io.File;
@@ -15,10 +14,9 @@ import java.io.IOException;
  */
 public abstract class DataPersistence implements DataPersistenceWriter {
 
-   private String persistentDataFileName;
-   private String persistentDataFileNamePath;
-   private File persistentDataFile = null;
-
+    private String persistentDataFileName;
+    private String persistentDataFileNamePath;
+    private File persistentDataFile = null;
 
     @Override
     abstract public void writePersistentData() throws FileNotFoundException, IOException, Exception;
@@ -50,7 +48,4 @@ public abstract class DataPersistence implements DataPersistenceWriter {
     public void setPersistentDataFile(File persistentDataFile) {
         this.persistentDataFile = persistentDataFile;
     }
-    
-
-
 }
