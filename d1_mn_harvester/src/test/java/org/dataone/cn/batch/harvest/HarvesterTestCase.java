@@ -9,6 +9,8 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.PropertyPermission;
+import java.util.TimeZone;
 import javax.annotation.Resource;
 import org.apache.commons.io.FileUtils;
 import org.apache.log4j.Logger;
@@ -57,7 +59,17 @@ public class HarvesterTestCase implements ApplicationContextAware {
 
     @Before
     public void before() throws Exception {
-
+          boolean hasPermission = true;
+          SecurityManager sm = System.getSecurityManager();
+          if (sm != null) {
+           try {
+            sm.checkPermission(new PropertyPermission("user.timezone", "write"));
+           } catch (SecurityException e) {
+            hasPermission = false;
+           }
+          }
+        assertTrue(hasPermission);
+        TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
         cnObjectDirectory = new File(testTmpCacheDirectory + File.separator + "cn" + File.separator + "object");
         if (!cnObjectDirectory.exists()) {
             cnObjectDirectory.mkdirs();
