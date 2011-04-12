@@ -11,8 +11,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.util.HashMap;
-import java.util.Map;
 import org.apache.log4j.Logger;
 import org.dataone.cn.batch.proto.packager.types.DataPersistenceKeys;
 import org.dataone.cn.batch.proto.packager.types.EventMap;
@@ -42,7 +40,7 @@ public class ReplicationPersistence extends DataPersistence implements DataPersi
                     // ois.readObject() does not return a null, it throws and EOF exception instead
                     // therefore, keep track of  number of objects processed
                     int numberOfObjects = 0;
-                    while ( (numberOfObjects < 2) && (obj = ois.readObject()) != null) {
+                    while ((numberOfObjects < 2) && (obj = ois.readObject()) != null) {
                         if (obj instanceof EventMap) {
                             persistEventMap = (EventMap) obj;
                         } else if (obj instanceof MergeMap) {

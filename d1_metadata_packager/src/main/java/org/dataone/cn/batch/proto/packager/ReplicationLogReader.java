@@ -23,7 +23,6 @@ import org.apache.log4j.Logger;
 public class ReplicationLogReader extends EventLogReader {
 
     Logger logger = Logger.getLogger(ReplicationLogReader.class.getName());
-
     //
     // this will be map of a map, the first key is GUID
     // the map that the GUID points to will have two entires
@@ -32,8 +31,8 @@ public class ReplicationLogReader extends EventLogReader {
     // while the second has a key of 'SYSMETA' (once again type needed)
     // with a value of the system metadata file name from the log
     //
-
     protected ReplicationPersistence replicationPersistence;
+
     @Override
     public void readLogfile() throws FileNotFoundException, Exception {
 
@@ -48,7 +47,7 @@ public class ReplicationLogReader extends EventLogReader {
 
         LinkedList<File> processLogFiles;
 
-         Map<String, Long> persistMappings = replicationPersistence.getPersistEventMap().getMap();
+        Map<String, Long> persistMappings = replicationPersistence.getPersistEventMap().getMap();
         // Persistent file that will tell you how many bytes to skip before reading.
         // It will also maintain the lastAccessedDate of the file being processed
 
@@ -85,29 +84,29 @@ public class ReplicationLogReader extends EventLogReader {
         while ((logEntry = bufferedReader.readLine()) != null) {
             logger.trace(logEntry);
             if (logEntry.contains("replicate") && logEntry.contains(GUIDTOKEN)) {
-                
+
                 String entryToken = null;
                 DataPersistenceKeys entryKey = null;
                 Map<String, String> sciSysMetaHashMap = null;
                 String[] findIdFields = logEntry.split(GUIDTOKEN, 2);
-                if (findIdFields[1].contains(SCIDATATOKEN) ) {
+                if (findIdFields[1].contains(SCIDATATOKEN)) {
 
                     entryToken = SCIDATATOKEN;
                     entryKey = DataPersistenceKeys.SCIMETA;
-                } else if (findIdFields[1].contains(SYSDATATOKEN) ) {
+                } else if (findIdFields[1].contains(SYSDATATOKEN)) {
                     entryToken = SYSDATATOKEN;
                     entryKey = DataPersistenceKeys.SYSMETA;
                 } else {
                     logger.error("Non Exception Error: Unable to determine intent of the following log entry" + newline + logEntry);
                     continue;
                 }
-                logger.trace("found entryToken of " + entryToken );
+                logger.trace("found entryToken of " + entryToken);
                 int guidEndMarker = findIdFields[1].lastIndexOf(entryToken);
 
                 String guid = findIdFields[1].substring(0, guidEndMarker);
                 logger.trace("guid is " + guid);
                 if (this.getMergeMap().containsKey(guid)) {
-                    sciSysMetaHashMap = (Map<String, String>)this.getMergeMap().get(guid);
+                    sciSysMetaHashMap = (Map<String, String>) this.getMergeMap().get(guid);
                     logger.trace("guid exists in hashmap");
                 } else {
                     sciSysMetaHashMap = new HashMap<String, String>();
@@ -115,7 +114,7 @@ public class ReplicationLogReader extends EventLogReader {
                     logger.trace("guid does not exist, create new hashmap");
                 }
                 String entry = findIdFields[1].substring(guidEndMarker + entryToken.length(), findIdFields[1].lastIndexOf(":"));
-                logger.trace("value of " + entryToken + " is " +entry);
+                logger.trace("value of " + entryToken + " is " + entry);
                 sciSysMetaHashMap.put(entryKey.toString(), entry);
                 this.getMergeMap().put(guid, sciSysMetaHashMap);
             }
@@ -130,5 +129,4 @@ public class ReplicationLogReader extends EventLogReader {
     public void setReplicationPersistence(ReplicationPersistence replicationPersistence) {
         this.replicationPersistence = replicationPersistence;
     }
-
 }

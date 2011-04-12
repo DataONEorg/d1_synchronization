@@ -64,17 +64,6 @@
       factory-bean="testNodeListLocationResource"
       factory-method="getFile"/>
 
-    <bean id="testNodeListLocationString"
-        factory-bean="testNodeListLocationFile"
-        factory-method="getAbsolutePath" />
-
-    <bean id="testNodeListAccess" class="org.dataone.cn.batch.utils.NodeListAccess">
-        <constructor-arg ref="testNodeListLocationString"/>
-    </bean>
-
-    <bean id="testNodeList" class="org.dataone.service.types.NodeList"
-        factory-bean="testNodeListAccess"
-        factory-method="getNodeList" />
 <!--
    <bean id="testPackageHarvestDirectory" class="org.springframework.core.io.ClassPathResource">
        <constructor-arg value="/org/dataone/cn/batch/proto/packager/persistant.cache"/>
@@ -93,14 +82,13 @@
         <constructor-arg value="persistent2.cache" />
     </bean>
 
-    <bean id="testNodeReferenceUtility" class="org.dataone.cn.batch.utils.NodeReference">
-        <property name="mnNodeList" ref="testNodeList" />
-        <property name="mnNodeIdentifier" value="${mnNode.identifier}" />
+    <bean id="testNodeReferenceUtility" class="org.dataone.cn.batch.proto.packager.mock.MockCnClient">
+        <property name="nodeListFile" ref="testNodeListLocationFile" />
     </bean>
 
     <bean id="testMetadataPackagerWriter" class="org.dataone.cn.batch.proto.packager.MetadataPackageWriter">
         <property name="readMetacatDirectory" ref="testPackageSamplesDirectoryString" />
-        <property name="nodeReferenceUtility" ref="testNodeReferenceUtility" />
+        <property name="coordinatingNodeRegister" ref="testNodeReferenceUtility" />
         <property name="writeDirectory" ref="testPackageSamplesDirectoryString" />
         <property name="scienceMetadataFormatPathMap" ref="scienceMetadataFormatPathMap"/>
         <property name="metadataPackageAccess" ref="metadataPackageEventAccess" />

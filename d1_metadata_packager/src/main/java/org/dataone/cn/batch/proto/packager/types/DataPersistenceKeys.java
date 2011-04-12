@@ -2,7 +2,6 @@
  * To change this template, choose Tools | Templates
  * and open the template in the editor.
  */
-
 package org.dataone.cn.batch.proto.packager.types;
 
 /**
@@ -10,11 +9,12 @@ package org.dataone.cn.batch.proto.packager.types;
  * @author waltz
  */
 public enum DataPersistenceKeys {
+
     SKIP_IN_LOG_FIELD("skipInLogFile"),
     DATE_TIME_LAST_ACCESSED_FIELD("dateTimeLastAccessed"),
     SCIMETA("SCIMETA"),
     SYSMETA("SYSMETA");
-        private final String value;
+    private final String value;
 
     private DataPersistenceKeys(String value) {
         this.value = value;
