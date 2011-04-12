@@ -1,0 +1,12 @@
+<D1:systemMetadata xmlns:D1="http://dataone.org/service/types/0.5.1">
+ <identifier>MD_ORNLDAAC_781_03032010095920</identifier>
+ <objectFormat>FGDC-STD-001.1-1999</objectFormat>
+ <size>7857</size>
+ <submitter>ORNL DAAC User Services Office</submitter>
+ <rightsHolder>ORNL DAAC</rightsHolder>
+ <checksum algorithm="SHA-1">f037f696f5b7c599f4a08b4e2639ccc3147c3c25</checksum>
+ <dateUploaded>2010-03-30T00:00:00</dateUploaded>
+ <dateSysMetadataModified>2010-03-30T00:00:00</dateSysMetadataModified>
+ <originMemberNode>ORNL DAAC</originMemberNode>
+ <authoritativeMemberNode>ORNL DAAC</authoritativeMemberNode>
+</D1:systemMetadata>
