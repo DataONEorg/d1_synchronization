@@ -6,6 +6,7 @@ package org.dataone.cn.batch.proto.harvest.types;
 
 import java.io.Serializable;
 import java.util.Collection;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -18,10 +19,10 @@ import java.util.Set;
  */
 public class NodeMap extends HashMap implements Map, Serializable {
 
-    private Map<String, Long> eventMap;
+    private Map<String, Date> eventMap;
 
     public NodeMap() {
-        eventMap = new HashMap<String, Long>();
+        eventMap = new HashMap<String, Date>();
     }
 
     @Override
@@ -50,13 +51,13 @@ public class NodeMap extends HashMap implements Map, Serializable {
     @Override
     public boolean containsValue(Object o) {
         if (o instanceof Map) {
-            return eventMap.containsValue((Long) o);
+            return eventMap.containsValue((Date) o);
         } else {
             return false;
         }
     }
 
-    public boolean containsValue(Long o) {
+    public boolean containsValue(Date o) {
         return eventMap.containsValue(o);
 
     }
@@ -66,16 +67,16 @@ public class NodeMap extends HashMap implements Map, Serializable {
         return eventMap.get((String) o);
     }
 
-    public Long get(String o) {
+    public Date get(String o) {
         return eventMap.get(o);
     }
 
     @Override
     public Object put(Object k, Object v) {
-        return eventMap.put((String) k, (Long) v);
+        return eventMap.put((String) k, (Date) v);
     }
 
-    public Object put(String k, Long v) {
+    public Object put(String k, Date v) {
         return eventMap.put(k, v);
     }
 
@@ -84,13 +85,13 @@ public class NodeMap extends HashMap implements Map, Serializable {
         return eventMap.remove((String) o);
     }
 
-    public Long remove(String o) {
+    public Date remove(String o) {
         return eventMap.remove(o);
     }
 
     @Override
     public void putAll(Map map) {
-        eventMap.putAll((Map<String, Long>) map);
+        eventMap.putAll((Map<String, Date>) map);
     }
 
     @Override
@@ -113,11 +114,11 @@ public class NodeMap extends HashMap implements Map, Serializable {
         return eventMap.entrySet();
     }
 
-    public Map<String, Long> getMap() {
+    public Map<String, Date> getMap() {
         return eventMap;
     }
 
-    public void setMap(Map<String, Long> eventMap) {
+    public void setMap(Map<String, Date> eventMap) {
         this.eventMap = eventMap;
     }
 }

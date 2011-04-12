@@ -95,10 +95,9 @@ public class ObjectListQueueWriter {
         //    File sciMetaFile = null;
 
         Date lastHarvestDate = null;
-        Map<String, Long> nodeMap = nodeMapPersistance.getPersistMapping().getMap();
+        Map<String, Date> nodeMap = nodeMapPersistance.getPersistMapping().getMap();
         if (nodeMap.containsKey(mnIdentifier)) {
-            Long time = nodeMap.get(mnIdentifier);
-            lastHarvestDate = new Date(time.longValue());
+            lastHarvestDate = nodeMap.get(mnIdentifier);
         }
         Date lastMofidiedDate = lastHarvestDate;
 
@@ -218,7 +217,7 @@ public class ObjectListQueueWriter {
         if (lastMofidiedDate.after(lastHarvestDate)) {
             logger.info(":)");
             lastMofidiedDate.setTime(lastMofidiedDate.getTime() + (1000 - (lastMofidiedDate.getTime() % 1000)));
-            nodeMap.put(mnIdentifier, lastMofidiedDate.getTime());
+            nodeMap.put(mnIdentifier, lastMofidiedDate);
             nodeMapPersistance.writePersistentData();
         }
         readQueue.clear();
