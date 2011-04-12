@@ -8,6 +8,7 @@ import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import java.util.TimeZone;
 
 import org.apache.log4j.*;
 import org.dataone.cn.batch.proto.harvest.persist.NodeMapPersistence;
@@ -21,6 +22,7 @@ import org.dataone.service.mn.MemberNodeReplication;
 import org.dataone.service.types.AuthToken;
 import org.dataone.service.types.ObjectInfo;
 import org.dataone.service.types.ObjectList;
+import org.dataone.service.types.util.ServiceTypeUtil;
 
 /**
  *
@@ -52,14 +54,12 @@ public class ObjectListQueueBuilder {
         Boolean replicationStatus = null;
         Date now = new Date();
         Date lastHarvestDate;
-        Map<String, Long> nodeMap = nodeMapPersistance.getPersistMapping().getMap();
+        Map<String, Date> nodeMap = nodeMapPersistance.getPersistMapping().getMap();
         if (nodeMap.containsKey(mnIdentifier)) {
-            Long time = nodeMap.get(mnIdentifier);
-            lastHarvestDate = new Date(time.longValue());
+            lastHarvestDate = nodeMap.get(mnIdentifier);
         } else {
-            Long longTimeAgo = new Long(-2208988800L);
-            lastHarvestDate = new Date(longTimeAgo.longValue()); // Mon, 01 Jan 1900 00:00:00 GMT
-            nodeMap.put(mnIdentifier, longTimeAgo.longValue());
+            lastHarvestDate = ServiceTypeUtil.deserializeDateToUTC("1900-01-01T00:00:00.000"); // Mon, 01 Jan 1900 00:00:00 GMT
+            nodeMap.put(mnIdentifier, lastHarvestDate);
         }
         try {
             do {

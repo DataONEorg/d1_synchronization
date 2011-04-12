@@ -5,8 +5,8 @@
  <submitter>ORNL DAAC User Services Office</submitter>
  <rightsHolder>ORNL DAAC</rightsHolder>
  <checksum algorithm="SHA-1">49fd46daad283f0cbd411e0297e0d68d56d001a4</checksum>
- <dateUploaded>2010-03-30T00:00:00</dateUploaded>
- <dateSysMetadataModified>2010-03-30T00:00:00</dateSysMetadataModified>
+ <dateUploaded>2010-03-30T00:00:00Z</dateUploaded>
+ <dateSysMetadataModified>2010-03-30T00:00:00Z</dateSysMetadataModified>
  <originMemberNode>ORNL DAAC</originMemberNode>
  <authoritativeMemberNode>ORNL DAAC</authoritativeMemberNode>
 </D1:systemMetadata>

@@ -6,6 +6,7 @@ package org.dataone.cn.batch.harvest;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -22,6 +23,7 @@ import org.dataone.cn.batch.proto.harvest.types.NodeMap;
 import org.dataone.service.types.Identifier;
 import org.dataone.service.types.ObjectInfo;
 import org.dataone.service.types.SystemMetadata;
+import org.dataone.service.types.util.ServiceTypeUtil;
 import org.junit.*;
 import static org.junit.Assert.*;
 import org.junit.runner.RunWith;
@@ -59,17 +61,7 @@ public class HarvesterTestCase implements ApplicationContextAware {
 
     @Before
     public void before() throws Exception {
-          boolean hasPermission = true;
-          SecurityManager sm = System.getSecurityManager();
-          if (sm != null) {
-           try {
-            sm.checkPermission(new PropertyPermission("user.timezone", "write"));
-           } catch (SecurityException e) {
-            hasPermission = false;
-           }
-          }
-        assertTrue(hasPermission);
-        TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
+
         cnObjectDirectory = new File(testTmpCacheDirectory + File.separator + "cn" + File.separator + "object");
         if (!cnObjectDirectory.exists()) {
             cnObjectDirectory.mkdirs();
@@ -183,12 +175,12 @@ public class HarvesterTestCase implements ApplicationContextAware {
         testNodeMapPersistence.init();
         NodeMap persistNodeData = testNodeMapPersistence.getPersistMapping();
         assertTrue(!persistNodeData.isEmpty());
-        Map<String, Long> persistMap = persistNodeData.getMap();
+        Map<String, Date> persistMap = persistNodeData.getMap();
         for (String key : persistMap.keySet()) {
-            Long timeValue = (Long) persistMap.get(key);
-            logger.info("Persisted NodeId is " + key + "=" + timeValue + " ms from Epoche");
+            Date timeValue = (Date) persistMap.get(key);
+            logger.info("Persisted NodeId is " + key + "=" + ServiceTypeUtil.serializeDateToUTC(timeValue));
             assertTrue(key.contentEquals("r2d2"));
-            assertTrue(timeValue.compareTo(1269921601000L) == 0);
+            assertTrue(timeValue.compareTo(ServiceTypeUtil.deserializeDateToUTC("2010-03-30T00:00:01.000+0000")) == 0);
         }
 
 //        Map<String, Long> queueMap = objectListQueueBuilder.
