@@ -15,11 +15,13 @@ import java.util.TimeZone;
 import javax.annotation.Resource;
 import org.apache.commons.io.FileUtils;
 import org.apache.log4j.Logger;
+import org.dataone.cn.batch.harvest.mock.MockMnReplication;
 import org.dataone.cn.batch.proto.harvest.ObjectListQueueBuilder;
 import org.dataone.cn.batch.proto.harvest.ObjectListQueueProcessor;
 import org.dataone.cn.batch.proto.harvest.ObjectListQueueWriter;
 import org.dataone.cn.batch.proto.harvest.persist.NodeMapPersistence;
 import org.dataone.cn.batch.proto.harvest.types.NodeMap;
+import org.dataone.service.mn.MemberNodeReplication;
 import org.dataone.service.types.Identifier;
 import org.dataone.service.types.ObjectInfo;
 import org.dataone.service.types.SystemMetadata;
@@ -58,7 +60,10 @@ public class HarvesterTestCase implements ApplicationContextAware {
     static String testTmpCacheDirectory;
     static String testSamplesDirectory;
     static NodeMapPersistence objectPersistence;
-
+    MockMnReplication mockReplication;
+    File testEmptyObjectListLocationFile;
+    File testLyingCheatingObjectListLocationFile;
+    
     @Before
     public void before() throws Exception {
 
@@ -118,7 +123,18 @@ public class HarvesterTestCase implements ApplicationContextAware {
     public void setObjectListQueueWriter(ObjectListQueueWriter objectListQueueWriter) {
         this.objectListQueueWriter = objectListQueueWriter;
     }
-
+    @Resource
+    public void setMnReplication(MockMnReplication mockReplication) {
+        this.mockReplication = mockReplication;
+    }
+    @Resource
+    public void setTestEmptyObjectListLocationFile(File testEmptyObjectListLocationFile) {
+        this.testEmptyObjectListLocationFile = testEmptyObjectListLocationFile;
+    }
+    @Resource
+    public void setTestLyingCheatingObjectListLocationFile(File testLyingCheatingObjectListLocationFile) {
+        this.testLyingCheatingObjectListLocationFile = testLyingCheatingObjectListLocationFile;
+    }
     @Test
     public void testQueueBuilder() throws Exception {
 
@@ -185,6 +201,24 @@ public class HarvesterTestCase implements ApplicationContextAware {
 
 //        Map<String, Long> queueMap = objectListQueueBuilder.
 //        eventPersistence.writePersistentData();
+    }
+    @Test
+    public void testEmptyResultsQueueBuilder() throws Exception {
+        mockReplication.setObjectListFile(testEmptyObjectListLocationFile);
+        List<ObjectInfo> writeQueue = new ArrayList<ObjectInfo>();
+        objectListQueueBuilder.setWriteQueue(writeQueue);
+        objectListQueueBuilder.buildQueue();
+        assertTrue(writeQueue.isEmpty());
+
+    }
+    @Test
+    public void testLyingCheatingResultsQueueBuilder() throws Exception {
+        mockReplication.setObjectListFile(testLyingCheatingObjectListLocationFile);
+        List<ObjectInfo> writeQueue = new ArrayList<ObjectInfo>();
+        objectListQueueBuilder.setWriteQueue(writeQueue);
+        objectListQueueBuilder.buildQueue();
+        assertTrue(writeQueue.isEmpty());
+
     }
 
     @Override
