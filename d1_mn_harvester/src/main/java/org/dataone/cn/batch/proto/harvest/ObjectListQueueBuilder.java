@@ -31,7 +31,7 @@ import org.dataone.service.types.util.ServiceTypeUtil;
 public class ObjectListQueueBuilder {
 
     Logger logger = Logger.getLogger(ObjectListQueueBuilder.class.getName());
-    private MemberNodeReplication mnReader;
+    private MemberNodeReplication mnReplication;
     private List<ObjectInfo> writeQueue;
     private String mnIdentifier;
     private Integer objectRetrievalCount = 1000;
@@ -63,8 +63,10 @@ public class ObjectListQueueBuilder {
         }
         try {
             do {
-                objectList = mnReader.listObjects(token, lastHarvestDate, now, null, replicationStatus, start, objectRetrievalCount);
-                if (objectList == null || objectList.getTotal() == 0) {
+                objectList = mnReplication.listObjects(token, lastHarvestDate, now, null, replicationStatus, start, objectRetrievalCount);
+                if ((objectList == null) ||
+                        (objectList.getCount() == 0) ||
+                        (objectList.getObjectInfoList().isEmpty()) ) {
                     break;
                 }
                 start += objectList.getCount();
@@ -89,12 +91,12 @@ public class ObjectListQueueBuilder {
 //        Collections.sort(writeQueue, LAST_MOFIDIED_ORDER);
     }
 
-    public MemberNodeReplication getMnReader() {
-        return mnReader;
+    public MemberNodeReplication getMnReplication() {
+        return mnReplication;
     }
 
-    public void setMnReader(MemberNodeReplication mnReader) {
-        this.mnReader = mnReader;
+    public void setMnReplication(MemberNodeReplication mnReplication) {
+        this.mnReplication = mnReplication;
     }
 
     public List<ObjectInfo> getWriteQueue() {

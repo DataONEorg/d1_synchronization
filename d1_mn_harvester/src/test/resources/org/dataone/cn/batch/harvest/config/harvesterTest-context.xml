@@ -37,6 +37,21 @@
       factory-bean="testObjectListLocationResource"
       factory-method="getFile"/>
 
+    <bean id="testEmtpyObjectListLocationResource" class="org.springframework.core.io.ClassPathResource">
+        <constructor-arg value="/org/dataone/cn/batch/harvest/samples/objectList2.xml"/>
+    </bean>
+    <bean id="testEmptyObjectListLocationFile"
+      factory-bean="testEmtpyObjectListLocationResource"
+      factory-method="getFile"/>
+
+    <bean id="testLyingCheatingObjectListLocationResource" class="org.springframework.core.io.ClassPathResource">
+        <constructor-arg value="/org/dataone/cn/batch/harvest/samples/objectList3.xml"/>
+    </bean>
+    <bean id="testLyingCheatingObjectListLocationFile"
+      factory-bean="testLyingCheatingObjectListLocationResource"
+      factory-method="getFile"/>
+
+
     <bean id="testSamplesDirectoryResource" class="org.springframework.core.io.ClassPathResource">
         <constructor-arg value="/org/dataone/cn/batch/harvest/samples"/>
     </bean>
@@ -65,7 +80,7 @@
         <property name="persistentDataFileNamePath" ref="testSamplesDirectory" />
     </bean>
 
-    <bean id="mnReaderService" class="org.dataone.cn.batch.harvest.mock.MockMnReplication">
+    <bean id="mnReplicationService" class="org.dataone.cn.batch.harvest.mock.MockMnReplication">
         <property name="objectListFile" ref="testObjectListLocationFile" />
     </bean>
     
@@ -75,7 +90,7 @@
 
     <bean id="objectListQueueBuilder" class="org.dataone.cn.batch.proto.harvest.ObjectListQueueBuilder">
         <property name="token" ref="publicToken" />
-        <property name="mnReader" ref="mnReaderService" />
+        <property name="mnReplication" ref="mnReplicationService" />
         <property name="mnIdentifier" value="r2d2" />
         <property name="nodeMapPersistance" ref="objectPersistence" />
     </bean>
