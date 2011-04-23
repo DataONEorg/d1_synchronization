@@ -14,7 +14,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedList;
 import org.apache.log4j.Logger;
-import org.dataone.cn.batch.proto.packager.types.EventMap;
+import org.dataone.cn.batch.proto.packager.types.LogAccessMap;
 import org.dataone.cn.batch.proto.packager.types.MergeMap;
 
 /**
@@ -24,7 +24,7 @@ import org.dataone.cn.batch.proto.packager.types.MergeMap;
 public class EventLogReader extends LogReader {
 
     Logger logger = Logger.getLogger(EventLogReader.class.getName());
-    protected EventPersistence eventPersistence;
+    protected DataPersistence eventPersistence;
     //
     // this will be map of a map, the first key is GUID
     // the map that the GUID points to will have two entires
@@ -37,7 +37,7 @@ public class EventLogReader extends LogReader {
 
     @Override
     public void readLogfile() throws FileNotFoundException, Exception {
-        this.setMergeMap(new MergeMap());
+        this.setMergeMap(eventPersistence.getPersistMergeMap());
         // entries are from the event log
         File logFileDir = new File(logFilePath);
         // this is the date the file that is being processed is last modified
@@ -47,7 +47,7 @@ public class EventLogReader extends LogReader {
 
         LinkedList<File> processLogFiles;
 
-        EventMap persistentMapping = eventPersistence.getPersistMapping();
+        LogAccessMap persistentMapping = eventPersistence.getPersistLogAcessMap();
         // Persistent file that will tell you how many bytes to skip before reading.
         // It will also maintain the lastAccessedDate of the file being processed
 
@@ -104,11 +104,11 @@ public class EventLogReader extends LogReader {
         logger.info("number of entries = " + readlines);
     }
 
-    public EventPersistence getEventPersistence() {
+    public DataPersistence getEventPersistence() {
         return eventPersistence;
     }
 
-    public void setEventPersistence(EventPersistence eventPersistence) {
+    public void setEventPersistence(DataPersistence eventPersistence) {
         this.eventPersistence = eventPersistence;
     }
 }

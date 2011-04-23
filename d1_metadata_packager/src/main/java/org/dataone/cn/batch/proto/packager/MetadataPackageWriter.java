@@ -27,6 +27,9 @@ import org.apache.log4j.Logger;
 import org.dataone.cn.batch.proto.packager.types.MergeMap;
 import org.dataone.cn.batch.proto.packager.types.DataPersistenceKeys;
 import org.dataone.service.cn.CoordinatingNodeRegister;
+import org.dataone.service.exceptions.NotImplemented;
+import org.dataone.service.exceptions.ServiceFailure;
+import org.dataone.service.types.AuthToken;
 import org.dataone.service.types.ObjectFormat;
 import org.jibx.runtime.JiBXException;
 import org.w3c.dom.Document;
@@ -48,6 +51,7 @@ public class MetadataPackageWriter {
     private Map<String, String> scienceMetadataFormatPathMap;
     private HashMap<String, File> mergedMetaDir = new HashMap<String, File>();
     CoordinatingNodeRegister coordinatingNodeRegister;
+    AuthToken cnToken;
     org.dataone.service.types.NodeList nodeList;
     private DataPersistenceWriter dataPersistenceWriter;
     private List<ObjectFormat> validSciMetaObjectFormats;
@@ -56,58 +60,85 @@ public class MetadataPackageWriter {
     //  number of hours to search for
     private int hoursToExpire = 12;
 
-    public void writePackages() throws FileNotFoundException, JiBXException, IOException, ParserConfigurationException, SAXException, Exception {
+    public void writePackages() {
         logger.info("start write for " + readMap.keySet().size() + " number of packages");
         int writtenPackages = 0;
         // Copy into a new set or else receive nasty error
         Set<String> readSetQueue = new HashSet<String>(readMap.keySet());
-        for (String key : readSetQueue) {
-            Map<String, String> mergeFiles = readMap.get(key);
-            // Determine if the record contains both SciMeta and SysMeta. if so, write out.
-            // if not, set or check expiration date of incomplete record
+        try {
+            // get the most up-to-date dataone cn registry of nodes
+            nodeList = coordinatingNodeRegister.listNodes(cnToken);
+            for (String key : readSetQueue) {
+                Map<String, String> mergeFiles = readMap.get(key);
+                // Determine if the record contains both SciMeta and SysMeta. if so, write out.
+                // if not, set or check expiration date of incomplete record
 
-            if (mergeFiles.containsKey(DataPersistenceKeys.SCIMETA.toString()) && mergeFiles.containsKey(DataPersistenceKeys.SYSMETA.toString())) {
-                nodeList = coordinatingNodeRegister.listNodes(null);
-                logger.debug("found: scimetadata: " + mergeFiles.get(DataPersistenceKeys.SCIMETA.toString()) + ": sysmetadata: " + mergeFiles.get(DataPersistenceKeys.SYSMETA.toString()));
-                if (this.writePackage(mergeFiles.get(DataPersistenceKeys.SCIMETA.toString()), mergeFiles.get(DataPersistenceKeys.SYSMETA.toString()))) {
-                    ++writtenPackages;
-                    logger.debug("wrote: scimetadata: " + mergeFiles.get(DataPersistenceKeys.SCIMETA.toString()) + ": sysmetadata: " + mergeFiles.get(DataPersistenceKeys.SYSMETA.toString()));
-                }
-
-                // record has been written, remove from processing queue
-                readMap.remove(key);
-            } else {
-                // Check the Expiration Date of the incomplete record
-                if (mergeFiles.containsKey("EXPIRE_DATE_LONG")) {
-                    Date now = new Date();
-                    Long expireDateLong = Long.parseLong(mergeFiles.get("EXPIRE_DATE_LONG"));
-                    Date expireDate = new Date(expireDateLong.longValue());
-                    if (now.after(expireDate)) {
-                        // Expiration Date has passed
-                        DateFormat df = DateFormat.getDateInstance(DateFormat.LONG);
-                        logger.fatal("GUID: " + key + " HAS FAILED: " + df.format(expireDate) + " is now past due !!! DELETING RECORD. THIS SHOULD BE REPORTED TO THE AUTHORITIES");
-                        readMap.remove(key);
-                    } else {
-                        // Expiration Date has not passed
-                        logger.debug("GUID: " + key + " is not yet complete!");
+                if (mergeFiles.containsKey(DataPersistenceKeys.SCIMETA.toString()) && mergeFiles.containsKey(DataPersistenceKeys.SYSMETA.toString())) {
+                    logger.debug("found: scimetadata: " + mergeFiles.get(DataPersistenceKeys.SCIMETA.toString()) + ": sysmetadata: " + mergeFiles.get(DataPersistenceKeys.SYSMETA.toString()));
+                    if (this.writePackage(mergeFiles.get(DataPersistenceKeys.SCIMETA.toString()), mergeFiles.get(DataPersistenceKeys.SYSMETA.toString()))) {
+                        ++writtenPackages;
+                        logger.debug("wrote: scimetadata: " + mergeFiles.get(DataPersistenceKeys.SCIMETA.toString()) + ": sysmetadata: " + mergeFiles.get(DataPersistenceKeys.SYSMETA.toString()));
                     }
 
+                    // record has been written, remove from processing queue
+                    readMap.remove(key);
                 } else {
-                    // Create the Expiration Date of the incomplete record
-                    Date now = new Date();
+                    // Check the Expiration Date of the incomplete record
+                    if (mergeFiles.containsKey("EXPIRE_DATE_LONG")) {
+                        Date now = new Date();
+                        Long expireDateLong = Long.parseLong(mergeFiles.get("EXPIRE_DATE_LONG"));
+                        Date expireDate = new Date(expireDateLong.longValue());
+                        if (now.after(expireDate)) {
+                            // Expiration Date has passed
+                            DateFormat df = DateFormat.getDateInstance(DateFormat.LONG);
+                            logger.fatal("GUID: " + key + " HAS FAILED: " + df.format(expireDate) + " is now past due !!! DELETING RECORD. THIS SHOULD BE REPORTED TO THE AUTHORITIES");
+                            readMap.remove(key);
+                        } else {
+                            // Expiration Date has not passed
+                            logger.debug("GUID: " + key + " is not yet complete!");
+                        }
 
-                    Long expireDateLong = new Long(now.getTime() + (hoursToExpire * 60 * 60 * 1000));
-                    logger.warn("GUID: " + key + " is not yet complete!");
-                    mergeFiles.put("EXPIRE_DATE_LONG", expireDateLong.toString());
+                    } else {
+                        // Create the Expiration Date of the incomplete record
+                        Date now = new Date();
+
+                        Long expireDateLong = new Long(now.getTime() + (hoursToExpire * 60 * 60 * 1000));
+                        logger.warn("GUID: " + key + " is not yet complete!");
+                        mergeFiles.put("EXPIRE_DATE_LONG", expireDateLong.toString());
+                    }
                 }
             }
+        } catch (FileNotFoundException ex) {
+            logger.error(ex);
+        } catch (IOException ex) {
+            logger.error(ex);
+        } catch (SAXException ex) {
+            logger.error(ex);
+        } catch (JiBXException ex) {
+            logger.error(ex);
+        } catch (ParserConfigurationException ex) {
+            logger.error(ex);
+        } catch (NotImplemented ex) {
+            logger.error(ex);
+        } catch (ServiceFailure ex) {
+            logger.error(ex);
+        } catch (WritePackageException ex) {
+            logger.error(ex);
         }
-        // Save off state to check in future for completion of incomplete records
-        dataPersistenceWriter.writePersistentData();
+        try {
+            dataPersistenceWriter.writePersistentData();
+        } catch (FileNotFoundException ex) {
+            logger.error(ex);
+        } catch (IOException ex) {
+            logger.error(ex);
+        } catch (Exception ex) {
+            logger.error(ex);
+        }
         logger.info("wrote " + writtenPackages + " number of packages");
+
     }
 
-    private boolean writePackage(String scienceMetadataFile, String systemMetadataFile) throws JiBXException, IOException, ParserConfigurationException, SAXException, Exception {
+    private boolean writePackage(String scienceMetadataFile, String systemMetadataFile) throws JiBXException, IOException, ParserConfigurationException, SAXException, WritePackageException {
 
 // TODO code application logic here
 
@@ -118,7 +149,7 @@ public class MetadataPackageWriter {
         org.dataone.service.types.Node d1Node = null;
         try {
             sysMeta = parser.parse(new File(readMetacatDirectory + File.separator + systemMetadataFile));
-        } catch (Exception ex) {
+        } catch (SAXException ex) {
             logger.error(ex.getMessage(), ex);
             throw ex;
         }
@@ -132,13 +163,13 @@ public class MetadataPackageWriter {
             objectFormat = sysNodeList.item(i).getTextContent();
         }
         if (objectFormat.isEmpty()) {
-            throw new Exception("ObjectFormat:" + objectFormat + ": of file " + systemMetadataFile + " is not valid");
+            throw new WritePackageException("ObjectFormat:" + objectFormat + ": of file " + systemMetadataFile + " is not valid");
         }
         ObjectFormat objectFormatEnum = ObjectFormat.convert(objectFormat);
         if ((objectFormatEnum != null) && validSciMetaObjectFormats.contains(objectFormatEnum)) {
             try {
                 sciMeta = parser.parse(new File(readMetacatDirectory + File.separator + scienceMetadataFile));
-            } catch (Exception ex) {
+            } catch (IOException ex) {
                 logger.error(ex.getMessage(), ex);
                 throw ex;
             }
@@ -163,7 +194,7 @@ public class MetadataPackageWriter {
             originMemberNode = sysNodeList.item(i).getTextContent();
         }
         if (objectFormat.isEmpty()) {
-            throw new Exception("ObjectFormat:" + objectFormat + ": of file " + systemMetadataFile + " is not valid");
+            throw new WritePackageException("ObjectFormat:" + objectFormat + ": of file " + systemMetadataFile + " is not valid");
         }
         // Harzards of Languange we decided to use, Node/NodeList objects
         // in two different packages
@@ -176,7 +207,7 @@ public class MetadataPackageWriter {
             }
         }
         if (d1Node == null) {
-            throw new NullPointerException("Can not determine node with id: " + originMemberNode + " from NodeList");
+            throw new WritePackageException("Can not determine node with id: " + originMemberNode + " from NodeList");
         }
 
         Node adoptedMetadata = sciMeta.importNode(sysMeta.getDocumentElement(), true);
@@ -225,16 +256,16 @@ public class MetadataPackageWriter {
                         if (mergedMetadataDir.getParentFile().mkdir()) {
                             logger.info("created " + mergedMetadataDir.getParentFile().getAbsolutePath());
                         } else {
-                            throw new Exception("Unable to create parent directory " + mergedMetadataDir.getParentFile());
+                            throw new WritePackageException("Unable to create parent directory " + mergedMetadataDir.getParentFile());
                         }
                     }
                     if (mergedMetadataDir.mkdir()) {
                         logger.info("created " + mergedMetadataDirPath);
                     } else {
-                        throw new Exception("Unable to create directory :" + mergedMetadataDirPath + ":");
+                        throw new WritePackageException("Unable to create directory :" + mergedMetadataDirPath + ":");
                     }
                 } else {
-                    throw new Exception("Top Level Metadata Merge directory :" + writeDirectory + ": does not exist");
+                    throw new WritePackageException("Top Level Metadata Merge directory :" + writeDirectory + ": does not exist");
                 }
                 mergedMetaDir.put(mergedMetadataDirPath, mergedMetadataDir);
             }
@@ -344,5 +375,20 @@ public class MetadataPackageWriter {
 
     public void setHoursToExpire(int hoursToExpire) {
         this.hoursToExpire = hoursToExpire;
+    }
+
+    public AuthToken getCnToken() {
+        return cnToken;
+    }
+
+    public void setCnToken(AuthToken cnToken) {
+        this.cnToken = cnToken;
+    }
+
+    private class WritePackageException extends Exception {
+
+        WritePackageException(String s) {
+            super(s);
+        }
     }
 }

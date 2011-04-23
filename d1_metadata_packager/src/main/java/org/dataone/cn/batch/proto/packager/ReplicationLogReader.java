@@ -31,7 +31,7 @@ public class ReplicationLogReader extends EventLogReader {
     // while the second has a key of 'SYSMETA' (once again type needed)
     // with a value of the system metadata file name from the log
     //
-    protected ReplicationPersistence replicationPersistence;
+    protected DataPersistence replicationPersistence;
 
     @Override
     public void readLogfile() throws FileNotFoundException, Exception {
@@ -47,7 +47,7 @@ public class ReplicationLogReader extends EventLogReader {
 
         LinkedList<File> processLogFiles;
 
-        Map<String, Long> persistMappings = replicationPersistence.getPersistEventMap().getMap();
+        Map<String, Long> persistMappings = replicationPersistence.getPersistLogAcessMap().getMap();
         // Persistent file that will tell you how many bytes to skip before reading.
         // It will also maintain the lastAccessedDate of the file being processed
 
@@ -122,11 +122,11 @@ public class ReplicationLogReader extends EventLogReader {
         logger.info("number of new and unique entries = " + readlines);
     }
 
-    public ReplicationPersistence getReplicationPersistence() {
+    public DataPersistence getReplicationPersistence() {
         return replicationPersistence;
     }
 
-    public void setReplicationPersistence(ReplicationPersistence replicationPersistence) {
+    public void setReplicationPersistence(DataPersistence replicationPersistence) {
         this.replicationPersistence = replicationPersistence;
     }
 }
