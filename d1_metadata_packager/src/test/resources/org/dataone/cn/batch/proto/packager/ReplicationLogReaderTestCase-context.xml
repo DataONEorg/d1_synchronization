@@ -40,7 +40,7 @@
 <!--   <bean id="testPackageHarvestDirectory" class="org.springframework.core.io.ClassPathResource">
        <constructor-arg value="/org/dataone/cn/batch/proto/packager/persistant.cache"/>
    </bean> -->
-   <bean id="metadataReplicationPersistence" class="org.dataone.cn.batch.proto.packager.ReplicationPersistence">
+   <bean id="metadataReplicationPersistence" class="org.dataone.cn.batch.proto.packager.DataPersistence">
         <property name="persistentDataFileNamePath" ref="testPackageHarvestDirectoryString"/>
         <property name="persistentDataFileName" ref="testLogFilePersistDataName" />
    </bean>

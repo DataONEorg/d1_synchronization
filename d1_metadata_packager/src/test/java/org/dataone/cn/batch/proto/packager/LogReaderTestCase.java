@@ -32,7 +32,7 @@ public class LogReaderTestCase {
     String testLogFilePersistDataName;
     String testEvent2;
     String testEvent3;
-    EventPersistence eventPersistence;
+    DataPersistence eventPersistence;
     @Resource
     public void setTestLogFilePersistDataName(String testLogFilePersistDataName) {
         this.testLogFilePersistDataName = testLogFilePersistDataName;
@@ -58,7 +58,7 @@ public class LogReaderTestCase {
         this.testEvent3 = testEvent3;
     }
     @Resource
-    public void setEventPersistence(EventPersistence eventPersistence) {
+    public void setEventPersistence(DataPersistence eventPersistence) {
         this.eventPersistence = eventPersistence;
     }
 

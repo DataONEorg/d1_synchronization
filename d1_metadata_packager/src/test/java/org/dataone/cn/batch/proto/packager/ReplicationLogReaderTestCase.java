@@ -7,9 +7,7 @@ package org.dataone.cn.batch.proto.packager;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Map;
-import java.util.Set;
 import javax.annotation.Resource;
 import org.dataone.cn.batch.proto.packager.types.DataPersistenceKeys;
 import org.dataone.cn.batch.proto.packager.types.MergeMap;
@@ -40,11 +38,11 @@ public class ReplicationLogReaderTestCase {
     String testReplicate2;
     String testReplicate3;
     String testReplicationLogFile2;
-    ReplicationPersistence replicationPersistence;
+    DataPersistence replicationPersistence;
     static StringBuffer results1Buffer = new StringBuffer();
     static StringBuffer results2Buffer = new StringBuffer();
 
-    @Resource      
+    @Resource
     public void setTestLogFilePersistDataName(String testLogFilePersistDataName) {
         this.testLogFilePersistDataName = testLogFilePersistDataName;
     }
@@ -60,7 +58,7 @@ public class ReplicationLogReaderTestCase {
     }
 
     @Resource
-    public void setMetadataReplicationPersistence(ReplicationPersistence replicationPersistence) {
+    public void setMetadataReplicationPersistence(DataPersistence replicationPersistence) {
         this.replicationPersistence = replicationPersistence;
     }
 
@@ -74,7 +72,7 @@ public class ReplicationLogReaderTestCase {
         replicationLogReader.readLogfile();
         MergeMap results = replicationLogReader.getMergeMap();
         replicationPersistence.writePersistentData();
-        System.out.println("testLogReader success with " + results.size()  +" entries");
+        System.out.println("testLogReader success with " + results.size() + " entries");
     }
 
     @Test
@@ -83,7 +81,7 @@ public class ReplicationLogReaderTestCase {
         replicationLogReader.readLogfile();
         MergeMap results = replicationLogReader.getMergeMap();
         replicationPersistence.writePersistentData();
-        System.out.println("testLogReader success with " + results.size()  +" entries");
+        System.out.println("testLogReader success with " + results.size() + " entries");
         ArrayList<String> keyset = new ArrayList<String>(results.keySet());
         Collections.sort(keyset);
         for (String key : keyset) {
@@ -91,7 +89,7 @@ public class ReplicationLogReaderTestCase {
             results1Buffer.append(key);
 
             Map<String, String> mergeFiles = results.get(key);
-            ArrayList<String> mergedkeyset =  new ArrayList<String>(mergeFiles.keySet());
+            ArrayList<String> mergedkeyset = new ArrayList<String>(mergeFiles.keySet());
             Collections.sort(mergedkeyset);
             for (String keyMerge : mergedkeyset) {
                 results1Buffer.append(keyMerge);
@@ -100,6 +98,7 @@ public class ReplicationLogReaderTestCase {
             }
         }
     }
+
     @Test
     public void testLogPersistence() throws Exception {
         replicationPersistence.init();
@@ -109,7 +108,7 @@ public class ReplicationLogReaderTestCase {
         for (String key : keyset) {
             results2Buffer.append(key);
             Map<String, String> mergeFiles = results.get(key);
-            ArrayList<String> mergedkeyset =  new ArrayList<String>(mergeFiles.keySet());
+            ArrayList<String> mergedkeyset = new ArrayList<String>(mergeFiles.keySet());
             Collections.sort(mergedkeyset);
             for (String keyMerge : mergedkeyset) {
                 results2Buffer.append(keyMerge);
@@ -121,26 +120,28 @@ public class ReplicationLogReaderTestCase {
         File testLogFilePersistDataNameFile = new File(this.testPackageHarvestDirectoryString + File.separator + this.testLogFilePersistDataName);
         testLogFilePersistDataNameFile.delete();
     }
+
     @Test
     public void testReplicationPersistenceWithEmpty() throws Exception {
         replicationPersistence.init();
         long x = 100;
         long y = 100;
-        replicationPersistence.getPersistEventMap().put(DataPersistenceKeys.SKIP_IN_LOG_FIELD.toString(), new Long(x));
-        replicationPersistence.getPersistEventMap().put(DataPersistenceKeys.DATE_TIME_LAST_ACCESSED_FIELD.toString(), new Long(y));
-         System.out.println("\ntestReplicationPersistenceWithEmpty");
+        replicationPersistence.getPersistLogAcessMap().put(DataPersistenceKeys.SKIP_IN_LOG_FIELD.toString(), new Long(x));
+        replicationPersistence.getPersistLogAcessMap().put(DataPersistenceKeys.DATE_TIME_LAST_ACCESSED_FIELD.toString(), new Long(y));
+        System.out.println("\ntestReplicationPersistenceWithEmpty");
 //        MergeMap replicationMap = replicationPersistence.getPersistMergeMap();
 //        replicationMap.clear();
         replicationPersistence.writePersistentData();
 
     }
+
     @Test
     public void testReplicationPersistenceFailWithEmpty() throws Exception {
         try {
             System.out.println("\ntestReplicationPersistenceFailWithEmpty");
             replicationPersistence.init();
             MergeMap replicationMap = replicationPersistence.getPersistMergeMap();
-            for (String key: replicationMap.keySet()) {
+            for (String key : replicationMap.keySet()) {
                 System.out.println(key);
             }
         } catch (Exception e) {

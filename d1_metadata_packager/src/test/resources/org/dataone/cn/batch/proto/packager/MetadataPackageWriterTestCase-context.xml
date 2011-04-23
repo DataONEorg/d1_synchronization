@@ -68,7 +68,7 @@
    <bean id="testPackageHarvestDirectory" class="org.springframework.core.io.ClassPathResource">
        <constructor-arg value="/org/dataone/cn/batch/proto/packager/persistant.cache"/>
    </bean>   -->
-    <bean id="metadataPackageEventAccess" class="org.dataone.cn.batch.proto.packager.EventPersistence">
+    <bean id="metadataPackageEventAccess" class="org.dataone.cn.batch.proto.packager.DataPersistence">
         <property name="persistentDataFileNamePath" ref="testPackageHarvestDirectoryString"/>
         <property name="persistentDataFileName" ref="testEventLogFilePersistDataName" />
     </bean>

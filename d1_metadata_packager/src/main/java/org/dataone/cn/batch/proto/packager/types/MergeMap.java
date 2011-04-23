@@ -11,6 +11,38 @@ import java.util.Map;
 import java.util.Set;
 
 /**
+ * This Map contains a state information about processing created or replicated
+ * files in metacat.
+ *
+ * Logging files are parsed for create or replicate actions
+ * The actions conform to a specific pattern that matches a Data ONE PID
+ * to the identifier of the metacat object.  the PID will crossreferece
+ * metacat's systemmetadata id and sciencemetadata id to one D1 PID.
+ *
+ * The packager needs this crossreference to send a single xml document
+ * to the dataone search indexer
+ *
+ * For each DataONE PID there will be at a minimal two entries:
+ *         SCIMETA => metacat internal science metadata id
+ *         SYSMETA => metacat internal system metadata id
+ *
+ * optionally, if the when the writer is called, the entry is not complete,
+ * then additional data will be added
+ *         EXPIRE_DATE_LONG => string representation of long data date
+ *
+ * the optional field keeps a timestamp of how long the dateONE PID should be
+ * maintained in the persistent cache before expiring.
+ *
+ * During replication, most DataONE PIDs will not have both SCIMETA and SYSMETA
+ * appear at the same time in the log files, therefore, the system will keep attempting
+ * to create a complete entry for several hours (currently 12) before it fails
+ *
+ * Event processing may fail temporarily, and all read data needs to be cached in case the
+ * system goes down due to a temporary failure.  The system, then can start up where it
+ * left off in processing the event log.
+ *
+ * 
+ *
  * I need this class because of Java erasure of Generics during runtime.
  * Maybe there is a better way, but I need instanceof to ensure that
  * I have retrieved the correct object from the persistent store

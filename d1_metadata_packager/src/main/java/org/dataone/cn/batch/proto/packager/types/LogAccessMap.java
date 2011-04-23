@@ -16,11 +16,11 @@ import java.util.Set;
  * I have retrieved the correct object from the persistent store
  * @author waltz
  */
-public class EventMap extends HashMap implements Map, Serializable {
+public class LogAccessMap extends HashMap implements Map, Serializable {
 
     private Map<String, Long> eventMap;
 
-    public EventMap() {
+    public LogAccessMap() {
         eventMap = new HashMap<String, Long>();
     }
 
