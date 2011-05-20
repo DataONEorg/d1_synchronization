@@ -144,7 +144,8 @@ public class HarvesterTestCase implements ApplicationContextAware {
         for (ObjectInfo objectInfo : writeQueue) {
             assertTrue(testListIds1.contains(objectInfo.getIdentifier().getValue()));
         }
-
+        assertTrue(writeQueue.size() == 3);
+        System.out.println("Write Queue size is " + writeQueue.size() );
     }
 
     @Test

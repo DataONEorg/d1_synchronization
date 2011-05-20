@@ -1,4 +1,4 @@
-<D1:systemMetadata xmlns:D1="http://dataone.org/service/types/0.5.1">
+<D1:systemMetadata xmlns:D1="http://ns.dataone.org/service/types/0.6.1">
  <identifier>MD_ORNLDAAC_787_03032010095920</identifier>
  <objectFormat>FGDC-STD-001.1-1999</objectFormat>
  <size>7938</size>
