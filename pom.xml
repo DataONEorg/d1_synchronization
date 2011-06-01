@@ -5,7 +5,7 @@
 	<artifactId>d1_synchronization</artifactId>
 	<packaging>pom</packaging>
 	<name>DataONE_Synchronization</name>
-	<version>0.6.1-SNAPSHOT</version>
+	<version>0.6.1</version>
 	<description>Cn Member Node Synchronization</description>
         <url>http://dataone.org</url>
 	<modules>

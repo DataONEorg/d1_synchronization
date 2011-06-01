@@ -4,13 +4,13 @@
     <groupId>org.dataone</groupId>
     <artifactId>d1_synchronization_scheduler</artifactId>
     <name>DataONE_Synchronization_Scheduler</name>
-    <version>0.6.1-SNAPSHOT</version>
+    <version>0.6.1</version>
     <description>Cn Synchronization Batch Scheduler</description>
     <url>http://dataone.org</url>
     <parent>
         <groupId>org.dataone</groupId>
         <artifactId>d1_synchronization</artifactId>
-        <version>0.6.1-SNAPSHOT</version>
+        <version>0.6.1</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
     <properties>
@@ -149,7 +149,7 @@
         <dependency>
             <groupId>org.dataone</groupId>
             <artifactId>d1_common_java</artifactId>
-            <version>0.6.1-SNAPSHOT</version>
+            <version>0.6.1</version>
             <type>jar</type>
             <optional>false</optional>
             <scope>compile</scope>
@@ -157,7 +157,7 @@
         <dependency>
             <groupId>org.dataone</groupId>
             <artifactId>d1_libclient_java</artifactId>
-            <version>0.6.1-SNAPSHOT</version>
+            <version>0.6.1</version>
             <type>jar</type>
             <optional>false</optional>
             <scope>compile</scope>
@@ -165,7 +165,7 @@
         <dependency>
            <groupId>org.dataone</groupId>
            <artifactId>hoksihangukbuniseyo</artifactId>
-           <version>0.6.1-SNAPSHOT</version>
+           <version>0.6.1</version>
            <type>jar</type>
            <optional>false</optional>
            <scope>compile</scope>
@@ -173,13 +173,13 @@
         <dependency>
             <groupId>org.dataone</groupId>
             <artifactId>d1_metadata_packager</artifactId>
-            <version>0.6.1-SNAPSHOT</version>
+            <version>0.6.1</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>org.dataone</groupId>
             <artifactId>d1_mn_harvester</artifactId>
-            <version>0.6.1-SNAPSHOT</version>
+            <version>0.6.1</version>
             <scope>compile</scope>
         </dependency>
           
