@@ -88,11 +88,10 @@
 
     <bean id="testMetadataPackagerWriter" class="org.dataone.cn.batch.proto.packager.MetadataPackageWriter">
         <property name="readMetacatDirectory" ref="testPackageSamplesDirectoryString" />
-        <property name="coordinatingNodeRegister" ref="testNodeReferenceUtility" />
+        <property name="cnCore" ref="testNodeReferenceUtility" />
         <property name="writeDirectory" ref="testPackageSamplesDirectoryString" />
         <property name="scienceMetadataFormatPathMap" ref="scienceMetadataFormatPathMap"/>
         <property name="metadataPackageAccess" ref="metadataPackageEventAccess" />
-        <property name="validSciMetaObjectFormats" ref="validScienceMetadataFormats" />
         <property name="cnWebUrl" value="http://cn.dataone.org/knb/metacat"/>
         <property name="metacatObjectFormatSkin" ref="metacatObjectFormatSkinMap" />
     </bean>
