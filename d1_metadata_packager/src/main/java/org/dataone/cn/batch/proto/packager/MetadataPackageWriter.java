@@ -14,6 +14,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.logging.Level;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
@@ -26,11 +27,15 @@ import javax.xml.transform.stream.StreamResult;
 import org.apache.log4j.Logger;
 import org.dataone.cn.batch.proto.packager.types.MergeMap;
 import org.dataone.cn.batch.proto.packager.types.DataPersistenceKeys;
-import org.dataone.service.cn.CoordinatingNodeRegister;
+import org.dataone.service.cn.CNCore;
+import org.dataone.service.exceptions.InsufficientResources;
+import org.dataone.service.exceptions.InvalidRequest;
+import org.dataone.service.exceptions.NotFound;
 import org.dataone.service.exceptions.NotImplemented;
 import org.dataone.service.exceptions.ServiceFailure;
 import org.dataone.service.types.AuthToken;
 import org.dataone.service.types.ObjectFormat;
+import org.dataone.service.types.ObjectFormatIdentifier;
 import org.jibx.runtime.JiBXException;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -50,11 +55,10 @@ public class MetadataPackageWriter {
     private MergeMap readMap;
     private Map<String, String> scienceMetadataFormatPathMap;
     private HashMap<String, File> mergedMetaDir = new HashMap<String, File>();
-    CoordinatingNodeRegister coordinatingNodeRegister;
+    CNCore cnCore;
     AuthToken cnToken;
     org.dataone.service.types.NodeList nodeList;
     private DataPersistenceWriter dataPersistenceWriter;
-    private List<ObjectFormat> validSciMetaObjectFormats;
     private String cnWebUrl;
     private Map<String, String> metacatObjectFormatSkin;
     //  number of hours to search for
@@ -67,7 +71,7 @@ public class MetadataPackageWriter {
         Set<String> readSetQueue = new HashSet<String>(readMap.keySet());
         try {
             // get the most up-to-date dataone cn registry of nodes
-            nodeList = coordinatingNodeRegister.listNodes(cnToken);
+            nodeList = cnCore.listNodes();
             for (String key : readSetQueue) {
                 Map<String, String> mergeFiles = readMap.get(key);
                 // Determine if the record contains both SciMeta and SysMeta. if so, write out.
@@ -154,19 +158,47 @@ public class MetadataPackageWriter {
             throw ex;
         }
         Element mercury = null;
-        String objectFormat = "";
+        String objectFormatIdentifierValue = "";
 
         // Object Format is needed for producing subdirectories under the project directory
         Element sysMetaRoot = sysMeta.getDocumentElement();
         NodeList sysNodeList = sysMetaRoot.getElementsByTagName("objectFormat");
         for (int i = 0; i < sysNodeList.getLength(); ++i) {
-            objectFormat = sysNodeList.item(i).getTextContent();
+            NodeList frmtObjectNodeList = sysNodeList.item(i).getChildNodes();
+            for (int j = 0; j < sysNodeList.getLength(); ++j) {
+                if ( (sysNodeList.item(j).getNodeType() == Node.ELEMENT_NODE)
+                        && (sysNodeList.item(j).getNodeName().equalsIgnoreCase("fmtid"))) {
+                    objectFormatIdentifierValue = sysNodeList.item(j).getTextContent();
+
+                }
+            }
         }
-        if (objectFormat.isEmpty()) {
-            throw new WritePackageException("ObjectFormat:" + objectFormat + ": of file " + systemMetadataFile + " is not valid");
+        if (objectFormatIdentifierValue.isEmpty()) {
+            throw new WritePackageException("ObjectFormat: of file " + systemMetadataFile + " does not contain an Identifier");
         }
-        ObjectFormat objectFormatEnum = ObjectFormat.convert(objectFormat);
-        if ((objectFormatEnum != null) && validSciMetaObjectFormats.contains(objectFormatEnum)) {
+        ObjectFormatIdentifier objectFormatIdentifier = new ObjectFormatIdentifier();
+        objectFormatIdentifier.setValue(objectFormatIdentifierValue);
+        ObjectFormat objectFormat;
+        try {
+            objectFormat = cnCore.getFormat(objectFormatIdentifier);
+        } catch (InvalidRequest ex) {
+            logger.error("systemMetadataFile can not be parsed\n" + ex.serialize(ex.FMT_XML));
+            return false;
+        } catch (ServiceFailure ex) {
+            logger.error("systemMetadataFile can not be parsed\n" + ex.serialize(ex.FMT_XML));
+            return false;
+        } catch (NotFound ex) {
+            logger.error("systemMetadataFile can not be parsed\n" + ex.serialize(ex.FMT_XML));
+            return false;
+        } catch (InsufficientResources ex) {
+            logger.error("systemMetadataFile can not be parsed\n" + ex.serialize(ex.FMT_XML));
+            return false;
+        } catch (NotImplemented ex) {
+            logger.error("systemMetadataFile can not be parsed\n" + ex.serialize(ex.FMT_XML));
+            return false;
+        }
+
+        if ((objectFormat != null) && objectFormat.isScienceMetadata()) {
             try {
                 sciMeta = parser.parse(new File(readMetacatDirectory + File.separator + scienceMetadataFile));
             } catch (IOException ex) {
@@ -174,11 +206,11 @@ public class MetadataPackageWriter {
                 throw ex;
             }
         } else {
-            if (objectFormatEnum == null) {
-                System.out.println("ObjectFormat:" + objectFormat + " is missing from ObjectFormat Enumeration!!!!");
-                logger.error("ObjectFormat:" + objectFormat + " is missing from ObjectFormat Enumeration!!!!");
+            if (objectFormat == null) {
+                System.out.println("ObjectFormat:" + objectFormat.getFmtid().getValue() + " is missing from ObjectFormat Enumeration!!!!");
+                logger.error("ObjectFormat:" + objectFormat.getFmtid().getValue() + " is missing from ObjectFormat Enumeration!!!!");
             } else {
-                logger.warn("ObjectFormat:" + objectFormat + " can not be indexed");
+                logger.warn("ObjectFormat:" + objectFormat.getFmtid().getValue() + " can not be indexed");
             }
             return false;
         }
@@ -193,7 +225,7 @@ public class MetadataPackageWriter {
         for (int i = 0; i < sysNodeList.getLength(); ++i) {
             originMemberNode = sysNodeList.item(i).getTextContent();
         }
-        if (objectFormat.isEmpty()) {
+        if (objectFormat.getFmtid().getValue().isEmpty()) {
             throw new WritePackageException("ObjectFormat:" + objectFormat + ": of file " + systemMetadataFile + " is not valid");
         }
         // Harzards of Languange we decided to use, Node/NodeList objects
@@ -329,12 +361,12 @@ public class MetadataPackageWriter {
         this.scienceMetadataFormatPathMap = scienceMetadataFormatPathMap;
     }
 
-    public CoordinatingNodeRegister getCoordinatingNodeRegister() {
-        return coordinatingNodeRegister;
+    public CNCore getCnCore() {
+        return cnCore;
     }
 
-    public void setCoordinatingNodeRegister(CoordinatingNodeRegister coordinatingNodeRegister) {
-        this.coordinatingNodeRegister = coordinatingNodeRegister;
+    public void setCnCore(CNCore cnCore) {
+        this.cnCore = cnCore;
     }
 
     public DataPersistenceWriter getMetadataPackageAccess() {
@@ -343,14 +375,6 @@ public class MetadataPackageWriter {
 
     public void setMetadataPackageAccess(DataPersistenceWriter dataPersistenceWriter) {
         this.dataPersistenceWriter = dataPersistenceWriter;
-    }
-
-    public List<ObjectFormat> getValidSciMetaObjectFormats() {
-        return validSciMetaObjectFormats;
-    }
-
-    public void setValidSciMetaObjectFormats(List<ObjectFormat> validSciMetaObjectFormats) {
-        this.validSciMetaObjectFormats = validSciMetaObjectFormats;
     }
 
     public String getCnWebUrl() {
