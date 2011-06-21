@@ -8,7 +8,6 @@ import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
-import java.util.TimeZone;
 
 import org.apache.log4j.*;
 import org.dataone.cn.batch.proto.harvest.persist.NodeMapPersistence;
@@ -18,8 +17,8 @@ import org.dataone.service.exceptions.InvalidToken;
 import org.dataone.service.exceptions.NotAuthorized;
 import org.dataone.service.exceptions.NotImplemented;
 import org.dataone.service.exceptions.ServiceFailure;
-import org.dataone.service.mn.MemberNodeReplication;
-import org.dataone.service.types.AuthToken;
+import org.dataone.service.mn.tier1.MNRead;
+import org.dataone.service.types.Session;
 import org.dataone.service.types.ObjectInfo;
 import org.dataone.service.types.ObjectList;
 import org.dataone.service.types.util.ServiceTypeUtil;
@@ -31,11 +30,11 @@ import org.dataone.service.types.util.ServiceTypeUtil;
 public class ObjectListQueueBuilder {
 
     Logger logger = Logger.getLogger(ObjectListQueueBuilder.class.getName());
-    private MemberNodeReplication mnReplication;
+    private MNRead mnRead;
     private List<ObjectInfo> writeQueue;
     private String mnIdentifier;
     private Integer objectRetrievalCount = 1000;
-    private AuthToken token;
+    private Session session;
     private NodeMapPersistence nodeMapPersistance;
     static final Comparator<ObjectInfo> LAST_MOFIDIED_ORDER =
             new Comparator<ObjectInfo>() {
@@ -63,7 +62,7 @@ public class ObjectListQueueBuilder {
         }
         try {
             do {
-                objectList = mnReplication.listObjects(token, lastHarvestDate, now, null, replicationStatus, start, objectRetrievalCount);
+                objectList = mnRead.listObjects(session, lastHarvestDate, now, null, replicationStatus, start, objectRetrievalCount);
                 if ((objectList == null) ||
                         (objectList.getCount() == 0) ||
                         (objectList.getObjectInfoList().isEmpty()) ) {
@@ -91,12 +90,12 @@ public class ObjectListQueueBuilder {
 //        Collections.sort(writeQueue, LAST_MOFIDIED_ORDER);
     }
 
-    public MemberNodeReplication getMnReplication() {
-        return mnReplication;
+    public MNRead getMnRead() {
+        return mnRead;
     }
 
-    public void setMnReplication(MemberNodeReplication mnReplication) {
-        this.mnReplication = mnReplication;
+    public void setMnRead(MNRead mnRead) {
+        this.mnRead = mnRead;
     }
 
     public List<ObjectInfo> getWriteQueue() {
@@ -105,14 +104,6 @@ public class ObjectListQueueBuilder {
 
     public void setWriteQueue(List<ObjectInfo> writeQueue) {
         this.writeQueue = writeQueue;
-    }
-
-    public AuthToken getToken() {
-        return token;
-    }
-
-    public void setToken(AuthToken token) {
-        this.token = token;
     }
 
     public int getObjectRetrievalCount() {

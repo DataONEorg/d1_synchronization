@@ -14,11 +14,10 @@ import org.dataone.service.exceptions.NotAuthorized;
 import org.dataone.service.exceptions.NotFound;
 import org.dataone.service.exceptions.NotImplemented;
 import org.dataone.service.exceptions.ServiceFailure;
-import org.dataone.service.mn.MemberNodeCrud;
+import org.dataone.service.mn.tier1.MNRead;
 import org.dataone.service.types.AuthToken;
 import org.dataone.service.types.Identifier;
 import org.dataone.service.types.NodeReference;
-import org.dataone.service.types.ObjectFormat;
 import org.dataone.service.types.ObjectInfo;
 import org.dataone.service.types.SystemMetadata;
 import org.dataone.service.types.Replica;
@@ -68,13 +67,12 @@ public class ObjectListQueueProcessor {
      */
     private static final int MAX_OBJECT_TO_PROCESS = 1000;
     Logger logger = Logger.getLogger(ObjectListQueueProcessor.class.getName());
-    private MemberNodeCrud mnReader;
+    private MNRead mnRead;
     private List<ObjectInfo> readQueue;
     private Map<Identifier, SystemMetadata> writeQueue;
     private AuthToken token;
     private String mnIdentifier; // XXX This is only a temporary solution
     private String cnIdentifier; // XXX This is only a temporary solution
-    private List<ObjectFormat> validSciMetaObjectFormats;
 //    public void processQueue(Node node) { XXX future call i think, because we will be processing this for specific nodes
 
     public boolean processQueue() {
@@ -108,7 +106,7 @@ public class ObjectListQueueProcessor {
                 SystemMetadata systemMetadata = null;
                 do {
                     try {
-                        systemMetadata = mnReader.getSystemMetadata(null, pid);
+                        systemMetadata = mnRead.getSystemMetadata(null, pid);
                         needSystemMetadata = false;
                     } catch (NotAuthorized ex) {
                         if (tryAgain < 2) {
@@ -136,8 +134,10 @@ public class ObjectListQueueProcessor {
                 systemMetadata.addReplica(originalReplica);
 
                 // data objects are not fully synchronized, only their metadata is
-                // synchronized, so do not set sys metadata as being replicated
-                if (validSciMetaObjectFormats.contains(systemMetadata.getObjectFormat())) {
+                // synchronized,
+                // only set valid science metadata formats as having been replicated
+
+                if (systemMetadata.getObjectFormat().isScienceMetadata()) {
                     NodeReference cnReference = new NodeReference();
                     cnReference.setValue(cnIdentifier);
                     Replica cnReplica = new Replica();
@@ -176,12 +176,12 @@ public class ObjectListQueueProcessor {
         return continueProcessing;
     }
 
-    public MemberNodeCrud getMnReader() {
-        return mnReader;
+    public MNRead getMnRead() {
+        return mnRead;
     }
 
-    public void setMnReader(MemberNodeCrud mnReader) {
-        this.mnReader = mnReader;
+    public void setMnRead(MNRead mnRead) {
+        this.mnRead = mnRead;
     }
 
     public Map<Identifier, SystemMetadata> getWriteQueue() {
@@ -224,11 +224,4 @@ public class ObjectListQueueProcessor {
         this.cnIdentifier = cnIdentifier;
     }
 
-    public List<ObjectFormat> getValidSciMetaObjectFormats() {
-        return validSciMetaObjectFormats;
-    }
-
-    public void setValidSciMetaObjectFormats(List<ObjectFormat> validSciMetaObjectFormats) {
-        this.validSciMetaObjectFormats = validSciMetaObjectFormats;
-    }
 }

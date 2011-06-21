@@ -1,22 +1,36 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<d1:objectList xmlns:d1="http://ns.dataone.org/service/types/0.6.1" count="3" start="0" total="3">
+<d1:objectList xmlns:d1="http://ns.dataone.org/service/types/0.6.2"
+	 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+ 	xsi:schemaLocation="http://ns.dataone.org/service/types/0.6.2 https://repository.dataone.org/software/cicore/branches/D1_SCHEMA_0_6_2/dataoneTypes.xsd" count="3" start="0" total="3">
 	<objectInfo>
 		<identifier>MD_ORNLDAAC_787_03032010095920</identifier>
-		<objectFormat>FGDC-STD-001.1-1999</objectFormat>
+		  <objectFormat>
+                    <fmtid>FGDC-STD-001.1-1999</fmtid>
+                    <formatName>Content Standard for Digital Geospatial Metadata, Biological Data Profile, version 001.1-1999</formatName>
+                    <scienceMetadata>true</scienceMetadata>
+                 </objectFormat>
 		<checksum algorithm="SHA-1">49fd46daad283f0cbd411e0297e0d68d56d001a4</checksum>
 		<dateSysMetadataModified>2010-03-30T00:00:00Z</dateSysMetadataModified>
 		<size>7938</size>
 	</objectInfo>
 	<objectInfo>
 		<identifier>MD_ORNLDAAC_122_03032010095920</identifier>
-		<objectFormat>FGDC-STD-001.1-1999</objectFormat>
+		  <objectFormat>
+                      <fmtid>FGDC-STD-001.1-1999</fmtid>
+                      <formatName>Content Standard for Digital Geospatial Metadata, Biological Data Profile, version 001.1-1999</formatName>
+                      <scienceMetadata>true</scienceMetadata>
+                 </objectFormat>
 		<checksum algorithm="SHA-1">835c18118b489a4d68df958a1027c1ef</checksum>
 		<dateSysMetadataModified>2010-03-30T00:00:00Z</dateSysMetadataModified>
 		<size>6102</size>
 	</objectInfo>
 	<objectInfo>
 		<identifier>MD_ORNLDAAC_781_03032010095920</identifier>
-		<objectFormat>FGDC-STD-001.1-1999</objectFormat>
+		  <objectFormat>
+                      <fmtid>FGDC-STD-001.1-1999</fmtid>
+                      <formatName>Content Standard for Digital Geospatial Metadata, Biological Data Profile, version 001.1-1999</formatName>
+                      <scienceMetadata>true</scienceMetadata>
+                      </objectFormat>
 		<checksum algorithm="SHA-1">f037f696f5b7c599f4a08b4e2639ccc3147c3c25</checksum>
 		<dateSysMetadataModified>2010-03-30T00:00:00Z</dateSysMetadataModified>
 		<size>7857</size>

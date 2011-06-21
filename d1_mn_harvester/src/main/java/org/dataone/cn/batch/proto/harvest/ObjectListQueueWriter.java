@@ -15,8 +15,8 @@ import java.util.List;
 import java.util.Map;
 import org.apache.log4j.Logger;
 import org.dataone.cn.batch.proto.harvest.persist.NodeMapPersistence;
-import org.dataone.service.cn.CoordinatingNodeCrud;
-import org.dataone.service.cn.CoordinatingNodeAuthorization;
+import org.dataone.service.cn.CNAuthorization;
+import org.dataone.service.cn.CNCore;
 import org.dataone.service.exceptions.IdentifierNotUnique;
 import org.dataone.service.exceptions.InsufficientResources;
 import org.dataone.service.exceptions.InvalidRequest;
@@ -27,10 +27,10 @@ import org.dataone.service.exceptions.NotFound;
 import org.dataone.service.exceptions.NotImplemented;
 import org.dataone.service.exceptions.ServiceFailure;
 import org.dataone.service.exceptions.UnsupportedType;
-import org.dataone.service.mn.MemberNodeCrud;
-import org.dataone.service.types.AuthToken;
+import org.dataone.service.mn.tier1.MNRead;
 import org.dataone.service.types.Identifier;
 import org.dataone.service.types.ObjectFormat;
+import org.dataone.service.types.Session;
 import org.dataone.service.types.SystemMetadata;
 import org.dataone.service.types.util.ServiceTypeUtil;
 import org.jibx.runtime.BindingDirectory;
@@ -74,21 +74,20 @@ public class ObjectListQueueWriter {
 
     so you see in testGet(),
     I create the doc as user "kepler"
-    then I can read it with the kepler token
+    then I can read it with the kepler session
     but as I setAccess to public read
     I can use the publicToken to read it
      *
      *
      */
     Logger logger = Logger.getLogger(ObjectListQueueWriter.class.getName());
-    private MemberNodeCrud mnReader;
-    private CoordinatingNodeCrud cnWriter;
-    private CoordinatingNodeAuthorization cnAuthorization;
+    private MNRead mnRead;
+    private CNCore cnCore;
+    private CNAuthorization cnAuthorization;
     private Map<Identifier, SystemMetadata> readQueue;
-    private List<ObjectFormat> validSciMetaObjectFormats;
     private String mnIdentifier;
     private NodeMapPersistence nodeMapPersistance;
-    private AuthToken token;
+    private Session session;
 
     public void writeQueue() throws Exception {
 
@@ -127,15 +126,15 @@ public class ObjectListQueueWriter {
                 //
                 SystemMetadata systemMetadata = readQueue.get(identifier);
                 ObjectFormat objectFormat = systemMetadata.getObjectFormat();
-                logger.debug("Writing systemMetadata to metacat: " + systemMetadata.getIdentifier().getValue() + " with Format of " + objectFormat.toString());
+                logger.debug("Writing systemMetadata to metacat: " + systemMetadata.getIdentifier().getValue() + " with Format of " + objectFormat.getFmtid().getValue());
 
 
-                if (validSciMetaObjectFormats.contains(objectFormat)) {
+                if (objectFormat.isScienceMetadata()) {
                     int tryAgain = 0;
                     boolean needSciMetadata = true;
                     do {
                         try {
-                            sciMetaStream = mnReader.get(null, identifier);
+                            sciMetaStream = mnRead.get(null, identifier);
                             needSciMetadata = false;
                         } catch (NotAuthorized ex) {
                             if (tryAgain < 2) {
@@ -234,7 +233,7 @@ public class ObjectListQueueWriter {
             // performed here due to the way last DateSysMetadataModified is used to
             // determine the next batch of records to retreive from a MemberNode
             sysmeta.setDateSysMetadataModified(new Date());
-            d1Identifier = cnWriter.create(token, pid, objectInputStream, sysmeta);
+            d1Identifier = cnCore.create(session, pid, objectInputStream, sysmeta);
         } catch (InvalidToken ex) {
             logger.error("d1client.create:\n" + ex.serialize(ex.FMT_XML));
         } catch (ServiceFailure ex) {
@@ -252,16 +251,7 @@ public class ObjectListQueueWriter {
         } catch (NotImplemented ex) {
             logger.error("d1client.create:\n" + ex.serialize(ex.FMT_XML));
         }
-        if (d1Identifier != null) {
-            if (cnAuthorization.setAccess(token, pid, "public", "read", "allow", "allowFirst")) {
-                status = true;
-                logger.info("create success, id returned is " + d1Identifier.getValue());
-            } else {
-                logger.error("setAccess failed for pid: " + pid.getValue());
-            }
-        } else {
-            logger.error("create failed for pid:" + pid.getValue());
-        }
+
         return status;
     }
 
@@ -281,12 +271,12 @@ public class ObjectListQueueWriter {
         return outputFile;
     }
 
-    public MemberNodeCrud getMnReader() {
-        return mnReader;
+    public MNRead getMnRead() {
+        return mnRead;
     }
 
-    public void setMnReader(MemberNodeCrud mnReader) {
-        this.mnReader = mnReader;
+    public void setMnRead(MNRead mnRead) {
+        this.mnRead = mnRead;
     }
 
     public Map<Identifier, SystemMetadata> getReadQueue() {
@@ -297,35 +287,27 @@ public class ObjectListQueueWriter {
         this.readQueue = readQueue;
     }
 
-    public CoordinatingNodeCrud getCnWriter() {
-        return cnWriter;
+    public CNCore getCnCore() {
+        return cnCore;
     }
 
-    public void setCnWriter(CoordinatingNodeCrud cnWriter) {
-        this.cnWriter = cnWriter;
+    public void setCnCore(CNCore cnCore) {
+        this.cnCore = cnCore;
     }
 
-    public AuthToken getToken() {
-        return token;
+    public Session getSession() {
+        return session;
     }
 
-    public void setToken(AuthToken token) {
-        this.token = token;
+    public void setSession(Session session) {
+        this.session = session;
     }
 
-    public List<ObjectFormat> getValidSciMetaObjectFormats() {
-        return validSciMetaObjectFormats;
-    }
-
-    public void setValidSciMetaObjectFormats(List<ObjectFormat> validSciMetaObjectFormats) {
-        this.validSciMetaObjectFormats = validSciMetaObjectFormats;
-    }
-
-    public CoordinatingNodeAuthorization getCnAuthorization() {
+    public CNAuthorization getCnAuthorization() {
         return cnAuthorization;
     }
 
-    public void setCnAuthorization(CoordinatingNodeAuthorization cnAuthorization) {
+    public void setCnAuthorization(CNAuthorization cnAuthorization) {
         this.cnAuthorization = cnAuthorization;
     }
 
