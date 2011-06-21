@@ -10,10 +10,11 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Date;
 import org.apache.commons.codec.net.URLCodec;
 import org.apache.log4j.Logger;
 import org.dataone.cn.batch.utils.TypeMarshaller;
-import org.dataone.service.cn.CoordinatingNodeCrud;
+import org.dataone.service.cn.CNCore;
 import org.dataone.service.exceptions.IdentifierNotUnique;
 import org.dataone.service.exceptions.InsufficientResources;
 import org.dataone.service.exceptions.InvalidRequest;
@@ -25,9 +26,14 @@ import org.dataone.service.exceptions.NotImplemented;
 import org.dataone.service.exceptions.ServiceFailure;
 import org.dataone.service.exceptions.UnsupportedType;
 import org.dataone.service.types.AuthToken;
+import org.dataone.service.types.Event;
 import org.dataone.service.types.Identifier;
-import org.dataone.service.types.IdentifierFormat;
-import org.dataone.service.types.ObjectLocationList;
+import org.dataone.service.types.Log;
+import org.dataone.service.types.NodeList;
+import org.dataone.service.types.ObjectFormat;
+import org.dataone.service.types.ObjectFormatIdentifier;
+import org.dataone.service.types.ObjectFormatList;
+import org.dataone.service.types.Session;
 import org.dataone.service.types.SystemMetadata;
 import org.jibx.runtime.JiBXException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,36 +44,25 @@ import org.springframework.stereotype.Service;
  *
  * @author waltz
  */
-@Service("coordinatingNodeCrudImpl")
-@Qualifier("crudService")
-public class MockCnCrud implements CoordinatingNodeCrud {
+@Service("cnCoreServiceImpl")
+@Qualifier("cnCoreService")
+public class MockCNCore implements CNCore {
 
     @Autowired
     @Qualifier("testTmpCacheDirectory")
     private String dataoneCacheDirectory;
-    Logger logger = Logger.getLogger(MockCnCrud.class.getName());
+    Logger logger = Logger.getLogger(MockCNCore.class.getName());
     final static int SIZE = 16384;
     private URLCodec urlCodec = new URLCodec();
 
     @Override
-    public InputStream get(AuthToken token, Identifier guid) throws InvalidToken, ServiceFailure, NotAuthorized, NotFound, NotImplemented {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public SystemMetadata getSystemMetadata(AuthToken token, Identifier guid) throws InvalidToken, ServiceFailure, NotAuthorized, NotFound, InvalidRequest, NotImplemented {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public ObjectLocationList resolve(AuthToken token, Identifier guid) throws InvalidToken, ServiceFailure, NotAuthorized, NotFound, InvalidRequest, NotImplemented {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public Identifier create(AuthToken token, Identifier guid, InputStream object, SystemMetadata sysmeta) throws InvalidToken, ServiceFailure, NotAuthorized, IdentifierNotUnique, UnsupportedType, InsufficientResources, InvalidSystemMetadata, NotImplemented {
+        public Identifier create(Session session, Identifier pid, InputStream object,
+            SystemMetadata sysmeta) throws InvalidToken, ServiceFailure,
+            NotAuthorized, IdentifierNotUnique, UnsupportedType,
+            InsufficientResources, InvalidSystemMetadata, NotImplemented,
+            InvalidRequest{
         try {
-            File systemMetadata = new File(dataoneCacheDirectory + File.separator + "cn" + File.separator + "meta" + File.separator + urlCodec.encode(guid.getValue(), "UTF-8"));
+            File systemMetadata = new File(dataoneCacheDirectory + File.separator + "cn" + File.separator + "meta" + File.separator + urlCodec.encode(pid.getValue(), "UTF-8"));
             TypeMarshaller.marshalTypeToFile(sysmeta, systemMetadata.getAbsolutePath());
 
             if (systemMetadata.exists()) {
@@ -75,7 +70,7 @@ public class MockCnCrud implements CoordinatingNodeCrud {
             } else {
                 throw new ServiceFailure("1190", "SystemMetadata not found on FileSystem after create");
             }
-            File objectFile = new File(dataoneCacheDirectory + File.separator + "cn" + File.separator + "object" + File.separator + guid.getValue());
+            File objectFile = new File(dataoneCacheDirectory + File.separator + "cn" + File.separator + "object" + File.separator + pid.getValue());
             if (!objectFile.exists() && objectFile.createNewFile()) {
                 objectFile.setReadable(true);
                 objectFile.setWritable(true);
@@ -102,33 +97,9 @@ public class MockCnCrud implements CoordinatingNodeCrud {
         } catch (JiBXException ex) {
             throw new InvalidSystemMetadata("1180", ex.getMessage());
         }
-        return guid;
+        return pid;
     }
 
-    @Override
-    public Identifier reserveIdentifier(AuthToken token, String scope, IdentifierFormat format) throws InvalidToken, ServiceFailure, NotAuthorized, InvalidRequest, NotImplemented {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public Identifier reserveIdentifier(AuthToken token, String scope) throws InvalidToken, ServiceFailure, NotAuthorized, InvalidRequest, NotImplemented {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public Identifier reserveIdentifier(AuthToken token, IdentifierFormat format) throws InvalidToken, ServiceFailure, NotAuthorized, InvalidRequest, NotImplemented {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public Identifier reserveIdentifier(AuthToken token) throws InvalidToken, ServiceFailure, NotAuthorized, InvalidRequest, NotImplemented {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public boolean assertRelation(AuthToken token, Identifier subjectId, String relationship, Identifier objectId) throws InvalidToken, ServiceFailure, NotAuthorized, NotFound, InvalidRequest, NotImplemented {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
 
     public String getDataoneCacheDirectory() {
         return dataoneCacheDirectory;
@@ -139,7 +110,33 @@ public class MockCnCrud implements CoordinatingNodeCrud {
     }
 
     @Override
-    public Identifier update(AuthToken token, Identifier guid, InputStream object, Identifier obsoletedGuid, SystemMetadata sysmeta) throws InvalidToken, ServiceFailure, NotAuthorized, IdentifierNotUnique, UnsupportedType, InsufficientResources, NotFound, InvalidSystemMetadata, NotImplemented {
+    public ObjectFormatList listFormats() throws InvalidRequest, ServiceFailure, NotFound, InsufficientResources, NotImplemented {
         throw new UnsupportedOperationException("Not supported yet.");
     }
+
+    @Override
+    public ObjectFormat getFormat(ObjectFormatIdentifier fmtid) throws InvalidRequest, ServiceFailure, NotFound, InsufficientResources, NotImplemented {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public Log getLogRecords(Session session, Date fromDate, Date toDate, Event event) throws InvalidToken, InvalidRequest, ServiceFailure, NotAuthorized, NotImplemented {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public NodeList listNodes() throws NotImplemented, ServiceFailure {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public Identifier reserveIdentifier(Session session, Identifier pid, String scope, String format) throws InvalidToken, ServiceFailure, NotAuthorized, IdentifierNotUnique, NotImplemented, InvalidRequest {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public boolean registerSystemMetadata(Session session, Identifier pid, SystemMetadata sysmeta) throws NotImplemented, NotAuthorized, ServiceFailure, InvalidRequest, InvalidSystemMetadata {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
 }

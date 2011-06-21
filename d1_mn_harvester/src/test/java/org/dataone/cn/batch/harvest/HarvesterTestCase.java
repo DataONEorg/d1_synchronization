@@ -15,13 +15,13 @@ import java.util.TimeZone;
 import javax.annotation.Resource;
 import org.apache.commons.io.FileUtils;
 import org.apache.log4j.Logger;
-import org.dataone.cn.batch.harvest.mock.MockMnReplication;
+import org.dataone.cn.batch.harvest.mock.MockMNRead;
+import org.dataone.cn.batch.harvest.mock.MockCNCore;
 import org.dataone.cn.batch.proto.harvest.ObjectListQueueBuilder;
 import org.dataone.cn.batch.proto.harvest.ObjectListQueueProcessor;
 import org.dataone.cn.batch.proto.harvest.ObjectListQueueWriter;
 import org.dataone.cn.batch.proto.harvest.persist.NodeMapPersistence;
 import org.dataone.cn.batch.proto.harvest.types.NodeMap;
-import org.dataone.service.mn.MemberNodeReplication;
 import org.dataone.service.types.Identifier;
 import org.dataone.service.types.ObjectInfo;
 import org.dataone.service.types.SystemMetadata;
@@ -36,6 +36,7 @@ import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
 /**
+ *
  * These Tests need a lot more work. Only the gross functionality is tested and no hedge cases, or failure cases.
  * Testing of side effects is also absent.
  * @author rwaltz
@@ -60,7 +61,8 @@ public class HarvesterTestCase implements ApplicationContextAware {
     static String testTmpCacheDirectory;
     static String testSamplesDirectory;
     static NodeMapPersistence objectPersistence;
-    MockMnReplication mockReplication;
+    MockCNCore mockCNCore;
+    MockMNRead mockMNRead;
     File testEmptyObjectListLocationFile;
     File testLyingCheatingObjectListLocationFile;
     
@@ -124,8 +126,12 @@ public class HarvesterTestCase implements ApplicationContextAware {
         this.objectListQueueWriter = objectListQueueWriter;
     }
     @Resource
-    public void setMnReplication(MockMnReplication mockReplication) {
-        this.mockReplication = mockReplication;
+    public void setCNCore(MockCNCore mockCNCore) {
+        this.mockCNCore = mockCNCore;
+    }
+    @Resource
+    public void setMNRead(MockMNRead mockMNRead) {
+        this.mockMNRead = mockMNRead;
     }
     @Resource
     public void setTestEmptyObjectListLocationFile(File testEmptyObjectListLocationFile) {
@@ -205,7 +211,7 @@ public class HarvesterTestCase implements ApplicationContextAware {
     }
     @Test
     public void testEmptyResultsQueueBuilder() throws Exception {
-        mockReplication.setObjectListFile(testEmptyObjectListLocationFile);
+        mockMNRead.setObjectListFile(testEmptyObjectListLocationFile);
         List<ObjectInfo> writeQueue = new ArrayList<ObjectInfo>();
         objectListQueueBuilder.setWriteQueue(writeQueue);
         objectListQueueBuilder.buildQueue();
@@ -214,7 +220,7 @@ public class HarvesterTestCase implements ApplicationContextAware {
     }
     @Test
     public void testLyingCheatingResultsQueueBuilder() throws Exception {
-        mockReplication.setObjectListFile(testLyingCheatingObjectListLocationFile);
+        mockMNRead.setObjectListFile(testLyingCheatingObjectListLocationFile);
         List<ObjectInfo> writeQueue = new ArrayList<ObjectInfo>();
         objectListQueueBuilder.setWriteQueue(writeQueue);
         objectListQueueBuilder.buildQueue();

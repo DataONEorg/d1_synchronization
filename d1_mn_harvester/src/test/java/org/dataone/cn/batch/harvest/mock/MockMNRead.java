@@ -13,23 +13,19 @@ import java.util.Date;
 import org.apache.log4j.Logger;
 import org.dataone.cn.batch.utils.TypeMarshaller;
 import org.dataone.service.EncodingUtilities;
-import org.dataone.service.exceptions.IdentifierNotUnique;
-import org.dataone.service.exceptions.InsufficientResources;
 import org.dataone.service.exceptions.InvalidRequest;
-import org.dataone.service.exceptions.InvalidSystemMetadata;
 import org.dataone.service.exceptions.InvalidToken;
 import org.dataone.service.exceptions.NotAuthorized;
 import org.dataone.service.exceptions.NotFound;
 import org.dataone.service.exceptions.NotImplemented;
 import org.dataone.service.exceptions.ServiceFailure;
-import org.dataone.service.exceptions.UnsupportedType;
-import org.dataone.service.mn.MemberNodeCrud;
-import org.dataone.service.types.AuthToken;
+import org.dataone.service.mn.tier1.MNRead;
 import org.dataone.service.types.Checksum;
 import org.dataone.service.types.DescribeResponse;
-import org.dataone.service.types.Event;
 import org.dataone.service.types.Identifier;
-import org.dataone.service.types.Log;
+import org.dataone.service.types.ObjectFormat;
+import org.dataone.service.types.ObjectList;
+import org.dataone.service.types.Session;
 import org.dataone.service.types.SystemMetadata;
 import org.jibx.runtime.JiBXException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -40,21 +36,24 @@ import org.springframework.stereotype.Service;
  *
  * @author waltz
  */
-@Service("memberNodeCrudImpl")
-@Qualifier("crudService")
-public class MockMnCrud implements MemberNodeCrud {
+@Service("mnReadServiceImpl")
+@Qualifier("mnReadService")
+public class MockMNRead implements MNRead {
 
     @Autowired
     @Qualifier("testSamplesDirectory")
     private String dataoneCacheDirectory;
-    Logger logger = Logger.getLogger(MockMnCrud.class.getName());
+    Logger logger = Logger.getLogger(MockMNRead.class.getName());
     final static int SIZE = 16384;
+    File objectListFile;
 
     @Override
-    public InputStream get(AuthToken token, Identifier guid) throws InvalidToken, ServiceFailure, NotAuthorized, NotFound, NotImplemented {
+    public InputStream get(Session cert, Identifier pid)
+            throws InvalidToken, ServiceFailure, NotAuthorized, NotFound,
+                   NotImplemented, InvalidRequest {
         InputStream inputStream = null;
         try {
-            String filePath = dataoneCacheDirectory + File.separator + "mn" + File.separator + "object" + File.separator + EncodingUtilities.encodeUrlPathSegment(guid.getValue());
+            String filePath = dataoneCacheDirectory + File.separator + "mn" + File.separator + "object" + File.separator + EncodingUtilities.encodeUrlPathSegment(pid.getValue());
             logger.info("get filepath: " + filePath);
             inputStream = new FileInputStream(new File(filePath));
             logger.info("is it available? " + inputStream.available());
@@ -71,12 +70,14 @@ public class MockMnCrud implements MemberNodeCrud {
     }
 
     @Override
-    public SystemMetadata getSystemMetadata(AuthToken token, Identifier guid) throws InvalidToken, ServiceFailure, NotAuthorized, NotFound, InvalidRequest, NotImplemented {
+    public SystemMetadata getSystemMetadata(Session cert, Identifier pid)
+            throws InvalidToken, ServiceFailure, NotAuthorized, NotFound,
+            InvalidRequest, NotImplemented {
         SystemMetadata systemMetadata = new SystemMetadata();
 
         InputStream inputStream = null;
         try {
-            String filePath = dataoneCacheDirectory + File.separator + "mn" + File.separator + "meta" + File.separator + EncodingUtilities.encodeUrlPathSegment(guid.getValue());
+            String filePath = dataoneCacheDirectory + File.separator + "mn" + File.separator + "meta" + File.separator + EncodingUtilities.encodeUrlPathSegment(pid.getValue());
             logger.info(filePath);
             systemMetadata = TypeMarshaller.unmarshalTypeFromFile(SystemMetadata.class, filePath);
             logger.info("\n");
@@ -112,10 +113,6 @@ public class MockMnCrud implements MemberNodeCrud {
         return systemMetadata;
     }
 
-    @Override
-    public Identifier create(AuthToken token, Identifier guid, InputStream object, SystemMetadata sysmeta) throws InvalidToken, ServiceFailure, NotAuthorized, IdentifierNotUnique, UnsupportedType, InsufficientResources, InvalidSystemMetadata, NotImplemented {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
 
     public String getDataoneCacheDirectory() {
         return dataoneCacheDirectory;
@@ -126,32 +123,36 @@ public class MockMnCrud implements MemberNodeCrud {
     }
 
     @Override
-    public Log getLogRecords(AuthToken token, Date fromDate, Date toDate, Event event) throws InvalidToken, ServiceFailure, NotAuthorized, InvalidRequest, NotImplemented {
+    public DescribeResponse describe(Session cert, Identifier pid) throws InvalidToken, ServiceFailure, NotAuthorized, NotFound, NotImplemented, InvalidRequest {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
     @Override
-    public DescribeResponse describe(AuthToken token, Identifier guid) throws InvalidToken, ServiceFailure, NotAuthorized, NotFound, NotImplemented, InvalidRequest {
+    public Checksum getChecksum(Session cert, Identifier pid, String checksumAlgorithm) throws InvalidToken, ServiceFailure, NotAuthorized, NotFound, InvalidRequest, NotImplemented {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
     @Override
-    public Identifier update(AuthToken token, Identifier guid, InputStream object, Identifier obsoletedGuid, SystemMetadata sysmeta) throws InvalidToken, ServiceFailure, NotAuthorized, IdentifierNotUnique, UnsupportedType, InsufficientResources, NotFound, InvalidSystemMetadata, NotImplemented {
-        throw new UnsupportedOperationException("Not supported yet.");
+    public ObjectList listObjects(Session cert, Date startTime, Date endTime, ObjectFormat objectFormat, Boolean replicaStatus, Integer start, Integer count) throws NotAuthorized, InvalidRequest, NotImplemented, ServiceFailure, InvalidToken {
+        try {
+            return TypeMarshaller.unmarshalTypeFromFile(ObjectList.class, objectListFile);
+        } catch (IOException ex) {
+            throw new ServiceFailure("4801", ex.getClass().getName() + ": " + ex.getMessage());
+        } catch (InstantiationException ex) {
+            throw new ServiceFailure("4801", ex.getClass().getName() + ": " + ex.getMessage());
+        } catch (IllegalAccessException ex) {
+            throw new ServiceFailure("4801", ex.getClass().getName() + ": " + ex.getMessage());
+        } catch (JiBXException ex) {
+            throw new ServiceFailure("4801", ex.getClass().getName() + ": " + ex.getMessage());
+        }
+
     }
 
-    @Override
-    public Identifier delete(AuthToken token, Identifier guid) throws InvalidToken, ServiceFailure, NotAuthorized, NotFound, NotImplemented, InvalidRequest {
-        throw new UnsupportedOperationException("Not supported yet.");
+    public File getObjectListFile() {
+        return objectListFile;
     }
 
-    @Override
-    public Checksum getChecksum(AuthToken token, Identifier guid) throws InvalidToken, ServiceFailure, NotAuthorized, NotFound, InvalidRequest, NotImplemented {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public Checksum getChecksum(AuthToken token, Identifier guid, String checksumAlgorithm) throws InvalidToken, ServiceFailure, NotAuthorized, NotFound, InvalidRequest, NotImplemented {
-        throw new UnsupportedOperationException("Not supported yet.");
+    public void setObjectListFile(File objectListFile) {
+        this.objectListFile = objectListFile;
     }
 }

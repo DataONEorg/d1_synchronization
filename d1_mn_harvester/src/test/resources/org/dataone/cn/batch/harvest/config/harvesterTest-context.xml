@@ -26,10 +26,7 @@
             </list>
         </property>
     </bean>
-    <import resource="/scienceMetadataFormats.xml" />
-    <bean id="publicToken"  class="org.dataone.service.types.AuthToken">
-        <constructor-arg type="java.lang.String" value="public"/>
-    </bean>
+
     <bean id="testObjectListLocationResource" class="org.springframework.core.io.ClassPathResource">
         <constructor-arg value="/org/dataone/cn/batch/harvest/samples/objectList1.xml"/>
     </bean>
@@ -80,34 +77,26 @@
         <property name="persistentDataFileNamePath" ref="testSamplesDirectory" />
     </bean>
 
-    <bean id="mnReplicationService" class="org.dataone.cn.batch.harvest.mock.MockMnReplication">
-        <property name="objectListFile" ref="testObjectListLocationFile" />
-    </bean>
     
-    <bean id="mnCrudService" class="org.dataone.cn.batch.harvest.mock.MockMnCrud" />
-    <bean id="cnCrudService" class="org.dataone.cn.batch.harvest.mock.MockCnCrud" />
-    <bean id="cnCrudAuthorization" class="org.dataone.cn.batch.harvest.mock.MockCnAuthorization" />
+    <bean id="mockMNRead" class="org.dataone.cn.batch.harvest.mock.MockMNRead" >
+         <property name="objectListFile" ref="testObjectListLocationFile" />
+    </bean>
+    <bean id="mockCNCore" class="org.dataone.cn.batch.harvest.mock.MockCNCore" />
 
     <bean id="objectListQueueBuilder" class="org.dataone.cn.batch.proto.harvest.ObjectListQueueBuilder">
-        <property name="token" ref="publicToken" />
-        <property name="mnReplication" ref="mnReplicationService" />
+        <property name="mnRead" ref="mockMNRead" />
         <property name="mnIdentifier" value="r2d2" />
         <property name="nodeMapPersistance" ref="objectPersistence" />
     </bean>
     <bean id="objectListQueueProcessor" class="org.dataone.cn.batch.proto.harvest.ObjectListQueueProcessor">
-        <property name="token" ref="publicToken" />
-        <property name="mnReader" ref="mnCrudService" />
+        <property name="mnRead" ref="mockMNRead" />
         <property name="mnIdentifier" value="r2d2" />
         <property name="cnIdentifier" value="c3p0" />
-        <property name="validSciMetaObjectFormats" ref="validScienceMetadataFormats" />
     </bean>
     <bean id="objectListQueueWriter" class="org.dataone.cn.batch.proto.harvest.ObjectListQueueWriter">
-        <property name="token" ref="publicToken" />
-        <property name="mnReader" ref="mnCrudService" />
-        <property name="cnWriter" ref="cnCrudService" />
-        <property name="cnAuthorization" ref="cnCrudAuthorization" />
+        <property name="mnRead" ref="mockMNRead" />
+        <property name="cnCore" ref="mockCNCore" />
         <property name="mnIdentifier" value="r2d2" />
-        <property name="validSciMetaObjectFormats" ref="validScienceMetadataFormats" />
         <property name="nodeMapPersistance" ref="objectPersistence" />
     </bean>
 </beans>
