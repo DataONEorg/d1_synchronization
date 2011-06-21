@@ -5,13 +5,13 @@
 
   <groupId>org.dataone</groupId>
   <artifactId>hoksihangukbuniseyo</artifactId>
-  <version>0.6.1</version>
+  <version>0.6.2-SNAPSHOT</version>
   <name>HoksiHangukbuniseyo</name>
   <url>http://dataone.org</url>
     <parent>
         <groupId>org.dataone</groupId>
         <artifactId>d1_synchronization</artifactId>
-        <version>0.6.1</version>
+        <version>0.6.2-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
   <build>
