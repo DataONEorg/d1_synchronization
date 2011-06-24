@@ -19,6 +19,7 @@ import org.dataone.service.exceptions.NotAuthorized;
 import org.dataone.service.exceptions.NotFound;
 import org.dataone.service.exceptions.NotImplemented;
 import org.dataone.service.exceptions.ServiceFailure;
+import org.dataone.service.exceptions.SynchronizationFailed;
 import org.dataone.service.mn.tier1.MNRead;
 import org.dataone.service.types.Checksum;
 import org.dataone.service.types.DescribeResponse;
@@ -148,6 +149,11 @@ public class MockMNRead implements MNRead {
 
     }
 
+    @Override
+    public void synchronizationFailed(Session cert, SynchronizationFailed message) throws NotImplemented, ServiceFailure, NotAuthorized, InvalidRequest {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+    
     public File getObjectListFile() {
         return objectListFile;
     }
@@ -155,4 +161,6 @@ public class MockMNRead implements MNRead {
     public void setObjectListFile(File objectListFile) {
         this.objectListFile = objectListFile;
     }
+
+
 }
