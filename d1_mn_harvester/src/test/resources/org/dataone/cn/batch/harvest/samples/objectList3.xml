@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <d1:objectList xmlns:d1="http://ns.dataone.org/service/types/0.6.2"
 	 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
- 	xsi:schemaLocation="http://ns.dataone.org/service/types/0.6.2 https://repository.dataone.org/software/cicore/branches/D1_SCHEMA_0_6_2/dataoneTypes.xsd" count="3" start="0" total="10">
+ 	xsi:schemaLocation="http://ns.dataone.org/service/types/0.6.2 https://repository.dataone.org/software/cicore/trunk/d1_schemas/dataoneTypes.xsd" count="3" start="0" total="10">
 </d1:objectList>
