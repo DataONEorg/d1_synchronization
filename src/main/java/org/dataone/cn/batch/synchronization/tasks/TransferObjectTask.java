@@ -4,12 +4,14 @@
  */
 package org.dataone.cn.batch.synchronization.tasks;
 
+import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import org.apache.log4j.Logger;
 import org.dataone.cn.batch.type.MemberNodeReaderState;
@@ -64,13 +66,11 @@ public class TransferObjectTask implements Callable<Void> {
     private Session session = null;
     // need this task queue if a failure occurs on the CN such that the task will
     // need to be processed on a separate CN
-    private HazelcastInstance hazelcast;
-    // XXX need a better way of assigning this value
+    private HazelcastInstance hazelcast = Hazelcast.getDefaultInstance();
     String cnIdentifier = Settings.getConfiguration().getString("Synchronization.CN_REPLICA_NODE");
 
-    public TransferObjectTask(NodeComm nodeCommunications, HazelcastInstance hazelcast, SyncObject task) {
+    public TransferObjectTask(NodeComm nodeCommunications, SyncObject task) {
         this.nodeCommunications = nodeCommunications;
-        this.hazelcast = hazelcast;
         this.task = task;
     }
 
@@ -78,12 +78,13 @@ public class TransferObjectTask implements Callable<Void> {
     public Void call() {
         logger.debug("Locking task");
         try {
+// this will be from the hazelcast client running against metacat
 //        Lock lockObject = hazelcast.getLock(task.getPid());
 //        if (lockObject.tryLock()) {
-            logger.debug("Processing task");
+            logger.info("Processing task");
             SystemMetadata systemMetadata = process(task.getNodeId(), task.getPid());
             if (systemMetadata != null) {
-                logger.debug("Writing task");
+                logger.info("Writing task");
                 write(systemMetadata);
             } //else {
                 // object never written such that metacat replication
@@ -105,8 +106,7 @@ public class TransferObjectTask implements Callable<Void> {
             ex.printStackTrace();
             logger.error(ex.getMessage());
         }
-        logger.info("Setting Comm State");
-        nodeCommunications.setState(MemberNodeReaderState.AVAILABLE);
+
         return null;
     }
 
@@ -173,9 +173,9 @@ public class TransferObjectTask implements Callable<Void> {
                 // data objects are not fully synchronized, only their metadata is
                 // synchronized,
                 // only set valid science metadata formats as having been replicated
+                logger.debug("Get Object Format");
                 ObjectFormat objectFormat = nodeCommunications.getCnCore().getFormat(systemMetadata.getFmtid());
-                logger.debug("Got Object Format");
-                if (objectFormat != null && objectFormat.isScienceMetadata()) {
+                if (objectFormat != null && !objectFormat.getFormatType().equalsIgnoreCase("DATA")) {
                     NodeReference cnReference = new NodeReference();
                     cnReference.setValue(cnIdentifier);
                     Replica cnReplica = new Replica();
@@ -187,8 +187,10 @@ public class TransferObjectTask implements Callable<Void> {
                 }
             } catch (InsufficientResources ex) {
                 try {
-                    hazelcast.getQueue("syncTaskQueue").put(task);
-                } catch (InterruptedException ex1) {
+                    // maybe another
+                    logger.error(ex.serialize(BaseException.FMT_XML));
+                    hazelcast.getQueue("syncTaskQueue").offer(task,2, TimeUnit.SECONDS);
+                } catch (Exception ex1) {
                     logger.error("Unable to process pid " + pid + " from node " + memberNodeId);
                     ServiceFailure serviceFailure = new ServiceFailure("-1", ex1.getMessage());
                     submitSynchronizationFailed(pid, serviceFailure);
@@ -304,7 +306,7 @@ public class TransferObjectTask implements Callable<Void> {
         // determine the next batch of records to retreive from a MemberNode
         systemMetadata.setDateSysMetadataModified(new Date());
         ObjectFormat objectFormat = nodeCommunications.getCnCore().getFormat(systemMetadata.getFmtid());
-        if ((objectFormat != null) && objectFormat.isScienceMetadata()) {
+        if ((objectFormat != null) && !objectFormat.getFormatType().equalsIgnoreCase("DATA")) {
             InputStream sciMetaStream = null;
             // get the scimeta object and then feed it to metacat
             int tryAgain = 0;
@@ -344,7 +346,7 @@ public class TransferObjectTask implements Callable<Void> {
         if (oldSystemMetadata.getAuthoritativeMemberNode().getValue().contentEquals(task.getNodeId())) {
 
             if (newSystemMetadata.getObsoletedBy() != null) {
-                logger.info("Performing Update of systemMetadata due to an update operation having been performed on MN: " + task.getNodeId());
+                logger.debug("Performing Update of systemMetadata due to an update operation having been performed on MN: " + task.getNodeId());
                 oldSystemMetadata.setObsoletedBy(newSystemMetadata.getObsoletedBy());
                 Identifier pid = new Identifier();
                 pid.setValue(oldSystemMetadata.getIdentifier().getValue());

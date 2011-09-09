@@ -18,12 +18,11 @@ import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.log4j.Logger;
-import org.dataone.cn.batch.synchronization.NodeCommD1ClientFactory;
 import org.dataone.cn.batch.synchronization.NodeCommFactory;
 import org.dataone.cn.batch.type.NodeComm;
 import org.dataone.cn.batch.type.MemberNodeReaderState;
-import org.dataone.cn.batch.type.SimpleNode;
 import org.dataone.cn.batch.type.SyncObject;
+import org.dataone.service.types.v1.Node;
 import org.springframework.core.task.AsyncTaskExecutor;
 
 /**
@@ -52,50 +51,57 @@ public class SyncObjectTask implements Callable<String> {
         logger.debug("Starting SyncObjectTask");
         Map<String, List<NodeComm>> initializedMemberNodes = new HashMap<String, List<NodeComm>>();
         BlockingQueue<SyncObject> syncTaskQueue = hazelcast.getQueue("syncTaskQueue");
-        IMap<String, SimpleNode> d1NodesMap = hazelcast.getMap("d1NodesMap");
-//        ArrayList<Future> futuresList = new ArrayList<Future>();
+        IMap<String, Node> hzNodes = hazelcast.getMap("hzNodes");
+        HashMap<Future, NodeComm> futuresMap = new HashMap<Future, NodeComm>();
         SyncObject task = null;
         try {
             do {
-              
+
                 task = syncTaskQueue.take();
                 logger.info("found task " + task.getPid());
                 if (task != null) {
                     NodeComm nodeCommunications = null;
                     // first check all the futures of past tasks to see if any have finished
                     // XXX is this code doing anything useful?
-       /*             if (!futuresList.isEmpty()) {
+                    if (!futuresMap.isEmpty()) {
                         ArrayList<Future> removalList = new ArrayList<Future>();
-                        for (Future future : futuresList) {
-                            try {
-                                 future.get(1L, TimeUnit.MILLISECONDS);
-                                // the future is now, reset the state of the NodeCommunication object
-                                // so that it will be re-used (oh, maybe this should be done immediately
-                                // before task ends
-                                if (future.isDone()) {
-                                    // print something about it returning ok
-                                } 
 
+                        for (Future future : futuresMap.keySet()) {
+                            logger.debug("trying future " + future.toString());
+                            try {
+                                future.get(10L, TimeUnit.MILLISECONDS);
+                                // the future is now, reset the state of the NodeCommunication object
+                                // so that it will be re-used
+                                logger.debug("futureMap is done? " + future.isDone());
+                                NodeComm futureComm = futuresMap.get(future);
+                                logger.debug("Found futureComm " + futureComm.getNodeId() + ":" + futureComm.getNumber());
+                                futureComm.setState(MemberNodeReaderState.AVAILABLE);
                                 removalList.add(future);
-                                
+
                             } catch (ExecutionException ex) {
 
                                 // this is a problem because we don't know which of the tasks
                                 // threw an exception! 
                                 // should we do anything special?
-
+                                logger.error(ex.getMessage());
+                                ex.printStackTrace();
+                                NodeComm futureComm = futuresMap.get(future);
+                                logger.debug("FROM futureComm " + futureComm.getNodeId() + ":" + futureComm.getNumber());
+                                futureComm.setState(MemberNodeReaderState.AVAILABLE);
                                 removalList.add(future);
                             } catch (TimeoutException ex) {
-                                // not ready yet, ignore
+                                NodeComm futureComm = futuresMap.get(future);
+                                 logger.debug("waiting for future of "+ futureComm.getNodeId() + ":" + futureComm.getNumber());
                             }
 
                         }
                         if (!removalList.isEmpty()) {
-                        futuresList.removeAll(removalList);
+                            for (Future key : removalList) {
+                                futuresMap.remove(key);
+                            }
                         }
                     }
-        *
-        */
+
                     // investigate the task for membernode
                     String memberNodeId = task.getNodeId();
                     // grab a membernode client off of the stack of initialized clients
@@ -111,10 +117,12 @@ public class SyncObjectTask implements Callable<String> {
                         }
                         if (nodeCommunications == null) {
                             // no memberNodeReader is available, see if we can create a new one
-                            if (mnReaderList.size() < maxNumberOfClientsPerMemberNode) {
+                            if (mnReaderList.size() <= maxNumberOfClientsPerMemberNode) {
                                 // create and add a new one
-                                nodeCommunications = nodeCommunicationsFactory.getNodeComm(d1NodesMap.get(memberNodeId).getBaseUrl());
+                                nodeCommunications = nodeCommunicationsFactory.getNodeComm(hzNodes.get(memberNodeId).getBaseURL());
                                 nodeCommunications.setState(MemberNodeReaderState.RUNNING);
+                                nodeCommunications.setNodeId(memberNodeId);
+                                nodeCommunications.setNumber(mnReaderList.size() +1);
                                 mnReaderList.add(nodeCommunications);
                             }
                         }
@@ -123,17 +131,19 @@ public class SyncObjectTask implements Callable<String> {
                         // that is assigned to this MemberNode
                         // create it, get a reader, and put it in the hash
                         List<NodeComm> mnReaderList = new ArrayList<NodeComm>();
-                        nodeCommunications = nodeCommunicationsFactory.getNodeComm(d1NodesMap.get(memberNodeId).getBaseUrl());
+                        nodeCommunications = nodeCommunicationsFactory.getNodeComm(hzNodes.get(memberNodeId).getBaseURL());
                         nodeCommunications.setState(MemberNodeReaderState.RUNNING);
+                        nodeCommunications.setNodeId(memberNodeId);
+                        nodeCommunications.setNumber(mnReaderList.size() +1);
                         mnReaderList.add(nodeCommunications);
                         initializedMemberNodes.put(memberNodeId, mnReaderList);
                     }
                     if (nodeCommunications != null) {
                         // finally, execute the new task!
-                        TransferObjectTask transferObject = new TransferObjectTask(nodeCommunications,hazelcast, task);
+                        TransferObjectTask transferObject = new TransferObjectTask(nodeCommunications, task);
                         FutureTask futureTask = new FutureTask(transferObject);
                         taskExecutor.execute(new FutureTask(transferObject));
-       //                 futuresList.add(futureTask); // removed because futures are not doing anything
+                        futuresMap.put(futureTask, nodeCommunications); // removed because futures are not doing anything
                     } else {
                         // Membernode Reader is unavailable.  place the task back on the queue
                         // and sleep for a second in case this is the only
@@ -186,5 +196,4 @@ public class SyncObjectTask implements Callable<String> {
     public void setNodeCommunicationsFactory(NodeCommFactory nodeCommunicationsFactory) {
         this.nodeCommunicationsFactory = nodeCommunicationsFactory;
     }
-   
 }

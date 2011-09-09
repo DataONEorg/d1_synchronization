@@ -15,7 +15,7 @@ import org.dataone.cn.batch.synchronization.tasks.SyncObjectTask;
 
 /**
  * Runs the SyncObjectTask runnable class as a single daemon threaded
- * execution.
+ * executable.
  * 
  * @author waltz
  */

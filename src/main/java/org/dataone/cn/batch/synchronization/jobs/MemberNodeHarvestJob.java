@@ -19,8 +19,8 @@ import java.util.concurrent.TimeoutException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.dataone.cn.batch.synchronization.tasks.ObjectListHarvestTask;
-import org.dataone.cn.batch.type.SimpleNode;
 import org.dataone.configuration.Settings;
+import org.dataone.service.types.v1.Node;
 import org.quartz.DisallowConcurrentExecution;
 import org.quartz.Job;
 import org.quartz.JobExecutionContext;
@@ -50,9 +50,9 @@ public class MemberNodeHarvestJob implements Job {
             logger.debug("executing for " + mnIdentifier + " with batch size " + batchSize);
             HazelcastInstance hazelcast = Hazelcast.getDefaultInstance();
 
-            IMap<String, SimpleNode> d1NodesMap = hazelcast.getMap("d1NodesMap");
+            IMap<String, Node> hzNodes = hazelcast.getMap("hzNodes");
 
-            SimpleNode mnNode = d1NodesMap.tryLockAndGet(mnIdentifier, 5L, TimeUnit.SECONDS);
+            Node mnNode = hzNodes.tryLockAndGet(mnIdentifier, 5L, TimeUnit.SECONDS);
             ObjectListHarvestTask harvestTask = new ObjectListHarvestTask(mnNode, batchSize);
             ExecutorService executor = Hazelcast.getExecutorService();
             DistributedTask dtask = new DistributedTask((Callable<Date>) harvestTask);
@@ -66,14 +66,14 @@ public class MemberNodeHarvestJob implements Job {
                 logger.error(ex.getMessage());
             }
             if ((lastUpdateDate != null) && future.isDone()) {
-                if (lastUpdateDate.after(mnNode.getLastHarvested())) {
-                    mnNode.setLastHarvested(lastUpdateDate);
+                if (lastUpdateDate.after(mnNode.getSynchronization().getLastHarvested())) {
+                    mnNode.getSynchronization().setLastHarvested(lastUpdateDate);
                 }
-                d1NodesMap.putAndUnlock(mnIdentifier, mnNode);
+                hzNodes.putAndUnlock(mnIdentifier, mnNode);
                 // release lock or make certain lock is release
             } else {
                 // something bad happened so retry the harvest later
-                d1NodesMap.unlock(mnIdentifier);
+                hzNodes.unlock(mnIdentifier);
             }
             // if the lastUpdateDate has changed then it should be persisted
 
