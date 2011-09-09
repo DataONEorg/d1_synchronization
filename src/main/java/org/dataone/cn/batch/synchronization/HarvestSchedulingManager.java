@@ -4,6 +4,9 @@
  */
 package org.dataone.cn.batch.synchronization;
 
+import org.dataone.service.types.v1.NodeType;
+import org.dataone.service.types.v1.NodeState;
+import org.dataone.service.types.v1.Node;
 import org.quartz.impl.StdSchedulerFactory;
 import java.io.IOException;
 import java.util.Properties;
@@ -15,8 +18,7 @@ import org.dataone.cn.batch.synchronization.jobs.MemberNodeHarvestJob;
 import com.hazelcast.core.HazelcastInstance;
 import java.text.ParseException;
 import java.util.Set;
-import org.dataone.cn.batch.ldap.impl.HazelcastLdapStore;
-import org.dataone.cn.batch.type.SimpleNode;
+import org.dataone.cn.hazelcast.ldap.HazelcastLdapStore;
 import org.quartz.JobKey;
 import org.quartz.Scheduler;
 import org.quartz.SchedulerException;
@@ -92,22 +94,26 @@ public class HarvestSchedulingManager implements ApplicationContextAware {
             }
         }
         // populate the nodeList
-        IMap<String, SimpleNode> d1NodesMap = hazelcast.getMap("d1NodesMap");
+        IMap<String, Node> hzNodes = hazelcast.getMap("hzNodes");
 
-        logger.debug("Node map has " + d1NodesMap.size() + " entries");
+        logger.debug("Node map has " + hzNodes.size() + " entries");
         // construct new jobs and triggers based on ownership of nodes in the nodeList
-        for (String key : d1NodesMap.localKeySet()) {
+        for (String key : hzNodes.localKeySet()) {
+            // exclude from the set any CNs or membernodes that are down or do not
+            // want to be synchronized
+            Node node = hzNodes.get(key);
+            if (node.getState().equals(NodeState.UP)
+                    && node.isSynchronize() && node.getType().equals(NodeType.MN)) {
+                String crontabEntry = this.getCrontabEntry(node);
+                logger.debug("scheduling  key " + key + " with schedule " + crontabEntry);
+                // the current mn node is owned by this hazelcast cn node member
+                // so schedule a job based on the settings of the node
+                JobDetail job = newJob(MemberNodeHarvestJob.class).withIdentity("job-" + key, groupName) // name "myJob", group "group1"
+                        .usingJobData("mnIdentifier", key).build();
 
-            // the current d1 node is owned by this hazelcast cn node member
-            // so schedule a job based on the settings of the node
-            JobDetail job = newJob(MemberNodeHarvestJob.class).withIdentity("job-" + key, groupName) // name "myJob", group "group1"
-                    .usingJobData("mnIdentifier", d1NodesMap.get(key).getNodeId()).build();
-            String crontabEntry = d1NodesMap.get(key).getCrontab();
-            logger.debug("scheduling  key " + key + " for schedule " + crontabEntry);
-
-            Trigger trigger = newTrigger().withIdentity("trigger-" + key, groupName).startNow().withSchedule(cronSchedule(crontabEntry)).build();
-            scheduler.scheduleJob(job, trigger);
-
+                Trigger trigger = newTrigger().withIdentity("trigger-" + key, groupName).startNow().withSchedule(cronSchedule(crontabEntry)).build();
+                scheduler.scheduleJob(job, trigger);
+            }
         }
         scheduler.start();
 
@@ -115,6 +121,40 @@ public class HarvestSchedulingManager implements ApplicationContextAware {
             logger.debug("Scheduler is started");
         }
 
+    }
+
+    private String getCrontabEntry(Node node) {
+        String seconds = node.getSynchronization().getSchedule().getSec();
+        seconds = seconds.replace(" ", "");
+        String minutes = node.getSynchronization().getSchedule().getMin();
+        minutes = minutes.replace(" ", "");
+        String hours = node.getSynchronization().getSchedule().getHour();
+        hours = hours.replace(" ", "");
+        String days = node.getSynchronization().getSchedule().getMday();
+        days = days.replace(" ", "");
+        String months = node.getSynchronization().getSchedule().getMon();
+        months = months.replace(" ", "");
+        String weekdays = node.getSynchronization().getSchedule().getWday();
+        weekdays = weekdays.replace(" ", "");
+        String years = node.getSynchronization().getSchedule().getYear();
+        years = years.replace(" ", "");
+        if (days.equalsIgnoreCase("?") && weekdays.equalsIgnoreCase("?")) {
+            // both can not be ?
+            days = "*";
+        } else if (!(days.equalsIgnoreCase("?")) && !(weekdays.equalsIgnoreCase("?"))) {
+            // if both of them are set to something other than ?
+            // then one of them needs to be ?
+            // if one of them is set as * while the other is not
+            if (days.equalsIgnoreCase("*") && weekdays.equalsIgnoreCase("*")) {
+                weekdays = "?";
+            } else if (days.equalsIgnoreCase("*")) {
+                days = "?";
+            } else {
+                weekdays = "?";
+            }
+        }
+        String crontab = seconds + " " + minutes + " " + hours + " " + days + " " + months + " " + weekdays + " " + years;
+        return crontab;
     }
 
     public HazelcastInstance getHazelcast() {

@@ -34,7 +34,7 @@
         <property name="logName" value="log"/>
     </bean>
 
-    <bean id="contextSourceConfiguration" class="org.dataone.cn.batch.ldap.ContextSourceConfiguration" />
+    <bean id="contextSourceConfiguration" class="org.dataone.cn.service.ldap.ContextSourceConfiguration" />
 
     <bean id="contextSource" class="org.springframework.ldap.core.support.LdapContextSource"
         factory-bean="contextSourceConfiguration" factory-method="getLdapContextSource" />
@@ -43,15 +43,16 @@
        <!-- <qualifier value="ldapTemplate"/> -->
     </bean>
     <context:annotation-config/>
-    <context:component-scan base-package="org.dataone.cn.batch.ldap.impl"  />
+    <context:component-scan base-package="org.dataone.cn.service.ldap.impl.v1"  />
+    <context:component-scan base-package="org.dataone.cn.hazelcast.ldap"  />
     <hz:hazelcast id="hazelcastInstance">
         <hz:config>
-            <hz:group name="dev" password="dataone"/>
+            <hz:group name="dev-unit-testing" password="dataone"/>
             <hz:properties>
                 <hz:property name="hazelcast.merge.first.run.delay.seconds">120</hz:property>
                 <hz:property name="hazelcast.merge.next.run.delay.seconds">60</hz:property>
             </hz:properties>
-            <hz:network port="5701" port-auto-increment="false">
+            <hz:network port="5710" port-auto-increment="false">
                 <hz:join>
                     <hz:multicast enabled="false"
                                   multicast-group="224.2.2.3"
@@ -63,7 +64,7 @@
                 <hz:symmetric-encryption enabled="true" algorithm="PBEWithMD5AndDES" salt="430asdfjweofgasdADF68978230jfh2012378asgfadfhweifASDFQWFDGAF" password="^fksos$@fA9829" iteration-count="25"/>
             </hz:network>
             <hz:queue name="syncTaskQueue" max-size-per-jvm="0" />
-            <hz:map name="d1NodesMap"
+            <hz:map name="hzNodes"
                     backup-count="1"
                     max-size="0"
                     eviction-percentage="30"

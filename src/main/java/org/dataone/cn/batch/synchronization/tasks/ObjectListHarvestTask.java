@@ -6,34 +6,26 @@ package org.dataone.cn.batch.synchronization.tasks;
 
 import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
-import com.hazelcast.core.Instance;
 import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Date;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import org.apache.log4j.Logger;
 import org.dataone.cn.batch.synchronization.NodeCommD1ClientFactory;
-import org.dataone.cn.batch.synchronization.NodeCommFactory;
 import org.dataone.cn.batch.type.NodeComm;
-import org.dataone.cn.batch.type.SimpleNode;
 import org.dataone.cn.batch.type.SyncObject;
-import org.dataone.configuration.Settings;
 import org.dataone.service.exceptions.InvalidRequest;
 import org.dataone.service.exceptions.InvalidToken;
 import org.dataone.service.exceptions.NotAuthorized;
 import org.dataone.service.exceptions.NotImplemented;
 import org.dataone.service.exceptions.ServiceFailure;
 import org.dataone.service.mn.tier1.v1.MNRead;
-import org.dataone.service.types.v1.Identifier;
+import org.dataone.service.types.v1.Node;
 import org.dataone.service.types.v1.ObjectInfo;
 import org.dataone.service.types.v1.ObjectList;
 import org.dataone.service.types.v1.Session;
-import org.dataone.service.types.v1.SystemMetadata;
 
 /**
  * An executable task that retrieve a list of ObjectInfos
@@ -48,15 +40,15 @@ import org.dataone.service.types.v1.SystemMetadata;
  */
 public class ObjectListHarvestTask implements Callable<Date>, Serializable {
 
-    SimpleNode simpleNode;
+    Node d1Node;
     private Session session;
     private int start = 0;
     private int total = 0;
     Integer batchSize;
     private Date now = new Date();
 
-    public ObjectListHarvestTask(SimpleNode simpleNode, Integer batchSize) {
-        this.simpleNode = simpleNode;
+    public ObjectListHarvestTask(Node d1Node, Integer batchSize) {
+        this.d1Node = d1Node;
         this.batchSize = batchSize;
     }
 
@@ -68,17 +60,17 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
         HazelcastInstance hazelcast = Hazelcast.getDefaultInstance();
         BlockingQueue<SyncObject> syncTaskQueue = hazelcast.getQueue("syncTaskQueue");
         // Need the LinkedHashMap to preserver insertion order
-        Date lastMofidiedDate = simpleNode.getLastHarvested();
+        Date lastMofidiedDate = d1Node.getSynchronization().getLastHarvested();
         List<ObjectInfo> readQueue = null;
 
         do {
             // read upto a 1000 objects (the default, but it can be overwritten)
             // from ListObjects and process before retrieving more
             if (start == 0 || (start < total)) {
-                readQueue = this.retrieve(this.simpleNode);
+                readQueue = this.retrieve(this.d1Node);
 
                 for (ObjectInfo objectInfo : readQueue) {
-                    SyncObject syncObject = new SyncObject(simpleNode.getNodeId(), objectInfo.getIdentifier().getValue());
+                    SyncObject syncObject = new SyncObject(d1Node.getIdentifier().getValue(), objectInfo.getIdentifier().getValue());
 
                     if (objectInfo.getDateSysMetadataModified().after(lastMofidiedDate)) {
                         lastMofidiedDate = objectInfo.getDateSysMetadataModified();
@@ -100,12 +92,12 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
      * It retrieves the list in batches and should be called iteratively
      * until all objects have been retrieved from a node.
      */
-    private List<ObjectInfo> retrieve(SimpleNode mnNode) {
+    private List<ObjectInfo> retrieve(Node d1Node) {
         // logger is not  be serializable, but no need to make it transient imo
         Logger logger = Logger.getLogger(ObjectListHarvestTask.class.getName());
 
         NodeCommD1ClientFactory nodeCommClientFactory = new NodeCommD1ClientFactory();
-        NodeComm nodeComm = nodeCommClientFactory.getNodeComm(simpleNode.getBaseUrl());
+        NodeComm nodeComm = nodeCommClientFactory.getNodeComm(d1Node.getBaseURL());
         MNRead mnRead = nodeComm.getMnRead();
 
         List<ObjectInfo> writeQueue = new ArrayList<ObjectInfo>();
@@ -114,8 +106,8 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
         ObjectList objectList = null;
         Boolean replicationStatus = null;
 
-        Date lastHarvestDate = mnNode.getLastHarvested();
-        logger.debug("starting retrieval " + mnNode.getBaseUrl());
+        Date lastHarvestDate = d1Node.getSynchronization().getLastHarvested();
+        logger.debug("starting retrieval " + d1Node.getBaseURL());
         try {
 
             // always execute for the first run (for start = 0)
