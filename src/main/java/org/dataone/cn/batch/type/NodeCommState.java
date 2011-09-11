@@ -9,6 +9,6 @@ package org.dataone.cn.batch.type;
  *
  * @author waltz
  */
-public enum MemberNodeReaderState {
+public enum NodeCommState {
     AVAILABLE, RUNNING;
 }

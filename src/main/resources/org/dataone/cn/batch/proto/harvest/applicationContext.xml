@@ -80,7 +80,7 @@
                 </hz:join>
                 <hz:symmetric-encryption enabled="true" algorithm="PBEWithMD5AndDES" salt="430asdfjweofgasdADF68978230jfh2012378asgfadfhweifASDFQWFDGAF" password="^fksos$@fA9829" iteration-count="25"/>
             </hz:network>
-            <hz:queue name="syncTaskQueue" max-size-per-jvm="0" />
+            <hz:queue name="hzSyncObjectQueue" max-size-per-jvm="0" />
             <hz:map name="hzNodes"
                     backup-count="1"
                     max-size="0"
