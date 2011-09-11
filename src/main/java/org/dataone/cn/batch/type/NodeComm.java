@@ -4,11 +4,13 @@
  */
 package org.dataone.cn.batch.type;
 
+import java.util.Date;
 import org.dataone.service.cn.v1.CNCore;
 import org.dataone.service.cn.v1.CNRead;
 import org.dataone.service.mn.tier1.v1.MNRead;
 
 /**
+ * Assemble and manage communication channels used by TransferObjectTask
  *
  * @author waltz
  */
@@ -17,9 +19,15 @@ public class NodeComm {
     private MNRead mnRead;
     private CNCore cnCore;
     private CNRead cnRead;
-    private String nodeId;
+
+    // helpful for debugging
     private Integer number;
-    private MemberNodeReaderState state;
+
+    // keeps track of whether a thread is actively using this comm node
+    private NodeCommState state;
+    // help to determine if thread is blocking, used as timeout
+    private Date runningStartDate;
+
 
     public NodeComm(MNRead mnRead, CNCore cncore, CNRead cnread) {
         this.mnRead = mnRead;
@@ -35,11 +43,11 @@ public class NodeComm {
         this.mnRead = mnRead;
     }
 
-    public MemberNodeReaderState getState() {
+    public NodeCommState getState() {
         return state;
     }
 
-    public void setState(MemberNodeReaderState state) {
+    public void setState(NodeCommState state) {
         this.state = state;
     }
 
@@ -59,13 +67,6 @@ public class NodeComm {
         this.cnRead = cnRead;
     }
 
-    public String getNodeId() {
-        return nodeId;
-    }
-
-    public void setNodeId(String nodeId) {
-        this.nodeId = nodeId;
-    }
 
     public Integer getNumber() {
         return number;
@@ -74,5 +75,14 @@ public class NodeComm {
     public void setNumber(Integer number) {
         this.number = number;
     }
+
+    public Date getRunningStartDate() {
+        return runningStartDate;
+    }
+
+    public void setRunningStartDate(Date runningStartDate) {
+        this.runningStartDate = runningStartDate;
+    }
+
     
 }

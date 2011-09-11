@@ -58,7 +58,7 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
         Logger logger = Logger.getLogger(ObjectListHarvestTask.class.getName());
         logger.debug("called ObjectListHarvestTask");
         HazelcastInstance hazelcast = Hazelcast.getDefaultInstance();
-        BlockingQueue<SyncObject> syncTaskQueue = hazelcast.getQueue("syncTaskQueue");
+        BlockingQueue<SyncObject> hzSyncObjectQueue = hazelcast.getQueue("hzSyncObjectQueue");
         // Need the LinkedHashMap to preserver insertion order
         Date lastMofidiedDate = d1Node.getSynchronization().getLastHarvested();
         List<ObjectInfo> readQueue = null;
@@ -75,7 +75,7 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
                     if (objectInfo.getDateSysMetadataModified().after(lastMofidiedDate)) {
                         lastMofidiedDate = objectInfo.getDateSysMetadataModified();
                     }
-                    syncTaskQueue.put(syncObject);
+                    hzSyncObjectQueue.put(syncObject);
                     logger.debug("syncTask " + syncObject.getPid() + " placed on Queue");
                 }
             } else {
