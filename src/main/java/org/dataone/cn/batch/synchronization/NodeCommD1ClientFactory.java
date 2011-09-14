@@ -20,7 +20,7 @@ public class NodeCommD1ClientFactory implements NodeCommFactory {
 
     @Override
     public NodeComm getNodeComm(String mnUrl) {
-        MNode mNode = new MNode(mnUrl + "v1");
+        MNode mNode = new MNode(mnUrl + "/v1");
         // XXX this could be configurable parameter
         LocalHostNode metacatNode = new LocalHostNode(Settings.getConfiguration().getString("Synchronization.cn_base_url"));
         NodeComm nodeComm = new NodeComm(mNode, metacatNode, metacatNode);
