@@ -99,7 +99,7 @@ public class SyncObjectTask implements Callable<String> {
                             future.get(500L, TimeUnit.MILLISECONDS);
                             // the future is now, reset the state of the NodeCommunication object
                             // so that it will be re-used
-                            logger.info("futureMap is done? " + future.isDone());
+                            logger.debug("futureMap is done? " + future.isDone());
                             HashMap<String, Object> futureHash = futuresMap.get(future);
                             SyncObject futureTask = (SyncObject) futureHash.get(taskName);
                             NodeComm futureNodeComm = (NodeComm) futureHash.get(nodecommName);
@@ -136,7 +136,6 @@ public class SyncObjectTask implements Callable<String> {
                             NodeComm futureNodeComm = (NodeComm) futureHash.get(nodecommName);
                             logger.info("Waiting for the future of " + futureTask.getNodeId() + ":" + futureNodeComm.getNumber() + " for pid " + futureTask.getPid() + " since " + DateTimeMarshaller.serializeDateToUTC(futureNodeComm.getRunningStartDate()));
                             Date now = new Date();
-                            logger.info(ex.getMessage());
                             // if the thread is running longer than an hour, kill it
                             if ((now.getTime() - futureNodeComm.getRunningStartDate().getTime()) > threadTimeout) {
                                 logger.warn("Cancelling task of " + futureTask.getNodeId() + ":" + futureNodeComm.getNumber() + " for pid " + futureTask.getPid() + " waiting since " + DateTimeMarshaller.serializeDateToUTC(futureNodeComm.getRunningStartDate()));
@@ -162,7 +161,7 @@ public class SyncObjectTask implements Callable<String> {
                 if (task != null) {
                     // Found a task now see if there is a comm object available
                     // if so, then run it
-                    logger.info("found task " + task.getPid());
+                    logger.info("found task " + task.getPid() + " for " + task.getNodeId());
                     NodeComm nodeCommunications = null;
                     // investigate the task for membernode
                     String memberNodeId = task.getNodeId();
@@ -223,7 +222,7 @@ public class SyncObjectTask implements Callable<String> {
                             try {
                                 Thread.sleep(10000L); // ten seconds
                             } catch (InterruptedException iex) {
-                                logger.info("sleep interrupted");
+                                logger.debug("sleep interrupted");
                             }
                         }
                     } else {
@@ -236,7 +235,7 @@ public class SyncObjectTask implements Callable<String> {
                         try {
                             Thread.sleep(10000L); // ten seconds
                         } catch (InterruptedException ex) {
-                            logger.info("sleep interrupted");
+                            logger.debug("sleep interrupted");
                         }
                     }
                 }
