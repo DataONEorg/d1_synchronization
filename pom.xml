@@ -152,13 +152,13 @@
         <dependency>
             <groupId>com.hazelcast</groupId>
             <artifactId>hazelcast</artifactId>
-            <version>1.9.3.1</version>
+            <version>1.9.3.4</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>com.hazelcast</groupId>
             <artifactId>hazelcast-spring</artifactId>
-            <version>1.9.3.1</version>
+            <version>1.9.3.4</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
@@ -179,7 +179,6 @@
             <version>0.6.4-SNAPSHOT</version>
             <type>jar</type>
         </dependency>
-
     </dependencies>
   <licenses>
     <license>

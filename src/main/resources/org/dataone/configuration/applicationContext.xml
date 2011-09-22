@@ -35,17 +35,11 @@
     </bean>
     <bean id="log4jInitializationRedirectStdOutErr" class="org.dataone.cn.batch.daemon.utils.StdOutErrLog" init-method="init"/>
 
-    <bean id="contextSourceConfiguration" class="org.dataone.cn.service.ldap.ContextSourceConfiguration" />
-
-    <bean id="contextSource" class="org.springframework.ldap.core.support.LdapContextSource"
-        factory-bean="contextSourceConfiguration" factory-method="getLdapContextSource" />
-    <bean id="ldapTemplate" class="org.springframework.ldap.core.LdapTemplate">
-        <constructor-arg ref="contextSource" />
-       <!-- <qualifier value="ldapTemplate"/> -->
+    <bean id="hazelcastLdapStore" class="org.dataone.cn.hazelcast.ldap.HazelcastLdapStore">
+        <qualifier value="hazelcastLdapStore"/>
     </bean>
     <context:annotation-config/>
-    <context:component-scan base-package="org.dataone.cn.service.ldap.impl.v1"  />
-    <context:component-scan base-package="org.dataone.cn.hazelcast.ldap"  />
+
     <import resource="file:/etc/dataone/mn_synchronize/hazelcast.xml" />
 
 

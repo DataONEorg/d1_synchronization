@@ -26,6 +26,8 @@ import org.dataone.service.types.v1.Node;
 import org.dataone.service.types.v1.ObjectInfo;
 import org.dataone.service.types.v1.ObjectList;
 import org.dataone.service.types.v1.Session;
+import org.joda.time.DateTime;
+import org.joda.time.MutableDateTime;
 
 /**
  * An executable task that retrieve a list of ObjectInfos
@@ -106,7 +108,11 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
         ObjectList objectList = null;
         Boolean replicationStatus = null;
 
-        Date lastHarvestDate = d1Node.getSynchronization().getLastHarvested();
+        MutableDateTime lastHarvestDateTime = new MutableDateTime( d1Node.getSynchronization().getLastHarvested());
+
+        lastHarvestDateTime.addMillis(1);
+        Date lastHarvestDate = lastHarvestDateTime.toDate();
+        
         logger.debug("starting retrieval " + d1Node.getBaseURL());
         try {
 

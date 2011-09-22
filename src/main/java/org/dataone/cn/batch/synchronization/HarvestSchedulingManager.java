@@ -57,7 +57,7 @@ public class HarvestSchedulingManager implements ApplicationContextAware {
 
     public void init() {
         try {
-            logger.debug("HarvestingScheduler starting up");
+            logger.info("HarvestingScheduler starting up");
             hazelcastLdapStore.loadAllKeys();
             Properties properties = new Properties();
             properties.load(this.getClass().getResourceAsStream("/org/dataone/configuration/quartz.properties"));
@@ -96,7 +96,7 @@ public class HarvestSchedulingManager implements ApplicationContextAware {
         // populate the nodeList
         IMap<String, Node> hzNodes = hazelcast.getMap("hzNodes");
 
-        logger.debug("Node map has " + hzNodes.size() + " entries");
+        logger.info("Node map has " + hzNodes.size() + " entries");
         // construct new jobs and triggers based on ownership of nodes in the nodeList
         for (String key : hzNodes.localKeySet()) {
             // exclude from the set any CNs or membernodes that are down or do not
@@ -105,14 +105,18 @@ public class HarvestSchedulingManager implements ApplicationContextAware {
             if (node.getState().equals(NodeState.UP)
                     && node.isSynchronize() && node.getType().equals(NodeType.MN)) {
                 String crontabEntry = this.getCrontabEntry(node);
-                logger.debug("scheduling  key " + key + " with schedule " + crontabEntry);
+                logger.info("scheduling  key " + key + " with schedule " + crontabEntry);
                 // the current mn node is owned by this hazelcast cn node member
                 // so schedule a job based on the settings of the node
                 JobDetail job = newJob(MemberNodeHarvestJob.class).withIdentity("job-" + key, groupName) // name "myJob", group "group1"
                         .usingJobData("mnIdentifier", key).build();
 
                 Trigger trigger = newTrigger().withIdentity("trigger-" + key, groupName).startNow().withSchedule(cronSchedule(crontabEntry)).build();
-                scheduler.scheduleJob(job, trigger);
+                try {
+                    scheduler.scheduleJob(job, trigger);
+                } catch (SchedulerException ex) {
+                    logger.error("Unable to initialize job key " + key + " with schedule " + crontabEntry + "for scheduling: ", ex);
+                }
             }
         }
         scheduler.start();

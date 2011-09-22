@@ -4,6 +4,7 @@
  */
 package org.dataone.cn.batch.type;
 
+import com.hazelcast.core.HazelcastInstance;
 import java.util.Date;
 import org.dataone.service.cn.v1.CNCore;
 import org.dataone.service.cn.v1.CNRead;
@@ -19,6 +20,7 @@ public class NodeComm {
     private MNRead mnRead;
     private CNCore cnCore;
     private CNRead cnRead;
+    private HazelcastInstance hzClient;
 
     // helpful for debugging
     private Integer number;
@@ -29,10 +31,11 @@ public class NodeComm {
     private Date runningStartDate;
 
 
-    public NodeComm(MNRead mnRead, CNCore cncore, CNRead cnread) {
+    public NodeComm(MNRead mnRead, CNCore cncore, CNRead cnread, HazelcastInstance hzClient) {
         this.mnRead = mnRead;
         this.cnCore = cncore;
         this.cnRead = cnread;
+        this.hzClient = hzClient;
     }
 
     public MNRead getMnRead() {
@@ -82,6 +85,14 @@ public class NodeComm {
 
     public void setRunningStartDate(Date runningStartDate) {
         this.runningStartDate = runningStartDate;
+    }
+
+    public HazelcastInstance getHzClient() {
+        return hzClient;
+    }
+
+    public void setHzClient(HazelcastInstance hzClient) {
+        this.hzClient = hzClient;
     }
 
     
