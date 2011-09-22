@@ -3,6 +3,7 @@
 <configuration>
 	<properties fileName="synchronization.properties"/>
         <properties fileName="d1client.properties"/>
+        <properties fileName="ldapService.properties"/>
         <properties fileName="registryLdap.properties"/>
         <properties fileName="auth.properties"/>
 </configuration>

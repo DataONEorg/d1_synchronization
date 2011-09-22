@@ -14,4 +14,5 @@ import org.dataone.cn.batch.type.NodeComm;
 public interface NodeCommFactory {
 
     public NodeComm getNodeComm(String mnUrl);
+    public NodeComm getNodeComm(String mnUrl, String hzConfigLocation);
 }
