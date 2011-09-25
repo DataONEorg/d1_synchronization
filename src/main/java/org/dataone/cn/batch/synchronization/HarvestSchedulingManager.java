@@ -4,6 +4,19 @@
  */
 package org.dataone.cn.batch.synchronization;
 
+import com.hazelcast.partition.Partition;
+import com.hazelcast.partition.PartitionService;
+import com.hazelcast.core.Hazelcast;
+import java.util.List;
+import java.util.ArrayList;
+import com.hazelcast.partition.MigrationEvent;
+import com.hazelcast.partition.MigrationListener;
+import com.hazelcast.core.Member;
+import org.dataone.service.types.v1.NodeReference;
+import com.hazelcast.core.EntryEvent;
+import com.hazelcast.core.EntryListener;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.dataone.service.types.v1.NodeType;
 import org.dataone.service.types.v1.NodeState;
 import org.dataone.service.types.v1.Node;
@@ -46,7 +59,7 @@ import static org.quartz.JobBuilder.*;
  * 
  * @author waltz
  */
-public class HarvestSchedulingManager implements ApplicationContextAware {
+public class HarvestSchedulingManager implements ApplicationContextAware, EntryListener<NodeReference, Node>, MigrationListener {
 
     public static Log logger = LogFactory.getLog(HarvestSchedulingManager.class);
     private static String groupName = "MemberNodeHarvesting";
@@ -54,10 +67,15 @@ public class HarvestSchedulingManager implements ApplicationContextAware {
     private HazelcastLdapStore hazelcastLdapStore;
     private Scheduler scheduler;
     ApplicationContext applicationContext;
+    PartitionService partitionService;
+    Member localMember;
 
     public void init() {
         try {
             logger.info("HarvestingScheduler starting up");
+            partitionService = Hazelcast.getPartitionService();
+
+            localMember = hazelcast.getCluster().getLocalMember();
             hazelcastLdapStore.loadAllKeys();
             Properties properties = new Properties();
             properties.load(this.getClass().getResourceAsStream("/org/dataone/configuration/quartz.properties"));
@@ -66,16 +84,17 @@ public class HarvestSchedulingManager implements ApplicationContextAware {
 
 
             this.manageHarvest();
+            partitionService.addMigrationListener(this);
+            IMap<NodeReference, Node> hzNodes = hazelcast.getMap("hzNodes");
+            hzNodes.addEntryListener(this, true);
         } catch (IOException ex) {
             throw new IllegalStateException("Loading properties file failedUnable to initialize jobs for scheduling: " + ex.getMessage());
-        } catch (ParseException ex) {
-            throw new IllegalStateException("Unable to initialize jobs for scheduling due to parsing of node cron entry: " + ex.getMessage());
         } catch (SchedulerException ex) {
             throw new IllegalStateException("Unable to initialize jobs for scheduling: " + ex.getMessage());
         }
     }
 
-    public void manageHarvest() throws SchedulerException, ParseException {
+    public void manageHarvest() throws SchedulerException {
 
         // halt all operations
         if (scheduler.isStarted()) {
@@ -94,30 +113,15 @@ public class HarvestSchedulingManager implements ApplicationContextAware {
             }
         }
         // populate the nodeList
-        IMap<String, Node> hzNodes = hazelcast.getMap("hzNodes");
+        IMap<NodeReference, Node> hzNodes = hazelcast.getMap("hzNodes");
 
         logger.info("Node map has " + hzNodes.size() + " entries");
         // construct new jobs and triggers based on ownership of nodes in the nodeList
-        for (String key : hzNodes.localKeySet()) {
+        for (NodeReference key : hzNodes.localKeySet()) {
             // exclude from the set any CNs or membernodes that are down or do not
             // want to be synchronized
             Node node = hzNodes.get(key);
-            if (node.getState().equals(NodeState.UP)
-                    && node.isSynchronize() && node.getType().equals(NodeType.MN)) {
-                String crontabEntry = this.getCrontabEntry(node);
-                logger.info("scheduling  key " + key + " with schedule " + crontabEntry);
-                // the current mn node is owned by this hazelcast cn node member
-                // so schedule a job based on the settings of the node
-                JobDetail job = newJob(MemberNodeHarvestJob.class).withIdentity("job-" + key, groupName) // name "myJob", group "group1"
-                        .usingJobData("mnIdentifier", key).build();
-
-                Trigger trigger = newTrigger().withIdentity("trigger-" + key, groupName).startNow().withSchedule(cronSchedule(crontabEntry)).build();
-                try {
-                    scheduler.scheduleJob(job, trigger);
-                } catch (SchedulerException ex) {
-                    logger.error("Unable to initialize job key " + key + " with schedule " + crontabEntry + "for scheduling: ", ex);
-                }
-            }
+            addHarvest(key, node);
         }
         scheduler.start();
 
@@ -159,6 +163,117 @@ public class HarvestSchedulingManager implements ApplicationContextAware {
         }
         String crontab = seconds + " " + minutes + " " + hours + " " + days + " " + months + " " + weekdays + " " + years;
         return crontab;
+    }
+
+    private void addHarvest (NodeReference key, Node node) {
+            if (node.getState().equals(NodeState.UP)
+                    && node.isSynchronize() && node.getType().equals(NodeType.MN)) {
+                try {
+                String crontabEntry = this.getCrontabEntry(node);
+                    logger.info("scheduling  key " + key.getValue() + " with schedule " + crontabEntry);
+                // the current mn node is owned by this hazelcast cn node member
+                // so schedule a job based on the settings of the node
+                JobDetail job = newJob(MemberNodeHarvestJob.class).withIdentity("job-" + key.getValue(), groupName).usingJobData("mnIdentifier", key.getValue()).build();
+                Trigger trigger = newTrigger().withIdentity("trigger-" + key.getValue(), groupName).startNow().withSchedule(cronSchedule(crontabEntry)).build();
+                try {
+                    scheduler.scheduleJob(job, trigger);
+                } catch (SchedulerException ex) {
+                    logger.error("Unable to initialize job key " + key.getValue() + " with schedule " + crontabEntry + "for scheduling: ", ex);
+                }
+                } catch (ParseException ex) {
+                     logger.error("Parsing crontab failed Unable to initialize job key " + key.getValue() + "for scheduling: ", ex);
+                }
+            }
+    }
+    @Override
+    public void entryAdded(EntryEvent<NodeReference, Node> event) {
+        logger.info("Node Entry added key=" + event.getKey().getValue());
+        try {
+            Thread.sleep(2000L);
+        } catch (InterruptedException ex) {
+            Logger.getLogger(HarvestSchedulingManager.class.getName()).log(Level.SEVERE, null, ex);
+        }
+
+        Partition partition = partitionService.getPartition(event.getKey());
+        Member ownerMember = partition.getOwner();
+
+        if (localMember.equals(ownerMember)) {
+            try {
+                this.manageHarvest();
+            } catch (SchedulerException ex) {
+                throw new IllegalStateException("Unable to initialize jobs for scheduling: " + ex.getMessage());
+            }
+        }
+    }
+
+    @Override
+    public void entryRemoved(EntryEvent<NodeReference, Node> event) {
+        logger.error("Entry removed key=" + event.getKey().getValue());
+    }
+
+    @Override
+    public void entryUpdated(EntryEvent<NodeReference, Node> event) {
+        logger.info("Node Entry updated key=" + event.getKey().getValue());
+
+        try {
+            Thread.sleep(2000L);
+        } catch (InterruptedException ex) {
+            Logger.getLogger(HarvestSchedulingManager.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        Partition partition = partitionService.getPartition(event.getKey());
+        Member ownerMember = partition.getOwner();
+
+        if (localMember.equals(ownerMember)) {
+            logger.debug("Should not be here");
+            // try {
+                // need a mechanism to turn off the job, update the crontab entry if node is still active
+                // and schedule it again
+            // } catch (SchedulerException ex) {
+            //    throw new IllegalStateException("Unable to initialize jobs for scheduling: " + ex.getMessage());
+            // }
+
+        }
+    }
+
+    @Override
+    public void entryEvicted(EntryEvent<NodeReference, Node> event) {
+        logger.warn("Entry evicted key=" + event.getKey().getValue());
+    }
+
+    //
+    // http://code.google.com/p/hazelcast/source/browse/trunk/hazelcast/src/main/java/com/hazelcast/impl/TestUtil.java?r=1824
+    // http://groups.google.com/group/hazelcast/browse_thread/thread/3856d5829e26f81c?fwc=1
+    //
+    public void migrationCompleted(MigrationEvent migrationEvent) {
+        logger.warn("migrationCompleted " + migrationEvent.getPartitionId());
+        // this is the partition that was moved from 
+        // one node to the other
+        // try to determine if a Node has migrated home servers
+        if (localMember.equals(migrationEvent.getNewOwner()) || localMember.equals(migrationEvent.getOldOwner())) {
+            Integer partitionId = migrationEvent.getPartitionId();
+            PartitionService partitionService = Hazelcast.getPartitionService();
+
+            IMap<NodeReference, Node> hzNodes = hazelcast.getMap("hzNodes");
+
+            List<Integer> nodePartitions = new ArrayList<Integer>();
+            for (NodeReference key : hzNodes.keySet()) {
+                nodePartitions.add(partitionService.getPartition(key).getPartitionId());
+            }
+
+            if (nodePartitions.contains(partitionId)) {
+                try {
+                    this.manageHarvest();
+                } catch (SchedulerException ex) {
+                    throw new IllegalStateException("Unable to initialize jobs for scheduling: " + ex.getMessage());
+                }
+            }
+        }
+
+
+    }
+
+    public void migrationStarted(MigrationEvent migrationEvent) {
+        logger.warn("migrationStarted " + migrationEvent.getPartitionId());
     }
 
     public HazelcastInstance getHazelcast() {

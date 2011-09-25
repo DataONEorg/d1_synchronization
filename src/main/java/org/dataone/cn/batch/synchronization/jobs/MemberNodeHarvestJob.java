@@ -21,6 +21,7 @@ import org.apache.commons.logging.LogFactory;
 import org.dataone.cn.batch.synchronization.tasks.ObjectListHarvestTask;
 import org.dataone.configuration.Settings;
 import org.dataone.service.types.v1.Node;
+import org.dataone.service.types.v1.NodeReference;
 import org.quartz.DisallowConcurrentExecution;
 import org.quartz.Job;
 import org.quartz.JobExecutionContext;
@@ -44,16 +45,18 @@ public class MemberNodeHarvestJob implements Job {
         Log logger = LogFactory.getLog(MemberNodeHarvestJob.class);
         String mnIdentifier = jobContext.getMergedJobDataMap().getString("mnIdentifier");
         try {
-
+            NodeReference nodeReference = new NodeReference();
+            nodeReference.setValue(mnIdentifier);
             Integer batchSize = Settings.getConfiguration().getInt("Synchronization.mn_listobjects_batch_size");
 
             logger.debug("executing for " + mnIdentifier + " with batch size " + batchSize);
             HazelcastInstance hazelcast = Hazelcast.getDefaultInstance();
 
-            IMap<String, Node> hzNodes = hazelcast.getMap("hzNodes");
+            IMap<NodeReference, Node> hzNodes = hazelcast.getMap("hzNodes");
 
-            Node mnNode = hzNodes.tryLockAndGet(mnIdentifier, 5L, TimeUnit.SECONDS);
-            ObjectListHarvestTask harvestTask = new ObjectListHarvestTask(mnNode, batchSize);
+            Node mnNode = hzNodes.tryLockAndGet(nodeReference, 5L, TimeUnit.SECONDS);
+
+            ObjectListHarvestTask harvestTask = new ObjectListHarvestTask(nodeReference, batchSize);
             ExecutorService executor = Hazelcast.getExecutorService();
             DistributedTask dtask = new DistributedTask((Callable<Date>) harvestTask);
             Future future = executor.submit(dtask);
@@ -65,16 +68,9 @@ public class MemberNodeHarvestJob implements Job {
             } catch (ExecutionException ex) {
                 logger.error(ex.getMessage());
             }
-            if ((lastUpdateDate != null) && future.isDone()) {
-                if (lastUpdateDate.after(mnNode.getSynchronization().getLastHarvested())) {
-                    mnNode.getSynchronization().setLastHarvested(lastUpdateDate);
-                }
-                hzNodes.putAndUnlock(mnIdentifier, mnNode);
-                // release lock or make certain lock is release
-            } else {
-                // something bad happened so retry the harvest later
-                hzNodes.unlock(mnIdentifier);
-            }
+
+            hzNodes.unlock(nodeReference);
+
             // if the lastUpdateDate has changed then it should be persisted
 
         } catch (TimeoutException ex) {

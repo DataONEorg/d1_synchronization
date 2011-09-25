@@ -26,6 +26,7 @@ import org.dataone.cn.batch.type.NodeComm;
 import org.dataone.cn.batch.type.NodeCommState;
 import org.dataone.cn.batch.type.SyncObject;
 import org.dataone.service.types.v1.Node;
+import org.dataone.service.types.v1.NodeReference;
 import org.dataone.service.util.DateTimeMarshaller;
 import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.core.task.TaskRejectedException;
@@ -60,7 +61,7 @@ public class SyncObjectTask implements Callable<String> {
 
         logger.info("Starting SyncObjectTask");
         BlockingQueue<SyncObject> hzSyncObjectQueue = hazelcast.getQueue("hzSyncObjectQueue");
-        IMap<String, Node> hzNodes = hazelcast.getMap("hzNodes");
+        IMap<NodeReference, Node> hzNodes = hazelcast.getMap("hzNodes");
 
         // maintain a List of NodeComms for each membernode that will not
         // exceed the maxNumberOfClientsPerMemberNode
@@ -144,7 +145,9 @@ public class SyncObjectTask implements Callable<String> {
                                     // it is a 'special' task because we do not limit the number of NodeComms. they are not
                                     // maintained by the nodeCommList. if the submit sync failed task fails
                                     // we do not resubmit
-                                    submitSynchronizationFailed(futureTask, hzNodes.get(futureTask.getNodeId()).getBaseURL());
+                                    NodeReference nodeReference = new NodeReference();
+                                    nodeReference.setValue(futureTask.getNodeId());
+                                    submitSynchronizationFailed(futureTask, hzNodes.get(nodeReference).getBaseURL());
                                 }
                             }
                         } catch (Exception ex) {
@@ -164,6 +167,8 @@ public class SyncObjectTask implements Callable<String> {
                     logger.info("found task " + task.getPid() + " for " + task.getNodeId());
                     NodeComm nodeCommunications = null;
                     // investigate the task for membernode
+                    NodeReference nodeReference = new NodeReference();
+                    nodeReference.setValue(task.getNodeId());
                     String memberNodeId = task.getNodeId();
                     // grab a membernode client off of the stack of initialized clients
                     if (initializedMemberNodes.containsKey(memberNodeId)) {
@@ -181,7 +186,7 @@ public class SyncObjectTask implements Callable<String> {
                             // no node Communications is available, see if we can create a new one
                             if (nodeCommList.size() <= maxNumberOfClientsPerMemberNode) {
                                 // create and add a new one
-                                nodeCommunications = nodeCommunicationsFactory.getNodeComm(hzNodes.get(memberNodeId).getBaseURL());
+                                nodeCommunications = nodeCommunicationsFactory.getNodeComm(hzNodes.get(nodeReference).getBaseURL());
                                 nodeCommunications.setState(NodeCommState.RUNNING);
                                 nodeCommunications.setNumber(nodeCommList.size() + 1);
                                 nodeCommunications.setRunningStartDate(new Date());
@@ -193,7 +198,7 @@ public class SyncObjectTask implements Callable<String> {
                         // that is assigned to this MemberNode
                         // create it, get a node comm, and put it in the hash
                         List<NodeComm> nodeCommList = new ArrayList<NodeComm>();
-                        nodeCommunications = nodeCommunicationsFactory.getNodeComm(hzNodes.get(memberNodeId).getBaseURL());
+                        nodeCommunications = nodeCommunicationsFactory.getNodeComm(hzNodes.get(nodeReference).getBaseURL());
                         nodeCommunications.setState(NodeCommState.RUNNING);
                         nodeCommunications.setNumber(nodeCommList.size() + 1);
                         nodeCommunications.setRunningStartDate(new Date());

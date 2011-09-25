@@ -34,7 +34,6 @@ public class NodeCommD1ClientFactory implements NodeCommFactory {
     @Override
     public NodeComm getNodeComm(String mnUrl, String hzConfigLocation) {
         MNode mNode = new MNode(mnUrl + "/v1");
-        // XXX this could be configurable parameter
         ClientConfiguration clientConfiguration = null;
         try {
             if (hzConfigLocation != null) {
@@ -47,15 +46,10 @@ public class NodeCommD1ClientFactory implements NodeCommFactory {
         } catch (FileNotFoundException ex) {
             logger.debug("Unable to configure Hazelcast client " + hzConfigLocation, ex);
         }
-        List<String> addresses = new ArrayList<String>() ;
-        for (int i = 0; i < clientConfiguration.getAddresses().length; ++i)
-        {
-            addresses.add(clientConfiguration.getAddresses()[i]);
 
-        }
-        logger.info("group " + clientConfiguration.getGroup() + " pwd " + clientConfiguration.getPassword() + " addresses " + clientConfiguration.getAddresses());
+        logger.info("group " + clientConfiguration.getGroup() + " pwd " + clientConfiguration.getPassword() + " addresses " + clientConfiguration.getLocalhost());
         HazelcastInstance hzclient = HazelcastClient.newHazelcastClient(clientConfiguration.getGroup(), clientConfiguration.getPassword(),
-                "localhost:5701");
+                clientConfiguration.getLocalhost());
 
         LocalHostNode metacatNode = new LocalHostNode(Settings.getConfiguration().getString("Synchronization.cn_base_url"));
         NodeComm nodeComm = new NodeComm(mNode, metacatNode, metacatNode, hzclient);
