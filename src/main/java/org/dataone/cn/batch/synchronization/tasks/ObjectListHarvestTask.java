@@ -16,6 +16,7 @@ import org.apache.log4j.Logger;
 import org.dataone.cn.batch.synchronization.NodeCommD1ClientFactory;
 import org.dataone.cn.batch.type.NodeComm;
 import org.dataone.cn.batch.type.SyncObject;
+import org.dataone.service.cn.impl.v1.NodeRegistryService;
 import org.dataone.service.exceptions.InvalidRequest;
 import org.dataone.service.exceptions.InvalidToken;
 import org.dataone.service.exceptions.NotAuthorized;
@@ -23,6 +24,7 @@ import org.dataone.service.exceptions.NotImplemented;
 import org.dataone.service.exceptions.ServiceFailure;
 import org.dataone.service.mn.tier1.v1.MNRead;
 import org.dataone.service.types.v1.Node;
+import org.dataone.service.types.v1.NodeReference;
 import org.dataone.service.types.v1.ObjectInfo;
 import org.dataone.service.types.v1.ObjectList;
 import org.dataone.service.types.v1.Session;
@@ -42,26 +44,33 @@ import org.joda.time.MutableDateTime;
  */
 public class ObjectListHarvestTask implements Callable<Date>, Serializable {
 
-    Node d1Node;
+    NodeReference d1NodeReference;
     private Session session;
     private int start = 0;
     private int total = 0;
     Integer batchSize;
     private Date now = new Date();
 
-    public ObjectListHarvestTask(Node d1Node, Integer batchSize) {
-        this.d1Node = d1Node;
+    public ObjectListHarvestTask(NodeReference d1NodeReference, Integer batchSize) {
+        this.d1NodeReference = d1NodeReference;
         this.batchSize = batchSize;
     }
 
     @Override
     public Date call() throws Exception {
+        // we are going to write directly to ldap for the updateLastHarvested
+        // because we do not want hazelcast to spam us about
+        // all of these updates since we have a listener in HarvestSchedulingManager
+        // that determines when updates/additions have occured and 
+        // re-adjusts scheduling
+        NodeRegistryService nodeRegistryService = new NodeRegistryService();
         // logger is not  be serializable, but no need to make it transient imo
         Logger logger = Logger.getLogger(ObjectListHarvestTask.class.getName());
         logger.debug("called ObjectListHarvestTask");
         HazelcastInstance hazelcast = Hazelcast.getDefaultInstance();
         BlockingQueue<SyncObject> hzSyncObjectQueue = hazelcast.getQueue("hzSyncObjectQueue");
         // Need the LinkedHashMap to preserver insertion order
+        Node d1Node = nodeRegistryService.getNode(d1NodeReference);
         Date lastMofidiedDate = d1Node.getSynchronization().getLastHarvested();
         List<ObjectInfo> readQueue = null;
 
@@ -69,7 +78,7 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
             // read upto a 1000 objects (the default, but it can be overwritten)
             // from ListObjects and process before retrieving more
             if (start == 0 || (start < total)) {
-                readQueue = this.retrieve(this.d1Node);
+                readQueue = this.retrieve(d1Node);
 
                 for (ObjectInfo objectInfo : readQueue) {
                     SyncObject syncObject = new SyncObject(d1Node.getIdentifier().getValue(), objectInfo.getIdentifier().getValue());
@@ -84,7 +93,10 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
                 readQueue = null;
             }
         } while ((readQueue != null) && (!readQueue.isEmpty()));
-
+        
+        if (lastMofidiedDate.after(d1Node.getSynchronization().getLastHarvested())) {
+            nodeRegistryService.updateLastHarvested(d1NodeReference, lastMofidiedDate);
+        }
 
         return lastMofidiedDate;
     }

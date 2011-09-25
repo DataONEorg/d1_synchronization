@@ -87,36 +87,35 @@ public class TransferObjectTask implements Callable<Void> {
     @Override
     public Void call() {
         logger.debug("Task-" + task.getNodeId() + ":" + task.getPid() + " Locking task");
+        Lock lockObject = hazelcast.getLock(task.getPid());
+        boolean isLocked = false;
         try {
-// this will be from the hazelcast client running against metacat
-//        Lock lockObject = hazelcast.getLock(task.getPid());
-//        if (lockObject.tryLock()) {
-            logger.info("Task-" + task.getNodeId() + ":" + task.getPid() + " Processing task");
-            SystemMetadata systemMetadata = process(task.getNodeId(), task.getPid());
-            if (systemMetadata != null) {
-                logger.info("Task-" + task.getNodeId() + ":" + task.getPid() + " Writing task");
-                write(systemMetadata);
-            } //else {
-            // object never written such that metacat replication
-            // will never report that replication is complete
-            // and listener will never unlock the object
-//                lockObject.unlock();
-//            }
-//        } else {
-//            try {
-//                logger.warn("Pid Locked! Placing task pid: " + task.getPid() + " from " + task.getNodeId() + " back on hzSyncObjectQueue");
-//                hazelcast.getQueue("hzSyncObjectQueue").put(task);
-//            } catch (InterruptedException ex) {
-//                logger.error("Unable to process pid " + task.getPid() + " from node " + task.getNodeId());
-            //               ServiceFailure serviceFailure = new ServiceFailure("564001", "Checksum does not match existing object with same pid");
+            // this will be from the hazelcast client running against metacat
+            isLocked = lockObject.tryLock();
+            if (isLocked) {
+                logger.info("Task-" + task.getNodeId() + ":" + task.getPid() + " Processing task");
+                SystemMetadata systemMetadata = process(task.getNodeId(), task.getPid());
+                if (systemMetadata != null) {
+                    logger.info("Task-" + task.getNodeId() + ":" + task.getPid() + " Writing task");
+                    write(systemMetadata);
+                } // else it was a failure and it should have been reported to MN so do nothing
+            } else {
+                try {
+                    logger.warn("Pid Locked! Placing task pid: " + task.getPid() + " from " + task.getNodeId() + " back on hzSyncObjectQueue");
+                    hazelcast.getQueue("hzSyncObjectQueue").put(task);
+                } catch (InterruptedException ex) {
+                    logger.error("Unable to process pid " + task.getPid() + " from node " + task.getNodeId());
+                    ServiceFailure serviceFailure = new ServiceFailure("564001", "Checksum does not match existing object with same pid");
 
-            //           }
-//        }
+                }
+            }
         } catch (Exception ex) {
             ex.printStackTrace();
             logger.error("Task-" + task.getNodeId() + ":" + task.getPid() + "\n" + ex.getMessage());
         }
-
+        if (isLocked) {
+            lockObject.unlock();
+        }
         return null;
     }
 
@@ -401,7 +400,7 @@ public class TransferObjectTask implements Callable<Void> {
 //                nodeCommunications.getCnCore().updateSystemMetadata(session, pid, oldSystemMetadata);
                 hzSystemMetaMap.put(pid, oldSystemMetadata);
             } else {
-                 logger.warn(task.getNodeId() + ":" + task.getPid() + " Ignoring update from MN");
+                logger.warn(task.getNodeId() + ":" + task.getPid() + " Ignoring update from MN");
             }
         } else {
             boolean performUpdate = true;
