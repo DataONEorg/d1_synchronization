@@ -7,8 +7,6 @@ package org.dataone.cn.batch.synchronization;
 import com.hazelcast.client.HazelcastClient;
 import com.hazelcast.core.HazelcastInstance;
 import java.io.FileNotFoundException;
-import java.util.ArrayList;
-import java.util.List;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.dataone.client.CNode;
@@ -26,14 +24,11 @@ import org.dataone.service.util.D1Url;
  */
 public class NodeCommD1ClientFactory implements NodeCommFactory {
 
-    public static Log logger = LogFactory.getLog(NodeCommD1ClientFactory.class);
-    @Override
-    public NodeComm getNodeComm(String mnUrl) {
-        return this.getNodeComm(mnUrl, null);
-    }
-    @Override
-    public NodeComm getNodeComm(String mnUrl, String hzConfigLocation) {
-        MNode mNode = new MNode(mnUrl + "/v1");
+    public final static Log logger = LogFactory.getLog(NodeCommD1ClientFactory.class);
+    private static HazelcastInstance hzclient;
+
+    private final static String hzConfigLocation =Settings.getConfiguration().getString("dataone.hazelcast.clientconfigdir");
+    static {
         ClientConfiguration clientConfiguration = null;
         try {
             if (hzConfigLocation != null) {
@@ -48,8 +43,16 @@ public class NodeCommD1ClientFactory implements NodeCommFactory {
         }
 
         logger.info("group " + clientConfiguration.getGroup() + " pwd " + clientConfiguration.getPassword() + " addresses " + clientConfiguration.getLocalhost());
-        HazelcastInstance hzclient = HazelcastClient.newHazelcastClient(clientConfiguration.getGroup(), clientConfiguration.getPassword(),
+        hzclient = HazelcastClient.newHazelcastClient(clientConfiguration.getGroup(), clientConfiguration.getPassword(),
                 clientConfiguration.getLocalhost());
+    }
+    @Override
+    public NodeComm getNodeComm(String mnUrl) {
+        return this.getNodeComm(mnUrl, null);
+    }
+    @Override
+    public NodeComm getNodeComm(String mnUrl, String hzConfigLocation) {
+        MNode mNode = new MNode(mnUrl + "/v1");
 
         LocalHostNode metacatNode = new LocalHostNode(Settings.getConfiguration().getString("Synchronization.cn_base_url"));
         NodeComm nodeComm = new NodeComm(mNode, metacatNode, metacatNode, hzclient);

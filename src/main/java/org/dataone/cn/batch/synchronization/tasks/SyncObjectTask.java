@@ -86,6 +86,11 @@ public class SyncObjectTask implements Callable<String> {
                 try {
                     task = hzSyncObjectQueue.poll(90L, TimeUnit.SECONDS);
                 } catch (Exception ex) {
+                    // XXX this causes a nasty infinite loop of continuous failures.
+                    // if poll causes an exception...
+                    // probably should check for TIMEOUT exceptions
+                    // and any other causes this thread to die
+                    //
                     logger.warn(ex.getMessage());
                 }
                 // first check all the futures of past tasks to see if any have finished
@@ -258,6 +263,11 @@ public class SyncObjectTask implements Callable<String> {
                 }
             } while (true);
         } catch (Exception ex) {
+            // XXX
+            // determine which exceptions are acceptable for
+            // restart and which ones are truly fatal
+            // otherwise could cause an infinite loop of continuous failures
+            //
             ex.printStackTrace();
             logger.error("Interrupted! by something " + ex.getMessage() + "\n");
             return "Interrupted";
