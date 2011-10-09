@@ -186,7 +186,7 @@ public class TransferObjectTask implements Callable<Void> {
                 // only set valid science metadata formats as having been replicated
                 logger.debug("Task-" + task.getNodeId() + ":" + task.getPid() + " Get Object Format");
                 ObjectFormat objectFormat = nodeCommunications.getCnCore().getFormat(systemMetadata.getFmtid());
-                if (objectFormat != null && !objectFormat.getFormatType().equalsIgnoreCase("DATA")) {
+                if ( (objectFormat != null) && !(objectFormat.getFormatType().equalsIgnoreCase("DATA"))) {
                     NodeReference cnReference = new NodeReference();
                     cnReference.setValue(cnIdentifier);
                     Replica cnReplica = new Replica();
@@ -194,7 +194,7 @@ public class TransferObjectTask implements Callable<Void> {
                     cnReplica.setReplicationStatus(ReplicationStatus.COMPLETED);
                     cnReplica.setReplicaVerified(new Date());
                     systemMetadata.addReplica(cnReplica);
-                    logger.debug("Task-" + task.getNodeId() + ":" + task.getPid() + " Added CN as replica because data is sciMetadata");
+                    logger.debug("Task-" + task.getNodeId() + ":" + task.getPid() + " Added CN as replica because formatType " + objectFormat.getFormatType() + " is sciMetadata");
                 }
             } catch (InsufficientResources ex) {
                 try {

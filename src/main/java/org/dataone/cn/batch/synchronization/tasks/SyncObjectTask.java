@@ -85,7 +85,7 @@ public class SyncObjectTask implements Callable<String> {
             do {
                 try {
                     task = hzSyncObjectQueue.poll(90L, TimeUnit.SECONDS);
-                } catch (Exception ex) {
+                } catch (InterruptedException ex) {
                     // XXX this causes a nasty infinite loop of continuous failures.
                     // if poll causes an exception...
                     // probably should check for TIMEOUT exceptions
@@ -262,7 +262,7 @@ public class SyncObjectTask implements Callable<String> {
                     taskExecutor.getThreadPoolExecutor().purge();
                 }
             } while (true);
-        } catch (Exception ex) {
+        } catch (InterruptedException ex) {
             // XXX
             // determine which exceptions are acceptable for
             // restart and which ones are truly fatal

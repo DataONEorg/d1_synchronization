@@ -35,6 +35,9 @@ public class SyncObjectExecutor {
                 logger.warn( ex.getMessage());
             } catch (ExecutionException ex) {
                 shouldContinueRunning = false;
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                shouldContinueRunning = false;
             }
             if (future.isCancelled()) {
                 shouldContinueRunning = false;
