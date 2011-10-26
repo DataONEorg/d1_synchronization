@@ -60,7 +60,7 @@ public class NodeCommD1ClientFactory implements NodeCommFactory {
 
     @Override
     public NodeComm getNodeComm(String mnUrl, String hzConfigLocation) {
-        MNode mNode = new MNode(mnUrl + "/v1");
+        MNode mNode = new MNode(mnUrl);
 
         LocalHostNode metacatNode = new LocalHostNode(Settings.getConfiguration().getString("Synchronization.cn_base_url"));
         NodeComm nodeComm = new NodeComm(mNode, metacatNode, metacatNode, hzclient);
