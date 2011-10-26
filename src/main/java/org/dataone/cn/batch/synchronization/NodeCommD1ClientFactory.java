@@ -11,6 +11,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.dataone.client.CNode;
 import org.dataone.client.MNode;
+import org.dataone.client.auth.CertificateManager;
 import org.dataone.cn.batch.type.NodeComm;
 import org.dataone.cn.hazelcast.ClientConfiguration;
 import org.dataone.configuration.Settings;
@@ -26,8 +27,8 @@ public class NodeCommD1ClientFactory implements NodeCommFactory {
 
     public final static Log logger = LogFactory.getLog(NodeCommD1ClientFactory.class);
     private static HazelcastInstance hzclient;
+    private final static String hzConfigLocation = Settings.getConfiguration().getString("dataone.hazelcast.clientconfigdir");
 
-    private final static String hzConfigLocation =Settings.getConfiguration().getString("dataone.hazelcast.clientconfigdir");
     static {
         ClientConfiguration clientConfiguration = null;
         try {
@@ -45,11 +46,18 @@ public class NodeCommD1ClientFactory implements NodeCommFactory {
         logger.info("group " + clientConfiguration.getGroup() + " pwd " + clientConfiguration.getPassword() + " addresses " + clientConfiguration.getLocalhost());
         hzclient = HazelcastClient.newHazelcastClient(clientConfiguration.getGroup(), clientConfiguration.getPassword(),
                 clientConfiguration.getLocalhost());
+        String clientCertificateLocation =
+                Settings.getConfiguration().getString("D1Client.certificate.directory")
+                + "/" + Settings.getConfiguration().getString("cn.nodeId");
+        CertificateManager.getInstance().setCertificateLocation(clientCertificateLocation);
+        logger.info("NodeCommD1ClientFactory is using an X509 certificate from " + clientCertificateLocation);
     }
+
     @Override
     public NodeComm getNodeComm(String mnUrl) {
         return this.getNodeComm(mnUrl, null);
     }
+
     @Override
     public NodeComm getNodeComm(String mnUrl, String hzConfigLocation) {
         MNode mNode = new MNode(mnUrl + "/v1");
