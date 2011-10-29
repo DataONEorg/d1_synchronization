@@ -185,7 +185,7 @@ public class TransferObjectTask implements Callable<Void> {
                 // synchronized,
                 // only set valid science metadata formats as having been replicated
                 logger.debug("Task-" + task.getNodeId() + ":" + task.getPid() + " Get Object Format");
-                ObjectFormat objectFormat = nodeCommunications.getCnCore().getFormat(systemMetadata.getFmtid());
+                ObjectFormat objectFormat = nodeCommunications.getCnCore().getFormat(systemMetadata.getFormatId());
                 if ( (objectFormat != null) && !(objectFormat.getFormatType().equalsIgnoreCase("DATA"))) {
                     NodeReference cnReference = new NodeReference();
                     cnReference.setValue(cnIdentifier);
@@ -345,7 +345,7 @@ public class TransferObjectTask implements Callable<Void> {
         // performed here due to the way last DateSysMetadataModified is used to
         // determine the next batch of records to retreive from a MemberNode
         systemMetadata.setDateSysMetadataModified(new Date());
-        ObjectFormat objectFormat = nodeCommunications.getCnCore().getFormat(systemMetadata.getFmtid());
+        ObjectFormat objectFormat = nodeCommunications.getCnCore().getFormat(systemMetadata.getFormatId());
         if ((objectFormat != null) && !objectFormat.getFormatType().equalsIgnoreCase("DATA")) {
             InputStream sciMetaStream = null;
             // get the scimeta object and then feed it to metacat
