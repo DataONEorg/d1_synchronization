@@ -5,7 +5,7 @@
 	<artifactId>d1_synchronization</artifactId>
 	<packaging>jar</packaging>
 	<name>DataONE_Synchronization</name>
-	<version>0.6.4-SNAPSHOT</version>
+	<version>1.0.0-SNAPSHOT</version>
 	<description>Cn Member Node Synchronization</description>
         <url>http://dataone.org</url>
     <properties>
@@ -43,6 +43,16 @@
         <repository>
             <id>Jibx Maven Repository</id>
             <url>http://jibx.sourceforge.net/maven/</url>
+        </repository>
+        <repository>
+            <id>dataone.org</id>
+            <url>http://dev-testing.dataone.org/maven</url>
+            <releases>
+                <enabled>true</enabled>
+            </releases>
+            <snapshots>
+                <enabled>true</enabled>
+            </snapshots>
         </repository>
     </repositories>
     <dependencies>
@@ -124,13 +134,13 @@
         <dependency>
             <groupId>org.dataone</groupId>
             <artifactId>d1_libclient_java</artifactId>
-            <version>0.6.4-SNAPSHOT</version>
+            <version>1.0.0-SNAPSHOT</version>
             <type>jar</type>
         </dependency>
         <dependency>
             <groupId>org.dataone</groupId>
             <artifactId>d1_cn_noderegistry</artifactId>
-            <version>0.6.4-SNAPSHOT</version>
+            <version>1.0.0-SNAPSHOT</version>
             <type>jar</type>
         </dependency>
     </dependencies>
