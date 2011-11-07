@@ -69,8 +69,6 @@ public class SyncFailedTask implements Callable<String> {
         SynchronizationFailed syncFailed = new SynchronizationFailed("6001", "Synchronization task of [PID::]" + pid + "[::PID] failed. " + exception.getDescription());
         try {
             nodeCommunications.getMnRead().synchronizationFailed(session, syncFailed);
-        } catch (InvalidRequest ex) {
-            logger.error(ex.serialize(ex.FMT_XML));
         } catch (InvalidToken ex) {
             logger.error(ex.serialize(ex.FMT_XML));
         } catch (NotAuthorized ex) {
