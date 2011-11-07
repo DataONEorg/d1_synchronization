@@ -52,7 +52,7 @@ public class MockMNRead implements MNRead {
     @Override
     public InputStream get(Session cert, Identifier pid)
             throws InvalidToken, ServiceFailure, NotAuthorized, NotFound,
-                   NotImplemented, InvalidRequest {
+                   NotImplemented {
         InputStream inputStream = null;
         try {
             String filePath = dataoneCacheDirectory + File.separator + "mn" + File.separator + "object" + File.separator + EncodingUtilities.encodeUrlPathSegment(pid.getValue());
@@ -74,7 +74,7 @@ public class MockMNRead implements MNRead {
     @Override
     public SystemMetadata getSystemMetadata(Session cert, Identifier pid)
             throws InvalidToken, ServiceFailure, NotAuthorized, NotFound,
-            InvalidRequest, NotImplemented {
+            NotImplemented {
         SystemMetadata systemMetadata = new SystemMetadata();
 
         InputStream inputStream = null;
@@ -125,7 +125,7 @@ public class MockMNRead implements MNRead {
     }
 
     @Override
-    public DescribeResponse describe(Session cert, Identifier pid) throws InvalidToken, ServiceFailure, NotAuthorized, NotFound, NotImplemented, InvalidRequest {
+    public DescribeResponse describe(Session cert, Identifier pid) throws InvalidToken, ServiceFailure, NotAuthorized, NotFound, NotImplemented {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
@@ -136,7 +136,7 @@ public class MockMNRead implements MNRead {
 
 
     @Override
-    public void synchronizationFailed(Session cert, SynchronizationFailed message) throws NotImplemented, ServiceFailure, NotAuthorized, InvalidRequest {
+    public void synchronizationFailed(Session cert, SynchronizationFailed message) throws NotImplemented, ServiceFailure, NotAuthorized {
         throw new UnsupportedOperationException("Not supported yet.");
     }
     
