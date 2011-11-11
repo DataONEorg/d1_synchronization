@@ -10,6 +10,7 @@ import com.hazelcast.core.IMap;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -18,6 +19,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.logging.Level;
 import org.apache.log4j.Logger;
+import org.dataone.client.MNode;
 import org.dataone.cn.batch.type.NodeCommState;
 import org.dataone.cn.batch.type.NodeComm;
 import org.dataone.cn.batch.type.SyncObject;
@@ -36,7 +38,9 @@ import org.dataone.service.exceptions.SynchronizationFailed;
 import org.dataone.service.exceptions.UnsupportedType;
 import org.dataone.service.types.v1.Checksum;
 import org.dataone.service.types.v1.Identifier;
+import org.dataone.service.types.v1.Node;
 import org.dataone.service.types.v1.NodeReference;
+import org.dataone.service.types.v1.NodeType;
 import org.dataone.service.types.v1.ObjectFormat;
 import org.dataone.service.types.v1.Replica;
 import org.dataone.service.types.v1.ReplicationStatus;
@@ -87,11 +91,12 @@ public class TransferObjectTask implements Callable<Void> {
     @Override
     public Void call() {
         logger.debug("Task-" + task.getNodeId() + ":" + task.getPid() + " Locking task");
-        Lock lockObject = hazelcast.getLock(task.getPid());
+        Identifier lockPid = new Identifier();
+        lockPid.setValue(task.getPid());
         boolean isLocked = false;
         try {
             // this will be from the hazelcast client running against metacat
-            isLocked = lockObject.tryLock();
+            isLocked = hzSystemMetaMap.tryLock(lockPid, 100L, TimeUnit.MILLISECONDS);
             if (isLocked) {
                 logger.info("Task-" + task.getNodeId() + ":" + task.getPid() + " Processing task");
                 SystemMetadata systemMetadata = process(task.getNodeId(), task.getPid());
@@ -114,7 +119,7 @@ public class TransferObjectTask implements Callable<Void> {
             logger.error("Task-" + task.getNodeId() + ":" + task.getPid() + "\n" + ex.getMessage());
         }
         if (isLocked) {
-            lockObject.unlock();
+            hzSystemMetaMap.unlock(lockPid);
         }
         return null;
     }
@@ -186,7 +191,7 @@ public class TransferObjectTask implements Callable<Void> {
                 // only set valid science metadata formats as having been replicated
                 logger.debug("Task-" + task.getNodeId() + ":" + task.getPid() + " Get Object Format");
                 ObjectFormat objectFormat = nodeCommunications.getCnCore().getFormat(systemMetadata.getFormatId());
-                if ( (objectFormat != null) && !(objectFormat.getFormatType().equalsIgnoreCase("DATA"))) {
+                if ((objectFormat != null) && !(objectFormat.getFormatType().equalsIgnoreCase("DATA"))) {
                     NodeReference cnReference = new NodeReference();
                     cnReference.setValue(cnIdentifier);
                     Replica cnReplica = new Replica();
@@ -232,10 +237,6 @@ public class TransferObjectTask implements Callable<Void> {
             submitSynchronizationFailed(pid, ex);
             return null;
         } catch (NotImplemented ex) {
-            logger.error("Task-" + task.getNodeId() + ":" + task.getPid() + "\n" + ex.serialize(ex.FMT_XML));
-            submitSynchronizationFailed(pid, ex);
-            return null;
-        } catch (InvalidRequest ex) {
             logger.error("Task-" + task.getNodeId() + ":" + task.getPid() + "\n" + ex.serialize(ex.FMT_XML));
             submitSynchronizationFailed(pid, ex);
             return null;
@@ -388,17 +389,18 @@ public class TransferObjectTask implements Callable<Void> {
         // obsoletedBy
         Identifier pid = new Identifier();
         pid.setValue(newSystemMetadata.getIdentifier().getValue());
-//        SystemMetadata oldSystemMetadata = nodeCommunications.getCnRead().getSystemMetadata(session, newSystemMetadata.getIdentifier());
-        SystemMetadata oldSystemMetadata = hzSystemMetaMap.get(pid);
-        if (oldSystemMetadata.getAuthoritativeMemberNode().getValue().contentEquals(task.getNodeId())) {
+//        SystemMetadata cnSystemMetadata = nodeCommunications.getCnRead().getSystemMetadata(session, newSystemMetadata.getIdentifier());
+        SystemMetadata cnSystemMetadata = hzSystemMetaMap.get(pid);
+        if (cnSystemMetadata.getAuthoritativeMemberNode().getValue().contentEquals(task.getNodeId())) {
             // this is an update from the original memberNode
-            if ((oldSystemMetadata.getObsoletedBy() == null) && (newSystemMetadata.getObsoletedBy() != null)) {
+            if ((cnSystemMetadata.getObsoletedBy() == null) && (newSystemMetadata.getObsoletedBy() != null)) {
                 logger.debug(task.getNodeId() + ":" + task.getPid() + " Performing Update of systemMetadata due to an update operation having been performed on MN: " + task.getNodeId());
-                oldSystemMetadata.setObsoletedBy(newSystemMetadata.getObsoletedBy());
+                cnSystemMetadata.setObsoletedBy(newSystemMetadata.getObsoletedBy());
 
-                oldSystemMetadata.setDateSysMetadataModified(newSystemMetadata.getDateSysMetadataModified());
-//                nodeCommunications.getCnCore().updateSystemMetadata(session, pid, oldSystemMetadata);
-                hzSystemMetaMap.put(pid, oldSystemMetadata);
+                cnSystemMetadata.setDateSysMetadataModified(newSystemMetadata.getDateSysMetadataModified());
+//                nodeCommunications.getCnCore().updateSystemMetadata(session, pid, cnSystemMetadata);
+                hzSystemMetaMap.put(pid, cnSystemMetadata);
+                auditReplicaSystemMetadata(cnSystemMetadata);
             } else {
                 logger.warn(task.getNodeId() + ":" + task.getPid() + " Ignoring update from MN");
             }
@@ -407,7 +409,7 @@ public class TransferObjectTask implements Callable<Void> {
             // this may be an unrecorded replica
             // membernodes may have replicas of dataone objects that were created
             // before becoming a part of dataone
-            List<Replica> prevReplicaList = oldSystemMetadata.getReplicaList();
+            List<Replica> prevReplicaList = cnSystemMetadata.getReplicaList();
             for (Replica replica : prevReplicaList) {
                 if (task.getNodeId().equals(replica.getReplicaMemberNode().getValue())) {
                     performUpdate = false;
@@ -422,13 +424,41 @@ public class TransferObjectTask implements Callable<Void> {
                 mnReplica.setReplicaMemberNode(nodeReference);
                 mnReplica.setReplicationStatus(ReplicationStatus.COMPLETED);
                 mnReplica.setReplicaVerified(new Date());
-                oldSystemMetadata.getReplicaList().add(mnReplica);
+                cnSystemMetadata.getReplicaList().add(mnReplica);
 
-                oldSystemMetadata.setDateSysMetadataModified(newSystemMetadata.getDateSysMetadataModified());
-//                nodeCommunications.getCnCore().updateSystemMetadata(session, pid, oldSystemMetadata);
-                hzSystemMetaMap.put(pid, oldSystemMetadata);
+                cnSystemMetadata.setDateSysMetadataModified(newSystemMetadata.getDateSysMetadataModified());
+                cnSystemMetadata.setSerialVersion(cnSystemMetadata.getSerialVersion().add(BigInteger.ONE));
+//                nodeCommunications.getCnCore().updateSystemMetadata(session, pid, cnSystemMetadata);
+                hzSystemMetaMap.put(pid, cnSystemMetadata);
+                auditReplicaSystemMetadata(cnSystemMetadata);
             } else {
                 logger.warn(task.getNodeId() + ":" + task.getPid() + " Ignoring update from MN");
+            }
+        }
+        // perform audit of replicas to make certain they all are at the same serialVersion level, if no update
+        
+    }
+
+    private void auditReplicaSystemMetadata(SystemMetadata cnSystemMetadata) throws InvalidToken, ServiceFailure, NotAuthorized, NotFound, InvalidRequest, NotImplemented {
+        IMap<NodeReference, Node> hzNodes = hazelcast.getMap("hzNodes");
+        List<Replica> prevReplicaList = cnSystemMetadata.getReplicaList();
+        Session session = null;
+        for (Replica replica : prevReplicaList) {
+            Node node = hzNodes.get(replica.getReplicaMemberNode());
+            if (node.getType().equals(NodeType.MN)) {
+                String mnUrl = node.getBaseURL();
+
+                // Get an target MNode reference to communicate with
+                // TODO: need to figure out better way to handle versioning! -rpw
+                logger.info("Getting the MNode reference for " + node.getIdentifier().getValue() + " with baseURL " + mnUrl);
+                MNode mnNode = new MNode(mnUrl);
+                SystemMetadata mnSystemMetadata = mnNode.getSystemMetadata(session, cnSystemMetadata.getIdentifier());
+
+                if (mnSystemMetadata.getSerialVersion() != cnSystemMetadata.getSerialVersion()) {
+
+                    mnNode.systemMetadataChanged(session, cnSystemMetadata.getIdentifier(), cnSystemMetadata.getSerialVersion().longValue(), cnSystemMetadata.getDateSysMetadataModified());
+                }
+                
             }
         }
     }

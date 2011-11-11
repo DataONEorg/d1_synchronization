@@ -108,16 +108,6 @@ public class MockCNCore implements CNCore {
         this.dataoneCacheDirectory = dataoneCacheDirectory;
     }
 
-    @Override
-    public ObjectFormatList listFormats() throws InvalidRequest, ServiceFailure, NotFound, InsufficientResources, NotImplemented {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public ObjectFormat getFormat(ObjectFormatIdentifier fmtid) throws InvalidRequest, ServiceFailure, NotFound, InsufficientResources, NotImplemented {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
 
     @Override
     public NodeList listNodes() throws NotImplemented, ServiceFailure {
@@ -134,10 +124,6 @@ public class MockCNCore implements CNCore {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
-    @Override
-    public boolean reserveIdentifier(Session session, Identifier pid) throws InvalidToken, ServiceFailure, NotAuthorized, IdentifierNotUnique, NotImplemented, InvalidRequest {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
 
     @Override
     public Identifier generateIdentifier(Session session, String scheme, String fragment) throws InvalidToken, ServiceFailure, NotAuthorized, NotImplemented, InvalidRequest {
@@ -149,8 +135,19 @@ public class MockCNCore implements CNCore {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
+
     @Override
-    public boolean updateSystemMetadata(Session session, Identifier pid, SystemMetadata sysmeta) throws NotImplemented, NotAuthorized, ServiceFailure, InvalidRequest, InvalidSystemMetadata, NotFound {
+    public Identifier reserveIdentifier(Session session, Identifier pid) throws InvalidToken, ServiceFailure, NotAuthorized, IdentifierNotUnique, NotImplemented, InvalidRequest {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public ObjectFormatList listFormats() throws ServiceFailure, InsufficientResources, NotImplemented {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public ObjectFormat getFormat(ObjectFormatIdentifier formatid) throws ServiceFailure, NotFound, InsufficientResources, NotImplemented {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
