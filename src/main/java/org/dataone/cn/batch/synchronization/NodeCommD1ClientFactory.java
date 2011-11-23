@@ -14,6 +14,7 @@ import org.dataone.client.MNode;
 import org.dataone.client.auth.CertificateManager;
 import org.dataone.cn.batch.type.NodeComm;
 import org.dataone.cn.hazelcast.ClientConfiguration;
+import org.dataone.cn.hazelcast.HazelcastClientInstance;
 import org.dataone.configuration.Settings;
 import org.dataone.service.cn.v1.CNCore;
 import org.dataone.service.cn.v1.CNRead;
@@ -27,32 +28,7 @@ public class NodeCommD1ClientFactory implements NodeCommFactory {
 
     public final static Log logger = LogFactory.getLog(NodeCommD1ClientFactory.class);
     private static HazelcastInstance hzclient;
-    private final static String hzConfigLocation = Settings.getConfiguration().getString("dataone.hazelcast.clientconfigdir");
-
-    static {
-        ClientConfiguration clientConfiguration = null;
-        try {
-            if (hzConfigLocation != null) {
-
-                clientConfiguration = new ClientConfiguration(hzConfigLocation);
-
-            } else {
-                clientConfiguration = new ClientConfiguration();
-            }
-        } catch (FileNotFoundException ex) {
-            logger.debug("Unable to configure Hazelcast client " + hzConfigLocation, ex);
-        }
-
-        logger.info("group " + clientConfiguration.getGroup() + " pwd " + clientConfiguration.getPassword() + " addresses " + clientConfiguration.getLocalhost());
-        hzclient = HazelcastClient.newHazelcastClient(clientConfiguration.getGroup(), clientConfiguration.getPassword(),
-                clientConfiguration.getLocalhost());
-        String clientCertificateLocation =
-                Settings.getConfiguration().getString("D1Client.certificate.directory")
-                + "/" + Settings.getConfiguration().getString("cn.nodeId");
-        CertificateManager.getInstance().setCertificateLocation(clientCertificateLocation);
-        logger.info("NodeCommD1ClientFactory is using an X509 certificate from " + clientCertificateLocation);
-    }
-
+    
     @Override
     public NodeComm getNodeComm(String mnUrl) {
         return this.getNodeComm(mnUrl, null);
@@ -60,6 +36,9 @@ public class NodeCommD1ClientFactory implements NodeCommFactory {
 
     @Override
     public NodeComm getNodeComm(String mnUrl, String hzConfigLocation) {
+        if (hzclient == null) {
+            hzclient = HazelcastClientInstance.getHazelcastClient();
+        }
         MNode mNode = new MNode(mnUrl);
 
         LocalHostNode metacatNode = new LocalHostNode(Settings.getConfiguration().getString("Synchronization.cn_base_url"));
