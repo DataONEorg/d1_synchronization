@@ -90,13 +90,15 @@ public class TransferObjectTask implements Callable<Void> {
 
     @Override
     public Void call() {
-        logger.debug("Task-" + task.getNodeId() + ":" + task.getPid() + " Locking task");
+        
         Identifier lockPid = new Identifier();
         lockPid.setValue(task.getPid());
         boolean isLocked = false;
         try {
             // this will be from the hazelcast client running against metacat
-            isLocked = hzSystemMetaMap.tryLock(lockPid, 100L, TimeUnit.MILLISECONDS);
+            logger.debug("Task-" + task.getNodeId() + ":" + task.getPid() + " Locking task");
+            long timeToWait = 1;
+            isLocked = hzSystemMetaMap.tryLock(lockPid, timeToWait, TimeUnit.SECONDS);
             if (isLocked) {
                 logger.info("Task-" + task.getNodeId() + ":" + task.getPid() + " Processing task");
                 SystemMetadata systemMetadata = process(task.getNodeId(), task.getPid());
@@ -106,7 +108,7 @@ public class TransferObjectTask implements Callable<Void> {
                 } // else it was a failure and it should have been reported to MN so do nothing
             } else {
                 try {
-                    logger.warn("Pid Locked! Placing task pid: " + task.getPid() + " from " + task.getNodeId() + " back on hzSyncObjectQueue");
+                    logger.warn("Task-" + task.getNodeId() + ":" + task.getPid() + "Pid Locked! Placing back on hzSyncObjectQueue");
                     hazelcast.getQueue("hzSyncObjectQueue").put(task);
                 } catch (InterruptedException ex) {
                     logger.error("Unable to process pid " + task.getPid() + " from node " + task.getNodeId());
@@ -119,7 +121,9 @@ public class TransferObjectTask implements Callable<Void> {
             logger.error("Task-" + task.getNodeId() + ":" + task.getPid() + "\n" + ex.getMessage());
         }
         if (isLocked) {
+            logger.info("Task-" + task.getNodeId() + ":" + task.getPid() + " Unlocking task");
             hzSystemMetaMap.unlock(lockPid);
+            logger.debug("Task-" + task.getNodeId() + ":" + task.getPid() + " Unlocked task");
         }
         return null;
     }
@@ -375,10 +379,11 @@ public class TransferObjectTask implements Callable<Void> {
             logger.info("Task-" + task.getNodeId() + ":" + task.getPid() + " Creating Object");
 
             d1Identifier = nodeCommunications.getCnCore().create(session, d1Identifier, sciMetaStream, systemMetadata);
-
+            logger.info("Task-" + task.getNodeId() + ":" + task.getPid() + " Created Object");
         } else {
             logger.info("Task-" + task.getNodeId() + ":" + task.getPid() + " Registering SystemMetadata");
             hzSystemMetaMap.put(d1Identifier, systemMetadata);
+             logger.info("Task-" + task.getNodeId() + ":" + task.getPid() + " Registered SystemMetadata");
 //            nodeCommunications.getCnCore().registerSystemMetadata(session, d1Identifier, systemMetadata);
         }
     }
@@ -402,7 +407,7 @@ public class TransferObjectTask implements Callable<Void> {
                 hzSystemMetaMap.put(pid, cnSystemMetadata);
                 auditReplicaSystemMetadata(cnSystemMetadata);
             } else {
-                logger.warn(task.getNodeId() + ":" + task.getPid() + " Ignoring update from MN");
+                logger.warn(task.getNodeId() + ":" + task.getPid() + " Ignoring update from Authoritative MN");
             }
         } else {
             boolean performUpdate = true;
@@ -429,10 +434,12 @@ public class TransferObjectTask implements Callable<Void> {
                 cnSystemMetadata.setDateSysMetadataModified(newSystemMetadata.getDateSysMetadataModified());
                 cnSystemMetadata.setSerialVersion(cnSystemMetadata.getSerialVersion().add(BigInteger.ONE));
 //                nodeCommunications.getCnCore().updateSystemMetadata(session, pid, cnSystemMetadata);
+
                 hzSystemMetaMap.put(pid, cnSystemMetadata);
+                // Eventually this should be triggering the Audit SystemMetadata Process Story #2040
                 auditReplicaSystemMetadata(cnSystemMetadata);
             } else {
-                logger.warn(task.getNodeId() + ":" + task.getPid() + " Ignoring update from MN");
+                logger.warn(task.getNodeId() + ":" + task.getPid() + " Ignoring update from Replica MN");
             }
         }
         // perform audit of replicas to make certain they all are at the same serialVersion level, if no update
