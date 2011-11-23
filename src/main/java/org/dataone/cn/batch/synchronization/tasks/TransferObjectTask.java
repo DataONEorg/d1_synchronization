@@ -274,7 +274,7 @@ public class TransferObjectTask implements Callable<Void> {
              */
             SystemMetadata cnSystemMetadata = null;
             try {
-                cnSystemMetadata = hzSystemMetaMap.get(systemMetadata.getIdentifier());
+                cnSystemMetadata = nodeCommunications.getCnRead().getSystemMetadata(null, systemMetadata.getIdentifier());
             } catch (Exception ex) {
                 // assume if hazelcast has thrown an exception SystemMetadata does not exist
                 logger.info("Task-" + task.getNodeId() + ":" + task.getPid() + " Create sysMeta from Exception");
