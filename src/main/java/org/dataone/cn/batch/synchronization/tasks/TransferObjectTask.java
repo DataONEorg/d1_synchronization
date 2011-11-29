@@ -81,7 +81,7 @@ public class TransferObjectTask implements Callable<Void> {
     String cnIdentifier = Settings.getConfiguration().getString("Synchronization.CN_REPLICA_NODE");
     String hzSystemMetaMapString = Settings.getConfiguration().getString("Synchronization.hzSystemMetaMap");
     IMap<Identifier, SystemMetadata> hzSystemMetaMap;
-    Lock lock;
+    
 
     public TransferObjectTask(NodeComm nodeCommunications, SyncObject task) {
         this.nodeCommunications = nodeCommunications;
@@ -91,9 +91,9 @@ public class TransferObjectTask implements Callable<Void> {
 
     @Override
     public Void call() {
-        
-        Identifier lockPid = new Identifier();
-        lockPid.setValue(task.getPid());
+        Lock lock = null;
+        String lockPid = task.getPid();
+
         boolean isLocked = false;
         try {
             // this will be from the hazelcast client running against metacat
