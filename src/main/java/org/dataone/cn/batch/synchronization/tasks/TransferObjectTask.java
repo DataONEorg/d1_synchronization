@@ -81,6 +81,7 @@ public class TransferObjectTask implements Callable<Void> {
     String cnIdentifier = Settings.getConfiguration().getString("Synchronization.CN_REPLICA_NODE");
     String hzSystemMetaMapString = Settings.getConfiguration().getString("Synchronization.hzSystemMetaMap");
     IMap<Identifier, SystemMetadata> hzSystemMetaMap;
+    Lock lock;
 
     public TransferObjectTask(NodeComm nodeCommunications, SyncObject task) {
         this.nodeCommunications = nodeCommunications;
@@ -98,7 +99,9 @@ public class TransferObjectTask implements Callable<Void> {
             // this will be from the hazelcast client running against metacat
             logger.debug("Task-" + task.getNodeId() + ":" + task.getPid() + " Locking task");
             long timeToWait = 1;
-            isLocked = hzSystemMetaMap.tryLock(lockPid, timeToWait, TimeUnit.SECONDS);
+            
+            lock = nodeCommunications.getHzClient().getLock(lockPid);
+            isLocked = lock.tryLock(timeToWait, TimeUnit.SECONDS);
             if (isLocked) {
                 logger.info("Task-" + task.getNodeId() + ":" + task.getPid() + " Processing task");
                 SystemMetadata systemMetadata = process(task.getNodeId(), task.getPid());
@@ -122,7 +125,7 @@ public class TransferObjectTask implements Callable<Void> {
         }
         if (isLocked) {
             logger.info("Task-" + task.getNodeId() + ":" + task.getPid() + " Unlocking task");
-            hzSystemMetaMap.unlock(lockPid);
+            lock.unlock();
             logger.debug("Task-" + task.getNodeId() + ":" + task.getPid() + " Unlocked task");
         }
         return null;
@@ -274,7 +277,7 @@ public class TransferObjectTask implements Callable<Void> {
              */
             SystemMetadata cnSystemMetadata = null;
             try {
-                cnSystemMetadata = nodeCommunications.getCnRead().getSystemMetadata(null, systemMetadata.getIdentifier());
+                cnSystemMetadata = hzSystemMetaMap.get(systemMetadata.getIdentifier());
             } catch (Exception ex) {
                 // assume if hazelcast has thrown an exception SystemMetadata does not exist
                 logger.info("Task-" + task.getNodeId() + ":" + task.getPid() + " Create sysMeta from Exception");
