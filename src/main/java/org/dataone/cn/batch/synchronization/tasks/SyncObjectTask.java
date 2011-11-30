@@ -54,7 +54,7 @@ public class SyncObjectTask implements Callable<String> {
     private NodeCommFactory nodeCommunicationsFactory;
     private static final String nodecommName = "NODECOMM";
     private static final String taskName = "SYNCOBJECT";
-    private static final long threadTimeout = 3600000L; //represents an hour, for testing use 60000L
+    private static final long threadTimeout = 60000L; //900000L represents fifteen minutes, for testing use 60000L
 
     @Override
     public String call() {
