@@ -91,6 +91,7 @@ public class SyncObjectTask implements Callable<String> {
                     // probably should check for TIMEOUT exceptions
                     // and any other causes this thread to die
                     //
+                    task = null;
                     logger.warn(ex.getMessage());
                 }
                 // first check all the futures of past tasks to see if any have finished
