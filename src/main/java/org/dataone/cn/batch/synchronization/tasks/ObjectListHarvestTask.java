@@ -98,7 +98,8 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
             nodeRegistryService.updateLastHarvested(d1NodeReference, lastMofidiedDate);
         }
 
-        return lastMofidiedDate;
+        // return the date of completion of the task
+        return new Date();
     }
 
     /*

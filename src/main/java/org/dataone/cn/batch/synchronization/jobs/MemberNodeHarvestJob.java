@@ -26,6 +26,8 @@ import org.quartz.DisallowConcurrentExecution;
 import org.quartz.Job;
 import org.quartz.JobExecutionContext;
 import org.quartz.JobExecutionException;
+import java.text.SimpleDateFormat;
+import java.text.ParseException;
 
 /**
  * Quartz Job that starts off the hazelcast distributed execution of harvesting for a nodeList
@@ -39,51 +41,60 @@ import org.quartz.JobExecutionException;
  */
 @DisallowConcurrentExecution
 public class MemberNodeHarvestJob implements Job {
+    SimpleDateFormat format =
+            new SimpleDateFormat("EEE MMM dd yyyy HH:mm:ss zzz");
 
     @Override
     public void execute(JobExecutionContext jobContext) throws JobExecutionException {
         Log logger = LogFactory.getLog(MemberNodeHarvestJob.class);
         String mnIdentifier = jobContext.getMergedJobDataMap().getString("mnIdentifier");
+        boolean nodeLocked = false;
+        IMap<NodeReference, Node> hzNodes = null;
+        NodeReference nodeReference = new NodeReference();
+        JobExecutionException jex = null;
+        nodeReference.setValue(mnIdentifier);
         try {
-            NodeReference nodeReference = new NodeReference();
-            nodeReference.setValue(mnIdentifier);
             Integer batchSize = Settings.getConfiguration().getInt("Synchronization.mn_listobjects_batch_size");
 
             logger.debug("executing for " + mnIdentifier + " with batch size " + batchSize);
             HazelcastInstance hazelcast = Hazelcast.getDefaultInstance();
 
-            IMap<NodeReference, Node> hzNodes = hazelcast.getMap("hzNodes");
+            hzNodes = hazelcast.getMap("hzNodes");
 
-            Node mnNode = hzNodes.tryLockAndGet(nodeReference, 5L, TimeUnit.SECONDS);
+            nodeLocked = hzNodes.tryLock(nodeReference, 5L, TimeUnit.SECONDS);
+            if (nodeLocked) {
+                Node mnNode = hzNodes.get(nodeReference);
 
-            ObjectListHarvestTask harvestTask = new ObjectListHarvestTask(nodeReference, batchSize);
-            ExecutorService executor = Hazelcast.getExecutorService();
-            DistributedTask dtask = new DistributedTask((Callable<Date>) harvestTask);
-            Future future = executor.submit(dtask);
-            Date lastUpdateDate = null;
-            try {
-                lastUpdateDate = (Date) future.get();
-            } catch (InterruptedException ex) {
-                logger.error(ex.getMessage());
-            } catch (ExecutionException ex) {
-                logger.error(ex.getMessage());
+                ObjectListHarvestTask harvestTask = new ObjectListHarvestTask(nodeReference, batchSize);
+                ExecutorService executor = Hazelcast.getExecutorService();
+                DistributedTask dtask = new DistributedTask((Callable<Date>) harvestTask);
+                Future future = executor.submit(dtask);
+                Date lastProcessingCompletedDate = null;
+                try {
+                    lastProcessingCompletedDate = (Date) future.get();
+                } catch (InterruptedException ex) {
+                    logger.error(ex.getMessage());
+                } catch (ExecutionException ex) {
+                    logger.error(ex.getMessage());
+                }
+
+            // if the lastProcessingCompletedDate has changed then it should be persisted, but where?
+            // Does not need to be stored, maybe just printed?
+            logger.info("ObjectListHarvestTask returned at " + format.format(lastProcessingCompletedDate));
             }
-
-            hzNodes.unlock(nodeReference);
-
-            // if the lastUpdateDate has changed then it should be persisted
-
-        } catch (TimeoutException ex) {
-            logger.warn(jobContext.getJobDetail().getDescription() + " is locked from running " + mnIdentifier);
-            // log this message, someone else has the lock (and they probably shouldn't)
         } catch (Exception ex) {
             logger.error(jobContext.getJobDetail().getDescription() + " died: " + ex.getMessage());
             // log this message, someone else has the lock (and they probably shouldn't)
-            JobExecutionException jex = new JobExecutionException();
+            jex = new JobExecutionException();
             jex.unscheduleFiringTrigger();
             jex.setStackTrace(ex.getStackTrace());
+        } finally {
+            if (nodeLocked) {
+                hzNodes.unlock(nodeReference);
+            }
+        }
+        if (jex != null) {
             throw jex;
         }
-
     }
 }
