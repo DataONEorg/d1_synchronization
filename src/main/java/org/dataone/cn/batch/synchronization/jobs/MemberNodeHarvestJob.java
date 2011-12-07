@@ -41,11 +41,11 @@ import java.text.ParseException;
  */
 @DisallowConcurrentExecution
 public class MemberNodeHarvestJob implements Job {
-    SimpleDateFormat format =
-            new SimpleDateFormat("EEE MMM dd yyyy HH:mm:ss zzz");
 
     @Override
     public void execute(JobExecutionContext jobContext) throws JobExecutionException {
+    SimpleDateFormat format =
+            new SimpleDateFormat("EEE MMM dd yyyy HH:mm:ss zzz");
         Log logger = LogFactory.getLog(MemberNodeHarvestJob.class);
         String mnIdentifier = jobContext.getMergedJobDataMap().getString("mnIdentifier");
         boolean nodeLocked = false;
