@@ -78,7 +78,7 @@ public class HarvestSchedulingManager implements ApplicationContextAware, EntryL
             localMember = hazelcast.getCluster().getLocalMember();
             hazelcastLdapStore.loadAllKeys();
             Properties properties = new Properties();
-            properties.load(this.getClass().getResourceAsStream("/org/dataone/configuration/quartz.properties"));
+            properties.load(this.getClass().getResourceAsStream("/org/dataone/configuration/synchQuartz.properties"));
             StdSchedulerFactory schedulerFactory = new StdSchedulerFactory(properties);
             scheduler = schedulerFactory.getScheduler();
 
