@@ -93,11 +93,10 @@ public class TransferObjectTask implements Callable<Void> {
     public Void call() {
         Lock lock = null;
         String lockPid = task.getPid();
-
         boolean isLocked = false;
         try {
             // this will be from the hazelcast client running against metacat
-            logger.debug("Task-" + task.getNodeId() + ":" + task.getPid() + " Locking task");
+            logger.debug("Task-" + task.getNodeId() + ":" + task.getPid() + " Locking task of attempt " + task.getAttempt());
             long timeToWait = 1;
             
             lock = nodeCommunications.getHzClient().getLock(lockPid);
@@ -111,7 +110,8 @@ public class TransferObjectTask implements Callable<Void> {
                 } // else it was a failure and it should have been reported to MN so do nothing
             } else {
                 try {
-                    logger.warn("Task-" + task.getNodeId() + ":" + task.getPid() + "Pid Locked! Placing back on hzSyncObjectQueue");
+                    logger.warn("Task-" + task.getNodeId() + ":" + task.getPid() + "Pid Locked! Placing back on hzSyncObjectQueue of attempt " + task.getAttempt());
+                    task.setAttempt(task.getAttempt() + 1);
                     hazelcast.getQueue("hzSyncObjectQueue").put(task);
                 } catch (InterruptedException ex) {
                     logger.error("Unable to process pid " + task.getPid() + " from node " + task.getNodeId());
