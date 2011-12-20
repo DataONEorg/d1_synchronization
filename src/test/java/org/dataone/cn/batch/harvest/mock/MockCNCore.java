@@ -24,6 +24,7 @@ import org.dataone.service.exceptions.NotFound;
 import org.dataone.service.exceptions.NotImplemented;
 import org.dataone.service.exceptions.ServiceFailure;
 import org.dataone.service.exceptions.UnsupportedType;
+import org.dataone.service.types.v1.ChecksumAlgorithmList;
 import org.dataone.service.types.v1.Event;
 import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.Log;
@@ -142,12 +143,22 @@ public class MockCNCore implements CNCore {
     }
 
     @Override
-    public ObjectFormatList listFormats() throws ServiceFailure, InsufficientResources, NotImplemented {
+    public ObjectFormatList listFormats() throws ServiceFailure, NotImplemented {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
     @Override
-    public ObjectFormat getFormat(ObjectFormatIdentifier formatid) throws ServiceFailure, NotFound, InsufficientResources, NotImplemented {
+    public ObjectFormat getFormat(ObjectFormatIdentifier formatid) throws ServiceFailure, NotFound, NotImplemented {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public Date ping() throws NotImplemented, ServiceFailure, InsufficientResources {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public ChecksumAlgorithmList listChecksumAlgorithms() throws ServiceFailure, NotImplemented {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 

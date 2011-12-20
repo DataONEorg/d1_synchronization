@@ -192,33 +192,20 @@ public class TransferObjectTask implements Callable<Void> {
                 systemMetadata.addReplica(originalReplica);
             }
             logger.debug("Task-" + task.getNodeId() + ":" + task.getPid() + " Finished adding replica for original MN");
-            try {
-                // data objects are not fully synchronized, only their metadata is
-                // synchronized,
-                // only set valid science metadata formats as having been replicated
-                logger.debug("Task-" + task.getNodeId() + ":" + task.getPid() + " Get Object Format");
-                ObjectFormat objectFormat = nodeCommunications.getCnCore().getFormat(systemMetadata.getFormatId());
-                if ((objectFormat != null) && !(objectFormat.getFormatType().equalsIgnoreCase("DATA"))) {
-                    NodeReference cnReference = new NodeReference();
-                    cnReference.setValue(cnIdentifier);
-                    Replica cnReplica = new Replica();
-                    cnReplica.setReplicaMemberNode(cnReference);
-                    cnReplica.setReplicationStatus(ReplicationStatus.COMPLETED);
-                    cnReplica.setReplicaVerified(new Date());
-                    systemMetadata.addReplica(cnReplica);
-                    logger.debug("Task-" + task.getNodeId() + ":" + task.getPid() + " Added CN as replica because formatType " + objectFormat.getFormatType() + " is sciMetadata");
-                }
-            } catch (InsufficientResources ex) {
-                try {
-                    // maybe another
-                    logger.error("Task-" + task.getNodeId() + ":" + task.getPid() + ex.serialize(BaseException.FMT_XML));
-                    hazelcast.getQueue("hzSyncObjectQueue").offer(task, 2, TimeUnit.SECONDS);
-                } catch (Exception ex1) {
-                    logger.error("Task-" + task.getNodeId() + ":" + task.getPid() + " Unable to process pid " + pid + " from node " + memberNodeId);
-                    ServiceFailure serviceFailure = new ServiceFailure("-1", ex1.getMessage());
-                    submitSynchronizationFailed(pid, serviceFailure);
-                }
-                return null;
+            // data objects are not fully synchronized, only their metadata is
+            // synchronized,
+            // only set valid science metadata formats as having been replicated
+            logger.debug("Task-" + task.getNodeId() + ":" + task.getPid() + " Get Object Format");
+            ObjectFormat objectFormat = nodeCommunications.getCnCore().getFormat(systemMetadata.getFormatId());
+            if ((objectFormat != null) && !(objectFormat.getFormatType().equalsIgnoreCase("DATA"))) {
+                NodeReference cnReference = new NodeReference();
+                cnReference.setValue(cnIdentifier);
+                Replica cnReplica = new Replica();
+                cnReplica.setReplicaMemberNode(cnReference);
+                cnReplica.setReplicationStatus(ReplicationStatus.COMPLETED);
+                cnReplica.setReplicaVerified(new Date());
+                systemMetadata.addReplica(cnReplica);
+                logger.debug("Task-" + task.getNodeId() + ":" + task.getPid() + " Added CN as replica because formatType " + objectFormat.getFormatType() + " is sciMetadata");
             }
             NodeReference originMemberNode = new NodeReference();
             originMemberNode.setValue(memberNodeId);
