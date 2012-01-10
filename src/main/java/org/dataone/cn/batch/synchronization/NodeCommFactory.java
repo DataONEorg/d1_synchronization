@@ -5,7 +5,8 @@
 
 package org.dataone.cn.batch.synchronization;
 
-import org.dataone.cn.batch.type.NodeComm;
+import org.dataone.cn.batch.synchronization.type.NodeComm;
+import org.dataone.service.exceptions.ServiceFailure;
 
 /**
  *
@@ -13,6 +14,6 @@ import org.dataone.cn.batch.type.NodeComm;
  */
 public interface NodeCommFactory {
 
-    public NodeComm getNodeComm(String mnUrl);
-    public NodeComm getNodeComm(String mnUrl, String hzConfigLocation);
+    public NodeComm getNodeComm(String mnUrl) throws ServiceFailure;
+    public NodeComm getNodeComm(String mnUrl, String hzConfigLocation) throws ServiceFailure;
 }
