@@ -14,8 +14,8 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import org.apache.log4j.Logger;
 import org.dataone.cn.batch.synchronization.NodeCommD1ClientFactory;
-import org.dataone.cn.batch.type.NodeComm;
-import org.dataone.cn.batch.type.SyncObject;
+import org.dataone.cn.batch.synchronization.type.NodeComm;
+import org.dataone.cn.batch.synchronization.type.SyncObject;
 import org.dataone.service.cn.impl.v1.NodeRegistryService;
 import org.dataone.service.exceptions.InvalidRequest;
 import org.dataone.service.exceptions.InvalidToken;
@@ -112,8 +112,6 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
         Logger logger = Logger.getLogger(ObjectListHarvestTask.class.getName());
 
         NodeCommD1ClientFactory nodeCommClientFactory = new NodeCommD1ClientFactory();
-        NodeComm nodeComm = nodeCommClientFactory.getNodeComm(d1Node.getBaseURL());
-        MNRead mnRead = nodeComm.getMnRead();
 
         List<ObjectInfo> writeQueue = new ArrayList<ObjectInfo>();
 
@@ -128,7 +126,8 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
         
         logger.debug("starting retrieval " + d1Node.getBaseURL());
         try {
-
+            NodeComm nodeComm = nodeCommClientFactory.getNodeComm(d1Node.getBaseURL());
+            MNRead mnRead = nodeComm.getMnRead();
             // always execute for the first run (for start = 0)
             // otherwise skip because when the start is equal or greater
             // then total, then all objects have been harvested

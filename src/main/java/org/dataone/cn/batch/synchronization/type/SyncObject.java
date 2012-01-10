@@ -3,7 +3,7 @@
  * and open the template in the editor.
  */
 
-package org.dataone.cn.batch.type;
+package org.dataone.cn.batch.synchronization.type;
 
 import java.io.Serializable;
 
@@ -29,6 +29,10 @@ public class SyncObject implements Serializable {
         return pid;
     }
 
+    // Number of times this object has been attempted to be synchronized
+    // it may be attempted multiple times due to a lock being present
+    // or another process changing the systemMetadata before
+    // the call to the CN for updating succeedsd
     public Integer getAttempt() {
         return attempt;
     }

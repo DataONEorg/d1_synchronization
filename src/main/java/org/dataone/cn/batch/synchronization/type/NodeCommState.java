@@ -3,7 +3,7 @@
  * and open the template in the editor.
  */
 
-package org.dataone.cn.batch.type;
+package org.dataone.cn.batch.synchronization.type;
 
 /**
  *

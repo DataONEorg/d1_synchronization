@@ -20,15 +20,16 @@ import java.util.concurrent.FutureTask;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.logging.Level;
 import org.apache.log4j.Logger;
 import org.dataone.cn.batch.synchronization.NodeCommFactory;
-import org.dataone.cn.batch.type.NodeComm;
-import org.dataone.cn.batch.type.NodeCommState;
-import org.dataone.cn.batch.type.SyncObject;
+import org.dataone.cn.batch.synchronization.type.NodeComm;
+import org.dataone.cn.batch.synchronization.type.NodeCommState;
+import org.dataone.cn.batch.synchronization.type.SyncObject;
+import org.dataone.service.exceptions.ServiceFailure;
 import org.dataone.service.types.v1.Node;
 import org.dataone.service.types.v1.NodeReference;
 import org.dataone.service.util.DateTimeMarshaller;
-import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.core.task.TaskRejectedException;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
@@ -191,25 +192,36 @@ public class SyncObjectTask implements Callable<String> {
                         if (nodeCommunications == null) {
                             // no node Communications is available, see if we can create a new one
                             if (nodeCommList.size() <= maxNumberOfClientsPerMemberNode) {
-                                // create and add a new one
-                                nodeCommunications = nodeCommunicationsFactory.getNodeComm(hzNodes.get(nodeReference).getBaseURL());
-                                nodeCommunications.setState(NodeCommState.RUNNING);
-                                nodeCommunications.setNumber(nodeCommList.size() + 1);
-                                nodeCommunications.setRunningStartDate(new Date());
-                                nodeCommList.add(nodeCommunications);
+                                try {
+                                    // create and add a new one
+                                    nodeCommunications = nodeCommunicationsFactory.getNodeComm(hzNodes.get(nodeReference).getBaseURL());
+
+                                    nodeCommunications.setState(NodeCommState.RUNNING);
+                                    nodeCommunications.setNumber(nodeCommList.size() + 1);
+                                    nodeCommunications.setRunningStartDate(new Date());
+                                    nodeCommList.add(nodeCommunications);
+                                } catch (ServiceFailure ex) {
+                                    ex.printStackTrace();
+                                    logger.error(ex.getDescription());
+                                }
                             }
                         }
                     } else {
                         // The memberNode hash does not contain an array
                         // that is assigned to this MemberNode
                         // create it, get a node comm, and put it in the hash
-                        List<NodeComm> nodeCommList = new ArrayList<NodeComm>();
-                        nodeCommunications = nodeCommunicationsFactory.getNodeComm(hzNodes.get(nodeReference).getBaseURL());
-                        nodeCommunications.setState(NodeCommState.RUNNING);
-                        nodeCommunications.setNumber(nodeCommList.size() + 1);
-                        nodeCommunications.setRunningStartDate(new Date());
-                        nodeCommList.add(nodeCommunications);
-                        initializedMemberNodes.put(memberNodeId, nodeCommList);
+                        try {
+                            List<NodeComm> nodeCommList = new ArrayList<NodeComm>();
+                            nodeCommunications = nodeCommunicationsFactory.getNodeComm(hzNodes.get(nodeReference).getBaseURL());
+                            nodeCommunications.setState(NodeCommState.RUNNING);
+                            nodeCommunications.setNumber(nodeCommList.size() + 1);
+                            nodeCommunications.setRunningStartDate(new Date());
+                            nodeCommList.add(nodeCommunications);
+                            initializedMemberNodes.put(memberNodeId, nodeCommList);
+                        } catch (ServiceFailure ex) {
+                            ex.printStackTrace();
+                            logger.error(ex.getDescription());
+                        }
                     }
                     if (nodeCommunications != null) {
                         // finally, execute the new task!
@@ -293,6 +305,9 @@ public class SyncObjectTask implements Callable<String> {
             logger.error("Submit SyncFailed Rejected from Node " + task.getNodeId() + " with Pid " + task.getPid());
             logger.error("ActiveCount: " + taskExecutor.getActiveCount() + " Pool size " + taskExecutor.getPoolSize() + " Max Pool Size " + taskExecutor.getMaxPoolSize());
 
+        } catch (ServiceFailure ex) {
+           ex.printStackTrace();
+           logger.error(ex.getDescription());
         }
     }
 

@@ -2,12 +2,12 @@
  * To change this template, choose Tools | Templates
  * and open the template in the editor.
  */
-package org.dataone.cn.batch.type;
+package org.dataone.cn.batch.synchronization.type;
 
 import com.hazelcast.core.HazelcastInstance;
 import java.util.Date;
 import org.dataone.service.cn.v1.CNCore;
-import org.dataone.service.cn.v1.CNRead;
+import org.dataone.service.cn.v1.CNReplication;
 import org.dataone.service.mn.tier1.v1.MNRead;
 
 /**
@@ -19,7 +19,7 @@ public class NodeComm {
 
     private MNRead mnRead;
     private CNCore cnCore;
-    private CNRead cnRead;
+    private CNReplication cnReplication;
     private HazelcastInstance hzClient;
 
     // helpful for debugging
@@ -31,10 +31,10 @@ public class NodeComm {
     private Date runningStartDate;
 
 
-    public NodeComm(MNRead mnRead, CNCore cncore, CNRead cnread, HazelcastInstance hzClient) {
+    public NodeComm(MNRead mnRead, CNCore cnCore, CNReplication cnReplication, HazelcastInstance hzClient) {
         this.mnRead = mnRead;
-        this.cnCore = cncore;
-        this.cnRead = cnread;
+        this.cnCore = cnCore;
+        this.cnReplication = cnReplication;
         this.hzClient = hzClient;
     }
 
@@ -62,14 +62,6 @@ public class NodeComm {
         this.cnCore = cnCore;
     }
 
-    public CNRead getCnRead() {
-        return cnRead;
-    }
-
-    public void setCnRead(CNRead cnRead) {
-        this.cnRead = cnRead;
-    }
-
 
     public Integer getNumber() {
         return number;
@@ -93,6 +85,14 @@ public class NodeComm {
 
     public void setHzClient(HazelcastInstance hzClient) {
         this.hzClient = hzClient;
+    }
+
+    public CNReplication getCnReplication() {
+        return cnReplication;
+    }
+
+    public void setCnReplication(CNReplication cnReplication) {
+        this.cnReplication = cnReplication;
     }
 
     

@@ -7,22 +7,17 @@ package org.dataone.cn.batch.synchronization.tasks;
 import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.IMap;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.io.InputStream;
-import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
-import java.util.logging.Level;
 import org.apache.log4j.Logger;
 import org.dataone.client.MNode;
-import org.dataone.cn.batch.type.NodeCommState;
-import org.dataone.cn.batch.type.NodeComm;
-import org.dataone.cn.batch.type.SyncObject;
+import org.dataone.cn.batch.synchronization.type.NodeComm;
+import org.dataone.cn.batch.synchronization.type.SyncObject;
 import org.dataone.configuration.Settings;
 import org.dataone.service.exceptions.BaseException;
 import org.dataone.service.exceptions.IdentifierNotUnique;
@@ -34,8 +29,8 @@ import org.dataone.service.exceptions.NotAuthorized;
 import org.dataone.service.exceptions.NotFound;
 import org.dataone.service.exceptions.NotImplemented;
 import org.dataone.service.exceptions.ServiceFailure;
-import org.dataone.service.exceptions.SynchronizationFailed;
 import org.dataone.service.exceptions.UnsupportedType;
+import org.dataone.service.exceptions.VersionMismatch;
 import org.dataone.service.types.v1.Checksum;
 import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.Node;
@@ -46,8 +41,6 @@ import org.dataone.service.types.v1.Replica;
 import org.dataone.service.types.v1.ReplicationStatus;
 import org.dataone.service.types.v1.Session;
 import org.dataone.service.types.v1.SystemMetadata;
-import org.dataone.service.util.TypeMarshaller;
-import org.jibx.runtime.JiBXException;
 
 /**
  * Transfer an object from a MemberNode(MN) to a CoordinatingNode(CN).
@@ -99,14 +92,20 @@ public class TransferObjectTask implements Callable<Void> {
             logger.debug("Task-" + task.getNodeId() + ":" + task.getPid() + " Locking task of attempt " + task.getAttempt());
             long timeToWait = 1;
             
-            lock = nodeCommunications.getHzClient().getLock(lockPid);
+            lock = hazelcast.getLock(lockPid);
             isLocked = lock.tryLock(timeToWait, TimeUnit.SECONDS);
             if (isLocked) {
                 logger.info("Task-" + task.getNodeId() + ":" + task.getPid() + " Processing task");
                 SystemMetadata systemMetadata = process(task.getNodeId(), task.getPid());
                 if (systemMetadata != null) {
                     logger.info("Task-" + task.getNodeId() + ":" + task.getPid() + " Writing task");
-                    write(systemMetadata);
+                    try {
+                        write(systemMetadata);
+                    } catch (VersionMismatch ex) {
+                        logger.warn("Task-" + task.getNodeId() + ":" + task.getPid() + "Pid altered before processing complete! Placing back on hzSyncObjectQueue of attempt " + task.getAttempt());
+                        task.setAttempt(task.getAttempt() + 1);
+                        hazelcast.getQueue("hzSyncObjectQueue").put(task);
+                    }
                 } // else it was a failure and it should have been reported to MN so do nothing
             } else {
                 try {
@@ -245,23 +244,13 @@ public class TransferObjectTask implements Callable<Void> {
         return systemMetadata;
     }
 
-    private void write(SystemMetadata systemMetadata) {
+    private void write(SystemMetadata systemMetadata) throws VersionMismatch {
         // is this an update or create?
 
         try {
 
-
             logger.info("Task-" + task.getNodeId() + ":" + task.getPid() + " Getting sysMeta from CN");
-            /*            try {
-            existingChecksum = nodeCommunications.getCnRead().getChecksum(session, systemMetadata.getIdentifier());
-            } catch (NotFound notFound) {
-            // it is a create operation !
-            logger.info("Task-" + task.getNodeId() + ":" + task.getPid() + " Create sysMeta");
-            createObject(systemMetadata);
-            return;
-            }
-             *
-             */
+
             SystemMetadata cnSystemMetadata = null;
             try {
                 cnSystemMetadata = hzSystemMetaMap.get(systemMetadata.getIdentifier());
@@ -296,6 +285,9 @@ public class TransferObjectTask implements Callable<Void> {
                     }
                 }
             }
+        } catch (VersionMismatch ex) {
+             logger.warn("Task-" + task.getNodeId() + ":" + task.getPid() + "\n" + ex.serialize(ex.FMT_XML));
+             throw ex;
         } catch (InvalidSystemMetadata ex) {
             logger.error("Task-" + task.getNodeId() + ":" + task.getPid() + "\n" + ex.serialize(ex.FMT_XML));
             submitSynchronizationFailed(systemMetadata.getIdentifier().getValue(), ex);
@@ -372,29 +364,29 @@ public class TransferObjectTask implements Callable<Void> {
             logger.info("Task-" + task.getNodeId() + ":" + task.getPid() + " Created Object");
         } else {
             logger.info("Task-" + task.getNodeId() + ":" + task.getPid() + " Registering SystemMetadata");
-            hzSystemMetaMap.put(d1Identifier, systemMetadata);
              logger.info("Task-" + task.getNodeId() + ":" + task.getPid() + " Registered SystemMetadata");
-//            nodeCommunications.getCnCore().registerSystemMetadata(session, d1Identifier, systemMetadata);
+            nodeCommunications.getCnCore().registerSystemMetadata(session, d1Identifier, systemMetadata);
         }
     }
 
-    private void updateSystemMetadata(SystemMetadata newSystemMetadata) throws InvalidSystemMetadata, NotFound, NotImplemented, NotAuthorized, ServiceFailure, InvalidRequest, InvalidToken {
+    private void updateSystemMetadata(SystemMetadata newSystemMetadata) throws InvalidSystemMetadata, NotFound, NotImplemented, NotAuthorized, ServiceFailure, InvalidRequest, InvalidToken, VersionMismatch {
         // Only update the systemMetadata fields that can be updated by a membernode
         // dateSysMetadataModified
         // obsoletedBy
         Identifier pid = new Identifier();
         pid.setValue(newSystemMetadata.getIdentifier().getValue());
-//        SystemMetadata cnSystemMetadata = nodeCommunications.getCnRead().getSystemMetadata(session, newSystemMetadata.getIdentifier());
         SystemMetadata cnSystemMetadata = hzSystemMetaMap.get(pid);
         if (cnSystemMetadata.getAuthoritativeMemberNode().getValue().contentEquals(task.getNodeId())) {
             // this is an update from the original memberNode
             if ((cnSystemMetadata.getObsoletedBy() == null) && (newSystemMetadata.getObsoletedBy() != null)) {
                 logger.debug(task.getNodeId() + ":" + task.getPid() + " Performing Update of systemMetadata due to an update operation having been performed on MN: " + task.getNodeId());
-                cnSystemMetadata.setObsoletedBy(newSystemMetadata.getObsoletedBy());
+//                cnSystemMetadata.setObsoletedBy(newSystemMetadata.getObsoletedBy());
 
-                cnSystemMetadata.setDateSysMetadataModified(newSystemMetadata.getDateSysMetadataModified());
+//                cnSystemMetadata.setDateSysMetadataModified(newSystemMetadata.getDateSysMetadataModified());
 //                nodeCommunications.getCnCore().updateSystemMetadata(session, pid, cnSystemMetadata);
-                hzSystemMetaMap.put(pid, cnSystemMetadata);
+//                hzSystemMetaMap.put(pid, cnSystemMetadata);
+                // XXX Need to implement new update call to systemMetadata in CNCore for
+                // setObsoletedBy
                 auditReplicaSystemMetadata(cnSystemMetadata);
             } else {
                 logger.warn(task.getNodeId() + ":" + task.getPid() + " Ignoring update from Authoritative MN");
@@ -419,13 +411,14 @@ public class TransferObjectTask implements Callable<Void> {
                 mnReplica.setReplicaMemberNode(nodeReference);
                 mnReplica.setReplicationStatus(ReplicationStatus.COMPLETED);
                 mnReplica.setReplicaVerified(new Date());
-                cnSystemMetadata.getReplicaList().add(mnReplica);
+//                cnSystemMetadata.getReplicaList().add(mnReplica);
 
-                cnSystemMetadata.setDateSysMetadataModified(newSystemMetadata.getDateSysMetadataModified());
-                cnSystemMetadata.setSerialVersion(cnSystemMetadata.getSerialVersion().add(BigInteger.ONE));
+                nodeCommunications.getCnReplication().updateReplicationMetadata(session, pid, mnReplica, cnSystemMetadata.getSerialVersion().longValue());
+//                cnSystemMetadata.setDateSysMetadataModified(newSystemMetadata.getDateSysMetadataModified());
+//                cnSystemMetadata.setSerialVersion(cnSystemMetadata.getSerialVersion().add(BigInteger.ONE));
 //                nodeCommunications.getCnCore().updateSystemMetadata(session, pid, cnSystemMetadata);
 
-                hzSystemMetaMap.put(pid, cnSystemMetadata);
+//                hzSystemMetaMap.put(pid, cnSystemMetadata);
                 // Eventually this should be triggering the Audit SystemMetadata Process Story #2040
                 auditReplicaSystemMetadata(cnSystemMetadata);
             } else {
