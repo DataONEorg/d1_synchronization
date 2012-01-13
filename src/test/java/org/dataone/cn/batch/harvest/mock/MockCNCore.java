@@ -24,6 +24,7 @@ import org.dataone.service.exceptions.NotFound;
 import org.dataone.service.exceptions.NotImplemented;
 import org.dataone.service.exceptions.ServiceFailure;
 import org.dataone.service.exceptions.UnsupportedType;
+import org.dataone.service.exceptions.VersionMismatch;
 import org.dataone.service.types.v1.ChecksumAlgorithmList;
 import org.dataone.service.types.v1.Event;
 import org.dataone.service.types.v1.Identifier;
@@ -159,6 +160,11 @@ public class MockCNCore implements CNCore {
 
     @Override
     public ChecksumAlgorithmList listChecksumAlgorithms() throws ServiceFailure, NotImplemented {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public boolean setObsoletedBy(Session session, Identifier pid, Identifier obsoletedByPid, long serialVersion) throws NotImplemented, NotFound, NotAuthorized, ServiceFailure, InvalidRequest, InvalidToken, VersionMismatch {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
