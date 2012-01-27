@@ -11,6 +11,7 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.math.BigInteger;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
@@ -19,6 +20,7 @@ import org.dataone.client.MNode;
 import org.dataone.cn.batch.synchronization.type.NodeComm;
 import org.dataone.cn.batch.synchronization.type.SyncObject;
 import org.dataone.configuration.Settings;
+import org.dataone.service.cn.impl.v1.ReserveIdentifierService;
 import org.dataone.service.exceptions.BaseException;
 import org.dataone.service.exceptions.IdentifierNotUnique;
 import org.dataone.service.exceptions.InsufficientResources;
@@ -74,7 +76,7 @@ public class TransferObjectTask implements Callable<Void> {
     String cnIdentifier = Settings.getConfiguration().getString("Synchronization.CN_REPLICA_NODE");
     String hzSystemMetaMapString = Settings.getConfiguration().getString("Synchronization.hzSystemMetaMap");
     IMap<Identifier, SystemMetadata> hzSystemMetaMap;
-    
+    ReserveIdentifierService reserveIdentifierService = new ReserveIdentifierService();
 
     public TransferObjectTask(NodeComm nodeCommunications, SyncObject task) {
         this.nodeCommunications = nodeCommunications;
@@ -129,7 +131,18 @@ public class TransferObjectTask implements Callable<Void> {
         }
         return null;
     }
-
+    /*
+     * Read in the SystemMetadata from the Membernode.
+     * Set the membernode being synchronized as the Origin & Authoritative
+     * Membernode (will be ignored if an update op)
+     * Add member node as a replica
+     * Add CN as a replica if the object is not a Sci Data object
+     *
+     * TODO: This portion of code may be better off executed after a create
+     * Op has been determined
+     *
+     * @author waltz
+     */
     private SystemMetadata process(String memberNodeId, String pid) {
         SystemMetadata systemMetadata = null;
         try {
@@ -244,6 +257,13 @@ public class TransferObjectTask implements Callable<Void> {
         return systemMetadata;
     }
 
+     /*
+     * Determine if the object should be created as a new entry
+     * or updated, or ignored
+     *
+     *
+     * @author waltz
+     */
     private void write(SystemMetadata systemMetadata) throws VersionMismatch {
         // is this an update or create?
 
@@ -251,20 +271,35 @@ public class TransferObjectTask implements Callable<Void> {
 
             logger.info("Task-" + task.getNodeId() + ":" + task.getPid() + " Getting sysMeta from CN");
 
-            SystemMetadata cnSystemMetadata = null;
+            
+            // use the identity manager to determine if the PID already exists or is previously
+            // reserved. 
+            // If the PID is already created hasReservation throws an IdentifierNotUnique
+            // this means we should go through the update logic
+            // If the PID has been reserved, then either NotAuthorized will be thrown
+            // indicating that the PID was reserved by another user
+            // or true is returned, indicating that the subject indeed has the reservation
+            //
+            boolean doCreate = false;
             try {
-                cnSystemMetadata = hzSystemMetaMap.get(systemMetadata.getIdentifier());
-            } catch (Exception ex) {
-                // assume if hazelcast has thrown an exception SystemMetadata does not exist
+                 Session verifySubmitter = new Session();
+                 verifySubmitter.setSubject(systemMetadata.getSubmitter());
+                 doCreate = reserveIdentifierService.hasReservation(verifySubmitter, null, systemMetadata.getIdentifier());
+                 logger.info("Task-" + task.getNodeId() + ":" + task.getPid() + " Create sysMeta from reservation");
+            } catch (NotFound ex) {
+                doCreate = true;
+                // assume if reserveIdentifierService has thrown NotFound exception SystemMetadata does not exist
                 logger.info("Task-" + task.getNodeId() + ":" + task.getPid() + " Create sysMeta from Exception");
-                createObject(systemMetadata);
-                return;
+            } catch (IdentifierNotUnique ex) {
+                logger.info("Task-" + task.getNodeId() + ":" + task.getPid() + " Pid Exists. Must be an Update");
             }
-            // could hazelcast ever return a null instead? prepare for it
-            if (cnSystemMetadata == null) {
+            // create, update or ignore
+            if (doCreate) {
                 logger.info("Task-" + task.getNodeId() + ":" + task.getPid() + " Create sysMeta");
                 createObject(systemMetadata);
             } else {
+                // determine if this is a valid update
+                SystemMetadata cnSystemMetadata = hzSystemMetaMap.get(systemMetadata.getIdentifier());
                 Checksum existingChecksum = cnSystemMetadata.getChecksum(); // maybe an update, maybe duplicate, maybe a conflicting pid
                 if (systemMetadata != null) {
                     Checksum newChecksum = systemMetadata.getChecksum();
@@ -325,6 +360,12 @@ public class TransferObjectTask implements Callable<Void> {
         }
     }
 
+    /*
+     * This will either create the object if a resource or sci meta object.
+     * It will register systemmetadata if a sci data object.
+     *
+     * @author waltz
+     */
     private void createObject(SystemMetadata systemMetadata) throws InvalidRequest, ServiceFailure, NotFound, InsufficientResources, NotImplemented, InvalidToken, NotAuthorized, InvalidSystemMetadata, IdentifierNotUnique, UnsupportedType {
         Identifier d1Identifier = new Identifier();
         d1Identifier.setValue(systemMetadata.getIdentifier().getValue());
@@ -369,6 +410,15 @@ public class TransferObjectTask implements Callable<Void> {
         }
     }
 
+    /*
+     * Object is already created. This opertation will only update systemmetadata
+     * if a portion of the systemmeta data has changed that synchroniziation can update.
+     * Namely, The authoritative member (XXX-?? only authoritative??) node can update
+     * the obsoletedBy field or if an existing replica is found, then the replica information is
+     * added to the systemMetadata.
+     *
+     * @author waltz
+     */
     private void updateSystemMetadata(SystemMetadata newSystemMetadata) throws InvalidSystemMetadata, NotFound, NotImplemented, NotAuthorized, ServiceFailure, InvalidRequest, InvalidToken, VersionMismatch {
         // Only update the systemMetadata fields that can be updated by a membernode
         // dateSysMetadataModified
@@ -380,13 +430,8 @@ public class TransferObjectTask implements Callable<Void> {
             // this is an update from the original memberNode
             if ((cnSystemMetadata.getObsoletedBy() == null) && (newSystemMetadata.getObsoletedBy() != null)) {
                 logger.debug(task.getNodeId() + ":" + task.getPid() + " Performing Update of systemMetadata due to an update operation having been performed on MN: " + task.getNodeId());
-//                cnSystemMetadata.setObsoletedBy(newSystemMetadata.getObsoletedBy());
 
-//                cnSystemMetadata.setDateSysMetadataModified(newSystemMetadata.getDateSysMetadataModified());
-//                nodeCommunications.getCnCore().updateSystemMetadata(session, pid, cnSystemMetadata);
-//                hzSystemMetaMap.put(pid, cnSystemMetadata);
-                // XXX Need to implement new update call to systemMetadata in CNCore for
-                // setObsoletedBy
+                nodeCommunications.getCnCore().setObsoletedBy(session, pid, newSystemMetadata.getObsoletedBy(),  cnSystemMetadata.getSerialVersion().longValue());
                 auditReplicaSystemMetadata(cnSystemMetadata);
             } else {
                 logger.warn(task.getNodeId() + ":" + task.getPid() + " Ignoring update from Authoritative MN");
@@ -411,15 +456,9 @@ public class TransferObjectTask implements Callable<Void> {
                 mnReplica.setReplicaMemberNode(nodeReference);
                 mnReplica.setReplicationStatus(ReplicationStatus.COMPLETED);
                 mnReplica.setReplicaVerified(new Date());
-//                cnSystemMetadata.getReplicaList().add(mnReplica);
 
                 nodeCommunications.getCnReplication().updateReplicationMetadata(session, pid, mnReplica, cnSystemMetadata.getSerialVersion().longValue());
-//                cnSystemMetadata.setDateSysMetadataModified(newSystemMetadata.getDateSysMetadataModified());
-//                cnSystemMetadata.setSerialVersion(cnSystemMetadata.getSerialVersion().add(BigInteger.ONE));
-//                nodeCommunications.getCnCore().updateSystemMetadata(session, pid, cnSystemMetadata);
 
-//                hzSystemMetaMap.put(pid, cnSystemMetadata);
-                // Eventually this should be triggering the Audit SystemMetadata Process Story #2040
                 auditReplicaSystemMetadata(cnSystemMetadata);
             } else {
                 logger.warn(task.getNodeId() + ":" + task.getPid() + " Ignoring update from Replica MN");
@@ -429,6 +468,11 @@ public class TransferObjectTask implements Callable<Void> {
         
     }
 
+    /*
+     * inform  membernodes that may have a copy to refresh their version of the systemmetadata
+     * 
+     * @author waltz
+     */
     private void auditReplicaSystemMetadata(SystemMetadata cnSystemMetadata) throws InvalidToken, ServiceFailure, NotAuthorized, NotFound, InvalidRequest, NotImplemented {
         IMap<NodeReference, Node> hzNodes = hazelcast.getMap("hzNodes");
         List<Replica> prevReplicaList = cnSystemMetadata.getReplicaList();
