@@ -34,6 +34,8 @@ import org.dataone.service.types.v1.ObjectFormat;
 import org.dataone.service.types.v1.ObjectFormatIdentifier;
 import org.dataone.service.types.v1.ObjectFormatList;
 import org.dataone.service.types.v1.Session;
+import org.dataone.service.types.v1.Subject;
+import org.dataone.service.types.v1.SubjectInfo;
 import org.dataone.service.types.v1.SystemMetadata;
 import org.dataone.service.util.TypeMarshaller;
 import org.jibx.runtime.JiBXException;
@@ -132,10 +134,6 @@ public class MockCNCore implements CNCore {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
-    @Override
-    public boolean hasReservation(Session session, Identifier pid) throws InvalidToken, ServiceFailure, NotFound, NotAuthorized, IdentifierNotUnique, NotImplemented, InvalidRequest {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
 
 
     @Override
@@ -167,5 +165,12 @@ public class MockCNCore implements CNCore {
     public boolean setObsoletedBy(Session session, Identifier pid, Identifier obsoletedByPid, long serialVersion) throws NotImplemented, NotFound, NotAuthorized, ServiceFailure, InvalidRequest, InvalidToken, VersionMismatch {
         throw new UnsupportedOperationException("Not supported yet.");
     }
+
+    @Override
+    public boolean hasReservation(Session session, Subject subject, Identifier pid) throws InvalidToken, ServiceFailure, NotFound, NotAuthorized, NotImplemented, InvalidRequest, IdentifierNotUnique {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+
 
 }
