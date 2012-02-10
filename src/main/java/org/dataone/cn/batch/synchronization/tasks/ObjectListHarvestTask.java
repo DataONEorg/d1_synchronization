@@ -16,6 +16,7 @@ import org.apache.log4j.Logger;
 import org.dataone.cn.batch.synchronization.NodeCommD1ClientFactory;
 import org.dataone.cn.batch.synchronization.type.NodeComm;
 import org.dataone.cn.batch.synchronization.type.SyncObject;
+import org.dataone.cn.ldap.NodeAccess;
 import org.dataone.service.cn.impl.v1.NodeRegistryService;
 import org.dataone.service.exceptions.InvalidRequest;
 import org.dataone.service.exceptions.InvalidToken;
@@ -64,6 +65,7 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
         // that determines when updates/additions have occured and 
         // re-adjusts scheduling
         NodeRegistryService nodeRegistryService = new NodeRegistryService();
+        NodeAccess nodeAccess = new NodeAccess();
         // logger is not  be serializable, but no need to make it transient imo
         Logger logger = Logger.getLogger(ObjectListHarvestTask.class.getName());
         logger.debug("called ObjectListHarvestTask");
@@ -95,7 +97,8 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
         } while ((readQueue != null) && (!readQueue.isEmpty()));
         
         if (lastMofidiedDate.after(d1Node.getSynchronization().getLastHarvested())) {
-            nodeRegistryService.updateLastHarvested(d1NodeReference, lastMofidiedDate);
+            // use nodeAccess directly to avoid hazelcast broadcasting the event
+            nodeAccess.setDateLastHarvested(d1NodeReference, lastMofidiedDate);
         }
 
         // return the date of completion of the task

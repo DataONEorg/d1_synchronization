@@ -135,10 +135,6 @@ public class MockMNRead implements MNRead {
     }
 
 
-    @Override
-    public void synchronizationFailed(Session cert, SynchronizationFailed message) throws NotImplemented, ServiceFailure, NotAuthorized {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
     
     public File getObjectListFile() {
         return objectListFile;
@@ -161,6 +157,11 @@ public class MockMNRead implements MNRead {
         } catch (JiBXException ex) {
             throw new ServiceFailure("4801", ex.getClass().getName() + ": " + ex.getMessage());
         }
+    }
+
+    @Override
+    public boolean synchronizationFailed(Session session, SynchronizationFailed message) throws InvalidToken, NotAuthorized, NotImplemented, ServiceFailure {
+        throw new UnsupportedOperationException("Not supported yet.");
     }
 
 
