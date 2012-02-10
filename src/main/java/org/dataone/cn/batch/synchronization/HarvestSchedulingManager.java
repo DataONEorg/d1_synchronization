@@ -31,7 +31,7 @@ import org.dataone.cn.batch.synchronization.jobs.MemberNodeHarvestJob;
 import com.hazelcast.core.HazelcastInstance;
 import java.text.ParseException;
 import java.util.Set;
-import org.dataone.cn.hazelcast.ldap.HazelcastLdapStore;
+import org.dataone.cn.hazelcast.HazelcastLdapStore;
 import org.quartz.JobKey;
 import org.quartz.Scheduler;
 import org.quartz.SchedulerException;
@@ -77,6 +77,7 @@ public class HarvestSchedulingManager implements ApplicationContextAware, EntryL
 
             localMember = hazelcast.getCluster().getLocalMember();
             hazelcastLdapStore.loadAllKeys();
+            
             Properties properties = new Properties();
             properties.load(this.getClass().getResourceAsStream("/org/dataone/configuration/synchQuartz.properties"));
             StdSchedulerFactory schedulerFactory = new StdSchedulerFactory(properties);
@@ -123,7 +124,7 @@ public class HarvestSchedulingManager implements ApplicationContextAware, EntryL
             Node node = hzNodes.get(key);
             addHarvest(key, node);
         }
-        scheduler.start();
+            scheduler.start();
 
         if (scheduler.isStarted()) {
             logger.debug("Scheduler is started");
