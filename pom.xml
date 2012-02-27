@@ -9,7 +9,12 @@
 	<description>Cn Member Node Synchronization</description>
         <url>http://dataone.org</url>
     <properties>
-        <org.springframework.version>3.0.5.RELEASE</org.springframework.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <spring.version>3.1.1.RELEASE</spring.version>
+        <hazelcast.version>1.9.4.6</hazelcast.version>
+        <d1_libclient_version>1.0.1-RC3-SNAPSHOT</d1_libclient_version>
+        <d1_cn_noderegistry_version>1.0.0-RC2-SNAPSHOT</d1_cn_noderegistry_version>
+        <d1_identity_manager_version>1.0.0-RC2-SNAPSHOT</d1_identity_manager_version>
     </properties>
     <build>
         <plugins>
@@ -104,16 +109,9 @@
             <scope>compile</scope>
         </dependency>
         <dependency>
-            <groupId>org.jibx</groupId>
-            <artifactId>jibx-run</artifactId>
-            <version>1.2.3</version>
-            <optional>false</optional>
-            <scope>compile</scope>
-        </dependency>
-        <dependency>
             <groupId>org.springframework</groupId>
             <artifactId>spring-core</artifactId>
-            <version>${org.springframework.version}</version>
+            <version>${spring.version}</version>
             <type>jar</type>
             <optional>false</optional>
             <scope>compile</scope>
@@ -121,7 +119,7 @@
         <dependency>
             <groupId>org.springframework</groupId>
             <artifactId>spring-context</artifactId>
-            <version>${org.springframework.version}</version>
+            <version>${spring.version}</version>
             <type>jar</type>
             <optional>false</optional>
             <scope>compile</scope>
@@ -129,8 +127,8 @@
         <dependency>
            <groupId>org.springframework</groupId>
             <artifactId>spring-test</artifactId>
-            <version>${org.springframework.version}</version>
-            <scope>provided</scope>
+            <version>${spring.version}</version>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>log4j</groupId>
@@ -162,31 +160,31 @@
         <dependency>
             <groupId>com.hazelcast</groupId>
             <artifactId>hazelcast</artifactId>
-            <version>1.9.4.6</version>
+            <version>${hazelcast.version}</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>com.hazelcast</groupId>
             <artifactId>hazelcast-spring</artifactId>
-            <version>1.9.4.6</version>
+            <version>${hazelcast.version}</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>org.dataone</groupId>
             <artifactId>d1_libclient_java</artifactId>
-            <version>1.0.1-RC3-SNAPSHOT</version>
+            <version>${d1_libclient_version}</version>
             <type>jar</type>
         </dependency>
         <dependency>
             <groupId>org.dataone</groupId>
             <artifactId>d1_cn_noderegistry</artifactId>
-            <version>1.0.0-RC2-SNAPSHOT</version>
+            <version>${d1_cn_noderegistry_version}</version>
             <type>jar</type>
         </dependency>
         <dependency>
             <groupId>org.dataone</groupId>
             <artifactId>d1_identity_manager</artifactId>
-            <version>1.0.0-RC2-SNAPSHOT</version>
+            <version>${d1_identity_manager_version}</version>
             <type>jar</type>
         </dependency>
     </dependencies>

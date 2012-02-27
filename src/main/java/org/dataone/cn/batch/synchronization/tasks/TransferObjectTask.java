@@ -73,7 +73,7 @@ public class TransferObjectTask implements Callable<Void> {
     // need this task queue if a failure occurs on the CN such that the task will
     // need to be processed on a separate CN
     private HazelcastInstance hazelcast = Hazelcast.getDefaultInstance();
-    String cnIdentifier = Settings.getConfiguration().getString("Synchronization.CN_REPLICA_NODE");
+    String cnIdentifier = Settings.getConfiguration().getString("cn.router.nodeId");
     String hzSystemMetaMapString = Settings.getConfiguration().getString("Synchronization.hzSystemMetaMap");
     IMap<Identifier, SystemMetadata> hzSystemMetaMap;
     ReserveIdentifierService reserveIdentifierService = new ReserveIdentifierService();
