@@ -108,7 +108,9 @@ public class HarvestSchedulingManager implements ApplicationContextAware, EntryL
                 }
             }
             // remove any existing jobs
-            Set<JobKey> jobsInGroup = scheduler.getJobKeys(GroupMatcher.groupEquals(groupName));
+            GroupMatcher<JobKey> groupMatcher = GroupMatcher.groupEquals(groupName);
+            Set<JobKey> jobsInGroup = scheduler.getJobKeys(groupMatcher);
+           
             for (JobKey jobKey : jobsInGroup) {
                 scheduler.deleteJob(jobKey);
             }
@@ -169,7 +171,7 @@ public class HarvestSchedulingManager implements ApplicationContextAware, EntryL
     private void addHarvest (NodeReference key, Node node) {
             if (node.getState().equals(NodeState.UP)
                     && node.isSynchronize() && node.getType().equals(NodeType.MN)) {
-                try {
+
                 String crontabEntry = this.getCrontabEntry(node);
                     logger.info("scheduling  key " + key.getValue() + " with schedule " + crontabEntry);
                 // the current mn node is owned by this hazelcast cn node member
@@ -181,9 +183,7 @@ public class HarvestSchedulingManager implements ApplicationContextAware, EntryL
                 } catch (SchedulerException ex) {
                     logger.error("Unable to initialize job key " + key.getValue() + " with schedule " + crontabEntry + "for scheduling: ", ex);
                 }
-                } catch (ParseException ex) {
-                     logger.error("Parsing crontab failed Unable to initialize job key " + key.getValue() + "for scheduling: ", ex);
-                }
+
             }
     }
     @Override
