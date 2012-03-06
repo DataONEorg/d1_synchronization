@@ -225,7 +225,7 @@ public class HarvestSchedulingManager implements ApplicationContextAware, EntryL
         Member ownerMember = partition.getOwner();
 
         if (localMember.equals(ownerMember)) {
-            logger.debug("Should not be here");
+            logger.warn("Should not be here");
             // try {
                 // need a mechanism to turn off the job, update the crontab entry if node is still active
                 // and schedule it again
@@ -246,7 +246,7 @@ public class HarvestSchedulingManager implements ApplicationContextAware, EntryL
     // http://groups.google.com/group/hazelcast/browse_thread/thread/3856d5829e26f81c?fwc=1
     //
     public void migrationCompleted(MigrationEvent migrationEvent) {
-        logger.warn("migrationCompleted " + migrationEvent.getPartitionId());
+        logger.info("migrationCompleted " + migrationEvent.getPartitionId());
         // this is the partition that was moved from 
         // one node to the other
         // try to determine if a Node has migrated home servers
@@ -262,6 +262,7 @@ public class HarvestSchedulingManager implements ApplicationContextAware, EntryL
             }
 
             if (nodePartitions.contains(partitionId)) {
+                logger.info("Node Partions migrated ");
                 try {
                     this.manageHarvest();
                 } catch (SchedulerException ex) {
