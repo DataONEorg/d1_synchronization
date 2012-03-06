@@ -114,7 +114,7 @@ public class TransferObjectTask implements Callable<Void> {
                         write(systemMetadata);
                     } catch (VersionMismatch ex) {
 
-                        logger.warn("Task-" + task.getNodeId() + "-" + task.getPid() + "Pid altered before processing complete! Placing back on hzSyncObjectQueue of attempt " + task.getAttempt());
+                        logger.warn("Task-" + task.getNodeId() + "-" + task.getPid() + " Pid altered before processing complete! Placing back on hzSyncObjectQueue of attempt " + task.getAttempt());
                         if (task.getAttempt() == 1) {
                             /* Member node should be informed to update its systemMetadata.
                             If the member node is unable to update, this will be a nasty failure */
@@ -136,7 +136,7 @@ public class TransferObjectTask implements Callable<Void> {
                             hazelcast.getQueue("hzSyncObjectQueue").put(task);
                             task.setAttempt(task.getAttempt() + 1);
                         } else {
-                            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "Pid altered before processing complete! Unable to process");
+                            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + " Pid altered before processing complete! Unable to process");
                         }
 
                     }
@@ -146,7 +146,7 @@ public class TransferObjectTask implements Callable<Void> {
                     // there should be a max # of attempts from locking
                     if (task.getAttempt() < 100) {
 
-                        logger.warn("Task-" + task.getNodeId() + "-" + task.getPid() + "Pid Locked! Placing back on hzSyncObjectQueue of attempt " + task.getAttempt());
+                        logger.warn("Task-" + task.getNodeId() + "-" + task.getPid() + " Pid Locked! Placing back on hzSyncObjectQueue of attempt " + task.getAttempt());
 
                         /* allow a maximum number of attempts before permanent failure */
                         task.setAttempt(task.getAttempt() + 1);
@@ -160,10 +160,10 @@ public class TransferObjectTask implements Callable<Void> {
                         hazelcast.getQueue("hzSyncObjectQueue").put(task);
 
                     } else {
-                        logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "Pid Locked! Unable to process pid " + task.getPid() + " from node " + task.getNodeId());
+                        logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + " Pid Locked! Unable to process pid " + task.getPid() + " from node " + task.getNodeId());
                     }
                 } catch (InterruptedException ex) {
-                    logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "Pid Locked! Unable to process pid " + task.getPid() + " from node " + task.getNodeId());
+                    logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + " Pid Locked! Unable to process pid " + task.getPid() + " from node " + task.getNodeId());
                     ServiceFailure serviceFailure = new ServiceFailure("564001", "Checksum does not match existing object with same pid");
 
                 }
@@ -470,8 +470,8 @@ public class TransferObjectTask implements Callable<Void> {
             logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Created Object");
         } else {
             logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Registering SystemMetadata");
-            logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Registered SystemMetadata");
             nodeCommunications.getCnCore().registerSystemMetadata(session, d1Identifier, systemMetadata);
+            logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Registered SystemMetadata");
         }
     }
 
@@ -503,10 +503,11 @@ public class TransferObjectTask implements Callable<Void> {
         if (cnSystemMetadata.getAuthoritativeMemberNode().getValue().contentEquals(task.getNodeId())) {
             // this is an update from the original memberNode
             if ((cnSystemMetadata.getObsoletedBy() == null) && (newSystemMetadata.getObsoletedBy() != null)) {
-                logger.debug(task.getNodeId() + "-" + task.getPid() + " Performing Update of systemMetadata due to an update operation having been performed on MN: " + task.getNodeId());
+                logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Update ObsoletedBy");
 
                 nodeCommunications.getCnCore().setObsoletedBy(session, pid, newSystemMetadata.getObsoletedBy(), cnSystemMetadata.getSerialVersion().longValue());
                 auditReplicaSystemMetadata(pid);
+                logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Updated ObsoletedBy");
             } else {
                 logger.warn(task.getNodeId() + "-" + task.getPid() + " Ignoring update from Authoritative MN");
             }
@@ -523,7 +524,7 @@ public class TransferObjectTask implements Callable<Void> {
                 }
             }
             if (performUpdate) {
-                logger.debug(task.getNodeId() + "-" + task.getPid() + " Performing Update of systemMetadata due a new replica being reported MN: " + task.getNodeId());
+                logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Update Replica");
                 Replica mnReplica = new Replica();
                 NodeReference nodeReference = new NodeReference();
                 nodeReference.setValue(task.getNodeId());
@@ -534,6 +535,7 @@ public class TransferObjectTask implements Callable<Void> {
                 nodeCommunications.getCnReplication().updateReplicationMetadata(session, pid, mnReplica, cnSystemMetadata.getSerialVersion().longValue());
 
                 auditReplicaSystemMetadata(pid);
+                logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Updated Replica");
             } else {
                 logger.warn(task.getNodeId() + "-" + task.getPid() + " Ignoring update from Replica MN");
             }
@@ -559,14 +561,13 @@ public class TransferObjectTask implements Callable<Void> {
         SystemMetadata cnSystemMetadata = hzSystemMetaMap.get(pid);
         List<Replica> prevReplicaList = cnSystemMetadata.getReplicaList();
         Session session = null;
+        logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " auditReplicaSystemMetadata" );
         for (Replica replica : prevReplicaList) {
             Node node = hzNodes.get(replica.getReplicaMemberNode());
             if (node.getType().equals(NodeType.MN)) {
                 String mnUrl = node.getBaseURL();
 
-                // Get an target MNode reference to communicate with
-                // TODO: need to figure out better way to handle versioning! -rpw
-                logger.info("Getting the MNode reference for " + node.getIdentifier().getValue() + " with baseURL " + mnUrl);
+                
                 MNode mnNode = new MNode(mnUrl);
                 SystemMetadata mnSystemMetadata = mnNode.getSystemMetadata(session, cnSystemMetadata.getIdentifier());
 

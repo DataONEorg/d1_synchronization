@@ -97,7 +97,11 @@ public class SyncObjectTask implements Callable<String> {
                 }
                 // first check all the futures of past tasks to see if any have finished
                 // XXX is this code doing anything useful?
-                logger.info("waiting on " + futuresMap.size() + " futures");
+                if (futuresMap.size() > 0) {
+                    logger.info("waiting on " + futuresMap.size() + " futures");
+                } else {
+                    logger.debug("Polling empty hzSyncObjectQueue");
+                }
                 if (!futuresMap.isEmpty()) {
                     ArrayList<Future> removalList = new ArrayList<Future>();
 
@@ -111,7 +115,7 @@ public class SyncObjectTask implements Callable<String> {
                             HashMap<String, Object> futureHash = futuresMap.get(future);
                             SyncObject futureTask = (SyncObject) futureHash.get(taskName);
                             NodeComm futureNodeComm = (NodeComm) futureHash.get(nodecommName);
-                            logger.info("Returned from the Future " + futureTask.getNodeId() + ":" + futureNodeComm.getNumber() + " running for pid" + futureTask.getPid());
+                            logger.info("Task-" + futureTask.getNodeId() + "-" + futureTask.getPid() + " Returned from the Future :"  + futureNodeComm.getNumber() + ":");
 
                             futureNodeComm.setState(NodeCommState.AVAILABLE);
                             removalList.add(future);
@@ -119,7 +123,7 @@ public class SyncObjectTask implements Callable<String> {
                             HashMap<String, Object> futureHash = futuresMap.get(future);
                             SyncObject futureTask = (SyncObject) futureHash.get(taskName);
                             NodeComm futureNodeComm = (NodeComm) futureHash.get(nodecommName);
-                            logger.info("The Future has been cancelled  " + futureTask.getNodeId() + ":(" + futureNodeComm.getNumber() + "): running for pid" + futureTask.getPid());
+                            logger.info("Task-" + futureTask.getNodeId() + "-" + futureTask.getPid() + "The Future has been cancelled  " + ":(" + futureNodeComm.getNumber() + "):");
                             futureNodeComm.setState(NodeCommState.AVAILABLE);
                             removalList.add(future);
 
@@ -135,18 +139,18 @@ public class SyncObjectTask implements Callable<String> {
                             SyncObject futureTask = (SyncObject) futureHash.get(taskName);
                             NodeComm futureNodeComm = (NodeComm) futureHash.get(nodecommName);
                             futureNodeComm.setState(NodeCommState.AVAILABLE);
-                            logger.error("An Exception is reported FROM the Future " + futureTask.getNodeId() + ":" + futureNodeComm.getNumber() + " for pid " + futureTask.getPid());
+                            logger.error("Task-" + futureTask.getNodeId() + "-" + futureTask.getPid() + "An Exception is reported FROM the Future " + ":(" + futureNodeComm.getNumber() + "):");
                             futureNodeComm.setState(NodeCommState.AVAILABLE);
                             removalList.add(future);
                         } catch (TimeoutException ex) {
                             HashMap<String, Object> futureHash = futuresMap.get(future);
                             SyncObject futureTask = (SyncObject) futureHash.get(taskName);
                             NodeComm futureNodeComm = (NodeComm) futureHash.get(nodecommName);
-                            logger.info("Waiting for the future of " + futureTask.getNodeId() + ":" + futureNodeComm.getNumber() + " for pid " + futureTask.getPid() + " since " + DateTimeMarshaller.serializeDateToUTC(futureNodeComm.getRunningStartDate()));
+                            logger.info("Task-" + futureTask.getNodeId() + "-" + futureTask.getPid() + "Waiting for the future " + ":(" + futureNodeComm.getNumber() + "):" + " since " + DateTimeMarshaller.serializeDateToUTC(futureNodeComm.getRunningStartDate()));
                             Date now = new Date();
                             // if the thread is running longer than an hour, kill it
                             if ((now.getTime() - futureNodeComm.getRunningStartDate().getTime()) > threadTimeout) {
-                                logger.warn("Cancelling task of " + futureTask.getNodeId() + ":" + futureNodeComm.getNumber() + " for pid " + futureTask.getPid() + " waiting since " + DateTimeMarshaller.serializeDateToUTC(futureNodeComm.getRunningStartDate()));
+                                logger.warn("Task-" + futureTask.getNodeId() + "-" + futureTask.getPid() + " Cancelling. " + ":(" + futureNodeComm.getNumber() + "):" + " Waiting since " + DateTimeMarshaller.serializeDateToUTC(futureNodeComm.getRunningStartDate()));
                                 if (future.cancel(true)) {
                                     // this is a task we don't care about tracking.
                                     // it is a 'special' task because we do not limit the number of NodeComms. they are not
@@ -171,7 +175,7 @@ public class SyncObjectTask implements Callable<String> {
                 if (task != null) {
                     // Found a task now see if there is a comm object available
                     // if so, then run it
-                    logger.info("found task " + task.getPid() + " for " + task.getNodeId());
+                    logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " received");
                     NodeComm nodeCommunications = null;
                     // investigate the task for membernode
                     NodeReference nodeReference = new NodeReference();
@@ -238,7 +242,7 @@ public class SyncObjectTask implements Callable<String> {
                             // Tasks maybe rejected because of the pool has filled up and no
                             // more tasks may be executed.
                             // This situation is dire since it should never be allowed to occur!
-                            logger.error("Task Rejected from Node " + task.getNodeId() + " with Pid " + task.getPid());
+                            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + " Rejected");
                             logger.error("ActiveCount: " + taskExecutor.getActiveCount() + " Pool size " + taskExecutor.getPoolSize() + " Max Pool Size " + taskExecutor.getMaxPoolSize());
                             nodeCommunications.setState(NodeCommState.AVAILABLE);
                             hzSyncObjectQueue.put(task);
@@ -262,7 +266,7 @@ public class SyncObjectTask implements Callable<String> {
                         }
                     }
                 }
-                logger.info("ActiveCount: " + taskExecutor.getActiveCount() + " Pool size " + taskExecutor.getPoolSize() + " Max Pool Size " + taskExecutor.getMaxPoolSize());
+                logger.debug("ActiveCount: " + taskExecutor.getActiveCount() + " Pool size " + taskExecutor.getPoolSize() + " Max Pool Size " + taskExecutor.getMaxPoolSize());
                 if ((taskExecutor.getPoolSize() + 5) > taskExecutor.getMaxPoolSize()) {
                     if ((taskExecutor.getPoolSize() == taskExecutor.getMaxPoolSize()) && futuresMap.isEmpty()) {
                         BlockingQueue<Runnable> blockingTaskQueue = taskExecutor.getThreadPoolExecutor().getQueue();
@@ -292,7 +296,7 @@ public class SyncObjectTask implements Callable<String> {
         // submission fails, then it would be somewhat futile to
         // repeatedly try to submit failing submisssions...
         try {
-            logger.info("Submit SyncFailed pid " + task.getPid());
+            logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Submit SyncFailed");
             NodeComm nodeCommunications = nodeCommunicationsFactory.getNodeComm(mnBaseUrl);
             SyncFailedTask syncFailedTask = new SyncFailedTask(nodeCommunications, task);
 
@@ -302,7 +306,7 @@ public class SyncObjectTask implements Callable<String> {
             // Tasks maybe rejected because of the pool has filled up and no
             // more tasks may be executed.
             // This situation is dire since it should never be allowed to occur!
-            logger.error("Submit SyncFailed Rejected from Node " + task.getNodeId() + " with Pid " + task.getPid());
+            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + " Submit SyncFailed Rejected from MN");
             logger.error("ActiveCount: " + taskExecutor.getActiveCount() + " Pool size " + taskExecutor.getPoolSize() + " Max Pool Size " + taskExecutor.getMaxPoolSize());
 
         } catch (ServiceFailure ex) {
