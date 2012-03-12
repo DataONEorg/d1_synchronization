@@ -246,7 +246,7 @@ public class HarvestSchedulingManager implements ApplicationContextAware, EntryL
     // http://groups.google.com/group/hazelcast/browse_thread/thread/3856d5829e26f81c?fwc=1
     //
     public void migrationCompleted(MigrationEvent migrationEvent) {
-        logger.info("migrationCompleted " + migrationEvent.getPartitionId());
+        logger.debug("migrationCompleted " + migrationEvent.getPartitionId());
         // this is the partition that was moved from 
         // one node to the other
         // try to determine if a Node has migrated home servers
@@ -275,7 +275,7 @@ public class HarvestSchedulingManager implements ApplicationContextAware, EntryL
     }
 
     public void migrationStarted(MigrationEvent migrationEvent) {
-        logger.warn("migrationStarted " + migrationEvent.getPartitionId());
+        logger.debug("migrationStarted " + migrationEvent.getPartitionId());
     }
 
     public HazelcastInstance getHazelcast() {
