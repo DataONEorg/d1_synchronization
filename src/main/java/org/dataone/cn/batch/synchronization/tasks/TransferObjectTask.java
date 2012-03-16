@@ -11,7 +11,6 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
-import java.math.BigInteger;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
@@ -41,6 +40,7 @@ import org.dataone.service.types.v1.NodeType;
 import org.dataone.service.types.v1.ObjectFormat;
 import org.dataone.service.types.v1.Replica;
 import org.dataone.service.types.v1.ReplicationStatus;
+import org.dataone.service.types.v1.Service;
 import org.dataone.service.types.v1.Session;
 import org.dataone.service.types.v1.SystemMetadata;
 
@@ -83,6 +83,7 @@ public class TransferObjectTask implements Callable<Void> {
         this.task = task;
         hzSystemMetaMap = nodeCommunications.getHzClient().getMap(hzSystemMetaMapString);
     }
+
     /**
      * Implement the Callable interface.  The process will attempt to lock the
      * pid in order to exclude replication and synchronization from changing
@@ -262,14 +263,22 @@ public class TransferObjectTask implements Callable<Void> {
             logger.debug("Task-" + task.getNodeId() + "-" + task.getPid() + " Get Object Format");
             ObjectFormat objectFormat = nodeCommunications.getCnCore().getFormat(systemMetadata.getFormatId());
             if ((objectFormat != null) && !(objectFormat.getFormatType().equalsIgnoreCase("DATA"))) {
-                NodeReference cnReference = new NodeReference();
-                cnReference.setValue(cnIdentifier);
-                Replica cnReplica = new Replica();
-                cnReplica.setReplicaMemberNode(cnReference);
-                cnReplica.setReplicationStatus(ReplicationStatus.COMPLETED);
-                cnReplica.setReplicaVerified(new Date());
-                systemMetadata.addReplica(cnReplica);
-                logger.debug("Task-" + task.getNodeId() + "-" + task.getPid() + " Added CN as replica because formatType " + objectFormat.getFormatType() + " is sciMetadata");
+                boolean hasNoCNReplica = true;
+                for (Replica replica : replicaList) {
+                    if (replica.getReplicaMemberNode().getValue().contentEquals(cnIdentifier)) {
+                        hasNoCNReplica = false;
+                    }
+                }
+                if (hasNoCNReplica) {
+                    NodeReference cnReference = new NodeReference();
+                    cnReference.setValue(cnIdentifier);
+                    Replica cnReplica = new Replica();
+                    cnReplica.setReplicaMemberNode(cnReference);
+                    cnReplica.setReplicationStatus(ReplicationStatus.COMPLETED);
+                    cnReplica.setReplicaVerified(new Date());
+                    systemMetadata.addReplica(cnReplica);
+                    logger.debug("Task-" + task.getNodeId() + "-" + task.getPid() + " Added CN as replica because formatType " + objectFormat.getFormatType() + " is sciMetadata");
+                }
             }
             NodeReference originMemberNode = new NodeReference();
             originMemberNode.setValue(memberNodeId);
@@ -561,21 +570,29 @@ public class TransferObjectTask implements Callable<Void> {
         SystemMetadata cnSystemMetadata = hzSystemMetaMap.get(pid);
         List<Replica> prevReplicaList = cnSystemMetadata.getReplicaList();
         Session session = null;
-        logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " auditReplicaSystemMetadata" );
+        logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " auditReplicaSystemMetadata");
         for (Replica replica : prevReplicaList) {
             Node node = hzNodes.get(replica.getReplicaMemberNode());
             if (node.getType().equals(NodeType.MN)) {
-                String mnUrl = node.getBaseURL();
-
-                
-                MNode mnNode = new MNode(mnUrl);
-                SystemMetadata mnSystemMetadata = mnNode.getSystemMetadata(session, cnSystemMetadata.getIdentifier());
-
-                if (mnSystemMetadata.getSerialVersion() != cnSystemMetadata.getSerialVersion()) {
-
-                    mnNode.systemMetadataChanged(session, cnSystemMetadata.getIdentifier(), cnSystemMetadata.getSerialVersion().longValue(), cnSystemMetadata.getDateSysMetadataModified());
+                boolean isTier3 = false;
+                // Find out if a teir 3 node, if not then do not callback since it is not implemented
+                for (Service service : node.getServices().getServiceList()) {
+                    if (service.getName().equals("MNStorage") && service.getAvailable()) {
+                        isTier3 = true;
+                        break;
+                    }
                 }
+                if (isTier3) {
+                    String mnUrl = node.getBaseURL();
 
+                    MNode mnNode = new MNode(mnUrl);
+                    SystemMetadata mnSystemMetadata = mnNode.getSystemMetadata(session, cnSystemMetadata.getIdentifier());
+
+                    if (mnSystemMetadata.getSerialVersion() != cnSystemMetadata.getSerialVersion()) {
+
+                        mnNode.systemMetadataChanged(session, cnSystemMetadata.getIdentifier(), cnSystemMetadata.getSerialVersion().longValue(), cnSystemMetadata.getDateSysMetadataModified());
+                    }
+                }
             }
         }
     }
@@ -587,6 +604,7 @@ public class TransferObjectTask implements Callable<Void> {
      * @author waltz
      * 
      */
+
     private void submitSynchronizationFailed(String pid, BaseException exception) {
         SyncFailedTask syncFailedTask = new SyncFailedTask(nodeCommunications, task);
         syncFailedTask.submitSynchronizationFailed(pid, exception);

@@ -4,42 +4,22 @@
  */
 package org.dataone.cn.batch.synchronization.tasks;
 
-import com.hazelcast.core.Hazelcast;
-import com.hazelcast.core.HazelcastInstance;
-import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
 import java.util.concurrent.Callable;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.Lock;
 import org.apache.log4j.Logger;
-import org.dataone.cn.batch.synchronization.type.NodeCommState;
 import org.dataone.cn.batch.synchronization.type.NodeComm;
 import org.dataone.cn.batch.synchronization.type.SyncObject;
 import org.dataone.configuration.Settings;
 import org.dataone.service.exceptions.BaseException;
-import org.dataone.service.exceptions.IdentifierNotUnique;
-import org.dataone.service.exceptions.InsufficientResources;
-import org.dataone.service.exceptions.InvalidRequest;
-import org.dataone.service.exceptions.InvalidSystemMetadata;
 import org.dataone.service.exceptions.InvalidToken;
 import org.dataone.service.exceptions.NotAuthorized;
-import org.dataone.service.exceptions.NotFound;
 import org.dataone.service.exceptions.NotImplemented;
 import org.dataone.service.exceptions.ServiceFailure;
 import org.dataone.service.exceptions.SynchronizationFailed;
-import org.dataone.service.exceptions.UnsupportedType;
-import org.dataone.service.types.v1.Checksum;
-import org.dataone.service.types.v1.Identifier;
-import org.dataone.service.types.v1.NodeReference;
-import org.dataone.service.types.v1.ObjectFormat;
-import org.dataone.service.types.v1.Replica;
-import org.dataone.service.types.v1.ReplicationStatus;
 import org.dataone.service.types.v1.Session;
-import org.dataone.service.types.v1.SystemMetadata;
 
 /**
+ * This is a callable class to report back to the MN when a failure has
+ * occurred during synchronization.
  *
  * @author waltz
  */
@@ -54,7 +34,12 @@ public class SyncFailedTask implements Callable<String> {
         this.nodeCommunications = nodeCommunications;
         this.task = task;
     }
-
+    /**
+     * Implement the Callable interface.  This class is executed as a separate thread
+     *
+     * @author waltz
+     *
+     */
     @Override
     public String call() {
         //
@@ -66,7 +51,10 @@ public class SyncFailedTask implements Callable<String> {
     }
 
     public void submitSynchronizationFailed(String pid, BaseException exception) {
+        String nodeId = Settings.getConfiguration().getString("cn.nodeId");
         SynchronizationFailed syncFailed = new SynchronizationFailed("6001", "Synchronization task of [PID::]" + pid + "[::PID] failed. " + exception.getDescription());
+        syncFailed.setPid(pid);
+        syncFailed.setNodeId(nodeId);
         try {
             nodeCommunications.getMnRead().synchronizationFailed(session, syncFailed);
         } catch (InvalidToken ex) {
