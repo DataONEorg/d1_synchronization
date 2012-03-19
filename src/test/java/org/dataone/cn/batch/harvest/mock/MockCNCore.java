@@ -134,7 +134,11 @@ public class MockCNCore implements CNCore {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
-
+    @Override
+    public Identifier delete(Session session, Identifier pid)
+    throws InvalidToken, ServiceFailure, InvalidRequest, NotAuthorized, NotFound, NotImplemented {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
 
     @Override
     public Identifier reserveIdentifier(Session session, Identifier pid) throws InvalidToken, ServiceFailure, NotAuthorized, IdentifierNotUnique, NotImplemented, InvalidRequest {
