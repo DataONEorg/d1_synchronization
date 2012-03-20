@@ -517,8 +517,12 @@ public class TransferObjectTask implements Callable<Void> {
                 nodeCommunications.getCnCore().setObsoletedBy(session, pid, newSystemMetadata.getObsoletedBy(), cnSystemMetadata.getSerialVersion().longValue());
                 auditReplicaSystemMetadata(pid);
                 logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Updated ObsoletedBy");
-            } else {
-                logger.warn(task.getNodeId() + "-" + task.getPid() + " Ignoring update from Authoritative MN");
+            } else if (! cnSystemMetadata.getArchived() && newSystemMetadata.getArchived()){
+                logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Update Archived");
+
+                nodeCommunications.getCnCore().delete(session, pid);
+                auditReplicaSystemMetadata(pid);
+                logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Updated Archived");
             }
         } else {
             boolean performUpdate = true;
