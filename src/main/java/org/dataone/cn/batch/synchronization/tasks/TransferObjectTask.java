@@ -346,7 +346,7 @@ public class TransferObjectTask implements Callable<Void> {
             try {
                 Session verifySubmitter = new Session();
                 verifySubmitter.setSubject(systemMetadata.getSubmitter());
-                doCreate = reserveIdentifierService.hasReservation(verifySubmitter, null, systemMetadata.getIdentifier());
+                doCreate = reserveIdentifierService.hasReservation(verifySubmitter, systemMetadata.getSubmitter(), systemMetadata.getIdentifier());
                 logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Create sysMeta from reservation");
             } catch (NotFound ex) {
                 doCreate = true;
