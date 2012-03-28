@@ -124,7 +124,7 @@ public class MockCNCore implements CNCore {
     }
 
     @Override
-    public Log getLogRecords(Session session, Date fromDate, Date toDate, Event event, Integer start, Integer count, String pidFilter) throws InvalidToken, InvalidRequest, ServiceFailure, NotAuthorized, NotImplemented {
+    public Log getLogRecords(Session session, Date fromDate, Date toDate, Event event, String pidFilter, Integer start, Integer count) throws InvalidToken, InvalidRequest, ServiceFailure, NotAuthorized, NotImplemented, InsufficientResources {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
