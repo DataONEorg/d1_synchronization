@@ -45,23 +45,20 @@ import org.dataone.service.types.v1.Session;
 import org.dataone.service.types.v1.SystemMetadata;
 
 /**
- * Transfer an object from a MemberNode(MN) to a CoordinatingNode(CN).
- * Executes as a thread that is executed by the SyncObjectTask class
+ * Transfer an object from a MemberNode(MN) to a CoordinatingNode(CN). Executes as a thread that is executed by the
+ * SyncObjectTask class
  *
- * This class will download SystemMetadata from a MN and
- * process the SystemMetadata. It will then take actions based
- * on the information in the SystemMetadata.
+ * This class will download SystemMetadata from a MN and process the SystemMetadata. It will then take actions based on
+ * the information in the SystemMetadata.
  *
- * If the SystemMetadata describes a new Science Metadata object, it
- * will download the object and perform a create
+ * If the SystemMetadata describes a new Science Metadata object, it will download the object and perform a create
  *
- * If the SystemMetadata describes a new Science Data Object, it will
- * register itself with the CN leaving the Data on the MN
+ * If the SystemMetadata describes a new Science Data Object, it will register itself with the CN leaving the Data on
+ * the MN
  *
- * If the SystemMetadata already exists on the CN, then based on the
- * state of the SystemMetadata it will either be ignored, updated, or
- * throw an exception.
- * 
+ * If the SystemMetadata already exists on the CN, then based on the state of the SystemMetadata it will either be
+ * ignored, updated, or throw an exception.
+ *
  * @author waltz
  */
 public class TransferObjectTask implements Callable<Void> {
@@ -85,14 +82,13 @@ public class TransferObjectTask implements Callable<Void> {
     }
 
     /**
-     * Implement the Callable interface.  The process will attempt to lock the
-     * pid in order to exclude replication and synchronization from changing
-     * the same object.  It will then process the systemMetadata from the
-     * Membernode, and lastly write the data (systemMetadata and any
-     * storage types of information) to Storage. The lock will then be released
-     * 
+     * Implement the Callable interface. The process will attempt to lock the pid in order to exclude replication and
+     * synchronization from changing the same object. It will then process the systemMetadata from the Membernode, and
+     * lastly write the data (systemMetadata and any storage types of information) to Storage. The lock will then be
+     * released
+     *
      * @author waltz
-     * 
+     *
      */
     @Override
     public Void call() {
@@ -117,8 +113,10 @@ public class TransferObjectTask implements Callable<Void> {
 
                         logger.warn("Task-" + task.getNodeId() + "-" + task.getPid() + " Pid altered before processing complete! Placing back on hzSyncObjectQueue of attempt " + task.getAttempt());
                         if (task.getAttempt() == 1) {
-                            /* Member node should be informed to update its systemMetadata.
-                            If the member node is unable to update, this will be a nasty failure */
+                            /*
+                             * Member node should be informed to update its systemMetadata. If the member node is unable
+                             * to update, this will be a nasty failure
+                             */
                             Identifier pid = new Identifier();
                             pid.setValue(task.getPid());
                             auditReplicaSystemMetadata(pid);
@@ -149,7 +147,9 @@ public class TransferObjectTask implements Callable<Void> {
 
                         logger.warn("Task-" + task.getNodeId() + "-" + task.getPid() + " Pid Locked! Placing back on hzSyncObjectQueue of attempt " + task.getAttempt());
 
-                        /* allow a maximum number of attempts before permanent failure */
+                        /*
+                         * allow a maximum number of attempts before permanent failure
+                         */
                         task.setAttempt(task.getAttempt() + 1);
                         // wait a second to see if replication completes its action and releases the lock
                         try {
@@ -182,18 +182,12 @@ public class TransferObjectTask implements Callable<Void> {
     /*
      * Process the Task before writing it out to storage
      *
-     * Read in the SystemMetadata from the Membernode.
-     * Set the membernode being synchronized as the Origin & Authoritative
-     * Membernode (will be ignored if an update op)
-     * Add member node as a replica
-     * Add CN as a replica if the object is not a Sci Data object
+     * Read in the SystemMetadata from the Membernode. Set the membernode being synchronized as the Origin &
+     * Authoritative Membernode (will be ignored if an update op) Add member node as a replica Add CN as a replica if
+     * the object is not a Sci Data object
      *
-     * @param String The Node Id of the task
-     * @param String The pid of the task
-     * @return SystemMetadata
-     * @throws ServiceFailure
-     * @throws NotFound
-     * @author waltz
+     * @param String The Node Id of the task @param String The pid of the task @return SystemMetadata @throws
+     * ServiceFailure @throws NotFound @author waltz
      */
 
     private SystemMetadata process(String memberNodeId, String pid) {
@@ -319,12 +313,9 @@ public class TransferObjectTask implements Callable<Void> {
     }
 
     /*
-     * Determine if the object should be created as a new entry, updated
-     *  or ignored
+     * Determine if the object should be created as a new entry, updated or ignored
      *
-     * @param SystemMetadata systemMetdata from the MN
-     * @throws VersionMismatch
-     * @author waltz
+     * @param SystemMetadata systemMetdata from the MN @throws VersionMismatch @author waltz
      */
     private void write(SystemMetadata systemMetadata) throws VersionMismatch {
         // is this an update or create?
@@ -362,8 +353,8 @@ public class TransferObjectTask implements Callable<Void> {
             } else {
                 // determine if this is a valid update
                 SystemMetadata cnSystemMetadata = hzSystemMetaMap.get(systemMetadata.getIdentifier());
-                Checksum existingChecksum = cnSystemMetadata.getChecksum(); // maybe an update, maybe duplicate, maybe a conflicting pid
                 if (systemMetadata != null) {
+                    Checksum existingChecksum = cnSystemMetadata.getChecksum(); // maybe an update, maybe duplicate, maybe a conflicting pid
                     Checksum newChecksum = systemMetadata.getChecksum();
                     if (!existingChecksum.getAlgorithm().equalsIgnoreCase(systemMetadata.getChecksum().getAlgorithm())) {
                         // we can't check algorithms that do not match, so get MN to recalculate with original checksum
@@ -380,6 +371,8 @@ public class TransferObjectTask implements Callable<Void> {
                         IdentifierNotUnique notUnique = new IdentifierNotUnique("-1", "Checksum does not match existing object with same pid.");
                         submitSynchronizationFailed(systemMetadata.getIdentifier().getValue(), notUnique);
                     }
+                } else {
+                    logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + " is null when get called from Hazelcast " + hzSystemMetaMapString + " Map");
                 }
             }
         } catch (VersionMismatch ex) {
@@ -416,6 +409,7 @@ public class TransferObjectTask implements Callable<Void> {
             logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + ex.serialize(ex.FMT_XML));
             submitSynchronizationFailed(systemMetadata.getIdentifier().getValue(), ex);
         } catch (Exception ex) {
+            ex.printStackTrace();
             logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + ex.getMessage());
             ServiceFailure serviceFailure = new ServiceFailure("-1", ex.getMessage());
             submitSynchronizationFailed(systemMetadata.getIdentifier().getValue(), serviceFailure);
@@ -423,22 +417,12 @@ public class TransferObjectTask implements Callable<Void> {
     }
 
     /*
-     * Create the object if a resource or sci meta object.
-     * Register systemmetadata if a sci data object.
+     * Create the object if a resource or sci meta object. Register systemmetadata if a sci data object.
      *
      *
-     * @param SystemMetadata systemMetdata from the MN
-     * @throws InvalidRequest
-     * @throws ServiceFailure
-     * @throws NotFound
-     * @throws InsufficientResources
-     * @throws NotImplemented
-     * @throws InvalidToken
-     * @throws NotAuthorized
-     * @throws InvalidSystemMetadata
-     * @throws IdentifierNotUnique
-     * @throws UnsupportedType
-     * @author waltz
+     * @param SystemMetadata systemMetdata from the MN @throws InvalidRequest @throws ServiceFailure @throws NotFound
+     * @throws InsufficientResources @throws NotImplemented @throws InvalidToken @throws NotAuthorized @throws
+     * InvalidSystemMetadata @throws IdentifierNotUnique @throws UnsupportedType @author waltz
      */
     private void createObject(SystemMetadata systemMetadata) throws InvalidRequest, ServiceFailure, NotFound, InsufficientResources, NotImplemented, InvalidToken, NotAuthorized, InvalidSystemMetadata, IdentifierNotUnique, UnsupportedType {
         Identifier d1Identifier = new Identifier();
@@ -485,22 +469,13 @@ public class TransferObjectTask implements Callable<Void> {
     }
 
     /*
-     * Object is already created. This opertation will only update systemmetadata
-     * if a portion of the systemmeta data has changed that synchroniziation can update.
-     * Namely, The authoritative member  node can update
-     * the obsoletedBy field or if an existing replica is found, then the replica information is
-     * added to the systemMetadata.
+     * Object is already created. This opertation will only update systemmetadata if a portion of the systemmeta data
+     * has changed that synchroniziation can update. Namely, The authoritative member node can update the obsoletedBy
+     * field or if an existing replica is found, then the replica information is added to the systemMetadata.
      *
-     * @param SystemMetadata systemMetdata from the MN
-     * @throws InvalidRequest
-     * @throws ServiceFailure
-     * @throws NotFound
-     * @throws NotImplemented
-     * @throws InvalidToken
-     * @throws NotAuthorized
-     * @throws InvalidSystemMetadata
-     * @throws VersionMismatch
-     * @author waltz
+     * @param SystemMetadata systemMetdata from the MN @throws InvalidRequest @throws ServiceFailure @throws NotFound
+     * @throws NotImplemented @throws InvalidToken @throws NotAuthorized @throws InvalidSystemMetadata @throws
+     * VersionMismatch @author waltz
      */
     private void updateSystemMetadata(SystemMetadata newSystemMetadata) throws InvalidSystemMetadata, NotFound, NotImplemented, NotAuthorized, ServiceFailure, InvalidRequest, InvalidToken, VersionMismatch {
         // Only update the systemMetadata fields that can be updated by a membernode
@@ -517,7 +492,7 @@ public class TransferObjectTask implements Callable<Void> {
                 nodeCommunications.getCnCore().setObsoletedBy(session, pid, newSystemMetadata.getObsoletedBy(), cnSystemMetadata.getSerialVersion().longValue());
                 auditReplicaSystemMetadata(pid);
                 logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Updated ObsoletedBy");
-            } else if (! cnSystemMetadata.getArchived() && newSystemMetadata.getArchived()){
+            } else if (!cnSystemMetadata.getArchived() && newSystemMetadata.getArchived()) {
                 logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Update Archived");
 
                 nodeCommunications.getCnCore().delete(session, pid);
@@ -558,55 +533,51 @@ public class TransferObjectTask implements Callable<Void> {
     }
 
     /*
-     * Inform  Member Nodes that may have a copy to refresh their version of the systemmetadata
-     * 
-     * @param Identifier pid
-     * @throws InvalidRequest
-     * @throws ServiceFailure
-     * @throws NotFound
-     * @throws NotImplemented
-     * @throws InvalidToken
-     * @throws NotAuthorized
-     * @author waltz
+     * Inform Member Nodes that may have a copy to refresh their version of the systemmetadata
+     *
+     * @param Identifier pid @throws InvalidRequest @throws ServiceFailure @throws NotFound @throws NotImplemented
+     * @throws InvalidToken @throws NotAuthorized @author waltz
      */
     private void auditReplicaSystemMetadata(Identifier pid) throws InvalidToken, ServiceFailure, NotAuthorized, NotFound, InvalidRequest, NotImplemented {
         IMap<NodeReference, Node> hzNodes = hazelcast.getMap("hzNodes");
         SystemMetadata cnSystemMetadata = hzSystemMetaMap.get(pid);
-        List<Replica> prevReplicaList = cnSystemMetadata.getReplicaList();
-        Session session = null;
-        logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " auditReplicaSystemMetadata");
-        for (Replica replica : prevReplicaList) {
-            Node node = hzNodes.get(replica.getReplicaMemberNode());
-            if (node.getType().equals(NodeType.MN)) {
-                boolean isTier3 = false;
-                // Find out if a teir 3 node, if not then do not callback since it is not implemented
-                for (Service service : node.getServices().getServiceList()) {
-                    if (service.getName().equals("MNStorage") && service.getAvailable()) {
-                        isTier3 = true;
-                        break;
+        if (cnSystemMetadata != null) {
+            List<Replica> prevReplicaList = cnSystemMetadata.getReplicaList();
+            Session session = null;
+            logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " auditReplicaSystemMetadata");
+            for (Replica replica : prevReplicaList) {
+                Node node = hzNodes.get(replica.getReplicaMemberNode());
+                if (node.getType().equals(NodeType.MN)) {
+                    boolean isTier3 = false;
+                    // Find out if a teir 3 node, if not then do not callback since it is not implemented
+                    for (Service service : node.getServices().getServiceList()) {
+                        if (service.getName().equals("MNStorage") && service.getAvailable()) {
+                            isTier3 = true;
+                            break;
+                        }
                     }
-                }
-                if (isTier3) {
-                    String mnUrl = node.getBaseURL();
+                    if (isTier3) {
+                        String mnUrl = node.getBaseURL();
 
-                    MNode mnNode = new MNode(mnUrl);
-                    SystemMetadata mnSystemMetadata = mnNode.getSystemMetadata(session, cnSystemMetadata.getIdentifier());
+                        MNode mnNode = new MNode(mnUrl);
+                        SystemMetadata mnSystemMetadata = mnNode.getSystemMetadata(session, cnSystemMetadata.getIdentifier());
 
-                    if (mnSystemMetadata.getSerialVersion() != cnSystemMetadata.getSerialVersion()) {
+                        if (mnSystemMetadata.getSerialVersion() != cnSystemMetadata.getSerialVersion()) {
 
-                        mnNode.systemMetadataChanged(session, cnSystemMetadata.getIdentifier(), cnSystemMetadata.getSerialVersion().longValue(), cnSystemMetadata.getDateSysMetadataModified());
+                            mnNode.systemMetadataChanged(session, cnSystemMetadata.getIdentifier(), cnSystemMetadata.getSerialVersion().longValue(), cnSystemMetadata.getDateSysMetadataModified());
+                        }
                     }
                 }
             }
+        } else {
+            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + " is null when get called from Hazelcast " + hzSystemMetaMapString + " Map");
         }
     }
     /*
-     * Inform  Member Nodes that synchronization task failed
+     * Inform Member Nodes that synchronization task failed
      *
-     * @param String pid
-     * @param BaseException message showing reason of failure
-     * @author waltz
-     * 
+     * @param String pid @param BaseException message showing reason of failure @author waltz
+     *
      */
 
     private void submitSynchronizationFailed(String pid, BaseException exception) {
