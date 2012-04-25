@@ -29,13 +29,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Date;
 import org.apache.log4j.Logger;
-import org.dataone.service.exceptions.InvalidRequest;
-import org.dataone.service.exceptions.InvalidToken;
-import org.dataone.service.exceptions.NotAuthorized;
-import org.dataone.service.exceptions.NotFound;
-import org.dataone.service.exceptions.NotImplemented;
-import org.dataone.service.exceptions.ServiceFailure;
-import org.dataone.service.exceptions.SynchronizationFailed;
+import org.dataone.service.exceptions.*;
 import org.dataone.service.mn.tier1.v1.MNRead;
 import org.dataone.service.types.v1.Checksum;
 import org.dataone.service.types.v1.DescribeResponse;
@@ -179,6 +173,36 @@ public class MockMNRead implements MNRead {
 
     @Override
     public boolean synchronizationFailed(Session session, SynchronizationFailed message) throws InvalidToken, NotAuthorized, NotImplemented, ServiceFailure {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public InputStream get(Identifier pid) throws InvalidToken, NotAuthorized, NotImplemented, ServiceFailure, NotFound, InsufficientResources {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public SystemMetadata getSystemMetadata(Identifier pid) throws InvalidToken, NotAuthorized, NotImplemented, ServiceFailure, NotFound {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public DescribeResponse describe(Identifier pid) throws InvalidToken, NotAuthorized, NotImplemented, ServiceFailure, NotFound {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public Checksum getChecksum(Identifier pid, String checksumAlgorithm) throws InvalidRequest, InvalidToken, NotAuthorized, NotImplemented, ServiceFailure, NotFound {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public ObjectList listObjects(Date fromDate, Date toDate, ObjectFormatIdentifier formatid, Boolean replicaStatus, Integer start, Integer count) throws InvalidRequest, InvalidToken, NotAuthorized, NotImplemented, ServiceFailure {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public boolean synchronizationFailed(SynchronizationFailed message) throws InvalidToken, NotAuthorized, NotImplemented, ServiceFailure {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
