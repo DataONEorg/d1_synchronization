@@ -193,6 +193,46 @@ public class MockCNCore implements CNCore {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
+    @Override
+    public Log getLogRecords(Date fromDate, Date toDate, Event event, String pidFilter, Integer start, Integer count) throws InvalidToken, InvalidRequest, ServiceFailure, NotAuthorized, NotImplemented, InsufficientResources {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public Identifier reserveIdentifier(Identifier pid) throws InvalidToken, ServiceFailure, NotAuthorized, IdentifierNotUnique, NotImplemented, InvalidRequest {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public Identifier generateIdentifier(String scheme, String fragment) throws InvalidToken, ServiceFailure, NotAuthorized, NotImplemented, InvalidRequest {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public boolean hasReservation(Subject subject, Identifier pid) throws InvalidToken, ServiceFailure, NotFound, NotAuthorized, NotImplemented, InvalidRequest, IdentifierNotUnique {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public Identifier create(Identifier pid, InputStream object, SystemMetadata sysmeta) throws InvalidToken, ServiceFailure, NotAuthorized, IdentifierNotUnique, UnsupportedType, InsufficientResources, InvalidSystemMetadata, NotImplemented, InvalidRequest {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public Identifier registerSystemMetadata(Identifier pid, SystemMetadata sysmeta) throws NotImplemented, NotAuthorized, ServiceFailure, InvalidRequest, InvalidSystemMetadata, InvalidToken {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public boolean setObsoletedBy(Identifier pid, Identifier obsoletedByPid, long serialVersion) throws NotImplemented, NotFound, NotAuthorized, ServiceFailure, InvalidRequest, InvalidToken, VersionMismatch {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public Identifier delete(Identifier pid) throws InvalidToken, ServiceFailure, InvalidRequest, NotAuthorized, NotFound, NotImplemented {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
 
 
 }
