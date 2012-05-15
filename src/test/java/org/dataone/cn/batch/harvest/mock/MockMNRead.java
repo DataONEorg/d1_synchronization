@@ -206,5 +206,15 @@ public class MockMNRead implements MNRead {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
+    @Override
+    public InputStream getReplica(Identifier pid) throws InvalidToken, NotAuthorized, NotImplemented, ServiceFailure, NotFound, InsufficientResources {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public InputStream getReplica(Session session, Identifier pid) throws InvalidToken, NotAuthorized, NotImplemented, ServiceFailure, NotFound, InsufficientResources {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
 
 }
