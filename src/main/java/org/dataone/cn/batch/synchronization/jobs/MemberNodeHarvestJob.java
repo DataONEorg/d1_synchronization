@@ -1,25 +1,20 @@
 /**
- * This work was created by participants in the DataONE project, and is
- * jointly copyrighted by participating institutions in DataONE. For 
- * more information on DataONE, see our web site at http://dataone.org.
+ * This work was created by participants in the DataONE project, and is jointly copyrighted by participating
+ * institutions in DataONE. For more information on DataONE, see our web site at http://dataone.org.
  *
- *   Copyright ${year}
+ * Copyright ${year}
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- * 
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations under the License.
+ *
  * $Id$
  */
-
 package org.dataone.cn.batch.synchronization.jobs;
 
 import com.hazelcast.core.DistributedTask;
@@ -48,12 +43,9 @@ import java.text.SimpleDateFormat;
 import java.text.ParseException;
 
 /**
- * Quartz Job that starts off the hazelcast distributed execution of harvesting for a nodeList
- * from a Membernode
- * It executes only for a given membernode, and while executing excludes via a lock
- * any other execution of a job on that membernode
- * It also sets and persists the LastHarvested date on a node after completion
- * before releasing the lock
+ * Quartz Job that starts off the hazelcast distributed execution of harvesting for a nodeList from a Membernode It
+ * executes only for a given membernode, and while executing excludes via a lock any other execution of a job on that
+ * membernode It also sets and persists the LastHarvested date on a node after completion before releasing the lock
  *
  * @author waltz
  */
@@ -62,46 +54,52 @@ public class MemberNodeHarvestJob implements Job {
 
     @Override
     public void execute(JobExecutionContext jobContext) throws JobExecutionException {
-    SimpleDateFormat format =
-            new SimpleDateFormat("EEE MMM dd yyyy HH:mm:ss zzz");
+
         Log logger = LogFactory.getLog(MemberNodeHarvestJob.class);
-        String mnIdentifier = jobContext.getMergedJobDataMap().getString("mnIdentifier");
+        JobExecutionException jex = null;
+        NodeReference nodeReference = new NodeReference();
+        SimpleDateFormat format =
+                new SimpleDateFormat("EEE MMM dd yyyy HH:mm:ss zzz");
         boolean nodeLocked = false;
         IMap<NodeReference, Node> hzNodes = null;
-        NodeReference nodeReference = new NodeReference();
-        JobExecutionException jex = null;
-        nodeReference.setValue(mnIdentifier);
+
         try {
-            Integer batchSize = Settings.getConfiguration().getInt("Synchronization.mn_listobjects_batch_size");
+            boolean activateJob = Boolean.parseBoolean(Settings.getConfiguration().getString("Synchronization.active"));
+            if (activateJob) {
+                String mnIdentifier = jobContext.getMergedJobDataMap().getString("mnIdentifier");
+                logger.info(mnIdentifier + "- ObjectListHarvestTask Start");
+                HazelcastInstance hazelcast = Hazelcast.getDefaultInstance();
 
-            logger.debug("executing for " + mnIdentifier + " with batch size " + batchSize);
-            HazelcastInstance hazelcast = Hazelcast.getDefaultInstance();
+                hzNodes = hazelcast.getMap("hzNodes");
 
-            hzNodes = hazelcast.getMap("hzNodes");
+                nodeReference.setValue(mnIdentifier);
 
-            nodeLocked = hzNodes.tryLock(nodeReference, 5L, TimeUnit.SECONDS);
-            if (nodeLocked) {
-                Node mnNode = hzNodes.get(nodeReference);
+                Integer batchSize = Settings.getConfiguration().getInt("Synchronization.mn_listobjects_batch_size");
 
-                ObjectListHarvestTask harvestTask = new ObjectListHarvestTask(nodeReference, batchSize);
-                ExecutorService executor = Hazelcast.getExecutorService();
-                DistributedTask dtask = new DistributedTask((Callable<Date>) harvestTask);
-                Future future = executor.submit(dtask);
-                Date lastProcessingCompletedDate = null;
-                try {
-                    lastProcessingCompletedDate = (Date) future.get();
-                } catch (InterruptedException ex) {
-                    logger.error(ex.getMessage());
-                } catch (ExecutionException ex) {
-                    logger.error(ex.getMessage());
+                nodeLocked = hzNodes.tryLock(nodeReference, 5L, TimeUnit.SECONDS);
+                if (nodeLocked) {
+
+                    ObjectListHarvestTask harvestTask = new ObjectListHarvestTask(nodeReference, batchSize);
+                    ExecutorService executor = Hazelcast.getExecutorService();
+                    DistributedTask dtask = new DistributedTask((Callable<Date>) harvestTask);
+                    Future future = executor.submit(dtask);
+                    Date lastProcessingCompletedDate = null;
+                    try {
+                        lastProcessingCompletedDate = (Date) future.get();
+                    } catch (InterruptedException ex) {
+                        logger.error("InterruptedException: " + ex.getMessage());
+                    } catch (ExecutionException ex) {
+                        logger.error("ExecutionException: " + ex.getMessage());
+                    }
+
+                    // if the lastProcessingCompletedDate has changed then it should be persisted, but where?
+                    // Does not need to be stored, maybe just printed?
+                    logger.info(mnIdentifier + "- ObjectListHarvestTask End at " + format.format(lastProcessingCompletedDate));
                 }
-
-            // if the lastProcessingCompletedDate has changed then it should be persisted, but where?
-            // Does not need to be stored, maybe just printed?
-            logger.info("ObjectListHarvestTask returned at " + format.format(lastProcessingCompletedDate));
             }
         } catch (Exception ex) {
-            logger.error(jobContext.getJobDetail().getDescription() + " died: " + ex.getMessage());
+            ex.printStackTrace();
+            logger.error(jobContext.getJobDetail().getKey().getName() + " died: " + ex.getMessage());
             // log this message, someone else has the lock (and they probably shouldn't)
             jex = new JobExecutionException();
             jex.unscheduleFiringTrigger();
@@ -114,5 +112,6 @@ public class MemberNodeHarvestJob implements Job {
         if (jex != null) {
             throw jex;
         }
+
     }
 }
