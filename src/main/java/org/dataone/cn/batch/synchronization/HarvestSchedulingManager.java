@@ -1,25 +1,20 @@
 /**
- * This work was created by participants in the DataONE project, and is
- * jointly copyrighted by participating institutions in DataONE. For 
- * more information on DataONE, see our web site at http://dataone.org.
+ * This work was created by participants in the DataONE project, and is jointly copyrighted by participating
+ * institutions in DataONE. For more information on DataONE, see our web site at http://dataone.org.
  *
- *   Copyright ${year}
+ * Copyright ${year}
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- * 
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations under the License.
+ *
  * $Id$
  */
-
 package org.dataone.cn.batch.synchronization;
 
 import com.hazelcast.partition.Partition;
@@ -64,17 +59,14 @@ import static org.quartz.CronScheduleBuilder.*;
 import static org.quartz.JobBuilder.*;
 
 /**
- * this bean must be managed by Spring
- * upon startup of spring it will execute via init method
- * 
- * evaluate whether the NodeList contains nodes that should be executed on the
- * executing coordinating node. it will add  or remove triggers for jobs based on
- * events, such as startup, nightly refactoring, more CNs coming online
+ * this bean must be managed by Spring upon startup of spring it will execute via init method
  *
- * todo: add in nightly job that re-calcuates jobs
- *       add in listeners that will,under certain conditions, add a job to call manager
- *       added jobs that call the manager should retrieve the manager from spring context
- * 
+ * evaluate whether the NodeList contains nodes that should be executed on the executing coordinating node. it will add
+ * or remove triggers for jobs based on events, such as startup, nightly refactoring, more CNs coming online
+ *
+ * XXX todo: add in nightly job that re-calcuates jobs evaluate if EntryListener and MigrationListeners create potential
+ * for race conditions
+ *
  * @author waltz
  */
 public class HarvestSchedulingManager implements ApplicationContextAware, EntryListener<NodeReference, Node>, MigrationListener {
@@ -88,6 +80,11 @@ public class HarvestSchedulingManager implements ApplicationContextAware, EntryL
     PartitionService partitionService;
     Member localMember;
 
+    /*
+     * initialize the scheduler at bean creation, also add in migration and entry listeners populate the hzNodes map
+     *
+     *
+     */
     public void init() {
         try {
             logger.info("HarvestingScheduler starting up");
@@ -95,7 +92,7 @@ public class HarvestSchedulingManager implements ApplicationContextAware, EntryL
 
             localMember = hazelcast.getCluster().getLocalMember();
             hazelcastLdapStore.loadAllKeys();
-            
+
             Properties properties = new Properties();
             properties.load(this.getClass().getResourceAsStream("/org/dataone/configuration/synchQuartz.properties"));
             StdSchedulerFactory schedulerFactory = new StdSchedulerFactory(properties);
@@ -113,6 +110,13 @@ public class HarvestSchedulingManager implements ApplicationContextAware, EntryL
         }
     }
 
+    /**
+     * will perform the recalculation of the scheduler. if scheduler is running, it will be disabled All jobs will be
+     * deleted for this node All nodes that are considered 'local' by hazelcast will be scheduled with synchronization
+     * jobs
+     *
+     *
+     */
     public void manageHarvest() throws SchedulerException {
 
         // halt all operations
@@ -128,8 +132,9 @@ public class HarvestSchedulingManager implements ApplicationContextAware, EntryL
             // remove any existing jobs
             GroupMatcher<JobKey> groupMatcher = GroupMatcher.groupEquals(groupName);
             Set<JobKey> jobsInGroup = scheduler.getJobKeys(groupMatcher);
-           
+
             for (JobKey jobKey : jobsInGroup) {
+                logger.info("deleting job " + jobKey.getGroup() + " " + jobKey.getName());
                 scheduler.deleteJob(jobKey);
             }
         }
@@ -144,14 +149,21 @@ public class HarvestSchedulingManager implements ApplicationContextAware, EntryL
             Node node = hzNodes.get(key);
             addHarvest(key, node);
         }
-            scheduler.start();
+        scheduler.start();
 
         if (scheduler.isStarted()) {
-            logger.debug("Scheduler is started");
+            logger.info("Scheduler is started");
         }
 
     }
 
+    /*
+     *
+     * Convert the values in the nodes' sychronization schedule into a valid crontab entry to be used by Quartz
+     *
+     * @param Node @return String of crontab
+     *
+     */
     private String getCrontabEntry(Node node) {
         String seconds = node.getSynchronization().getSchedule().getSec();
         seconds = seconds.replace(" ", "");
@@ -186,43 +198,44 @@ public class HarvestSchedulingManager implements ApplicationContextAware, EntryL
         return crontab;
     }
 
-    private void addHarvest (NodeReference key, Node node) {
-            if (node.getState().equals(NodeState.UP)
-                    && node.isSynchronize() && node.getType().equals(NodeType.MN)) {
+    /*
+     * Create the specific Trigger and Job that should be executed by Quartz
+     *
+     * @param NodeReference @param Node
+     *
+     */
+    private void addHarvest(NodeReference key, Node node) {
+        if (node.getState().equals(NodeState.UP)
+                && node.isSynchronize() && node.getType().equals(NodeType.MN)) {
 
-                String crontabEntry = this.getCrontabEntry(node);
-                    logger.info("scheduling  key " + key.getValue() + " with schedule " + crontabEntry);
-                // the current mn node is owned by this hazelcast cn node member
-                // so schedule a job based on the settings of the node
-                JobDetail job = newJob(MemberNodeHarvestJob.class).withIdentity("job-" + key.getValue(), groupName).usingJobData("mnIdentifier", key.getValue()).build();
-                Trigger trigger = newTrigger().withIdentity("trigger-" + key.getValue(), groupName).startNow().withSchedule(cronSchedule(crontabEntry)).build();
-                try {
-                    scheduler.scheduleJob(job, trigger);
-                } catch (SchedulerException ex) {
-                    logger.error("Unable to initialize job key " + key.getValue() + " with schedule " + crontabEntry + "for scheduling: ", ex);
-                }
-
+            String crontabEntry = this.getCrontabEntry(node);
+            logger.info("scheduling  key " + key.getValue() + " with schedule " + crontabEntry);
+            // the current mn node is owned by this hazelcast cn node member
+            // so schedule a job based on the settings of the node
+            JobDetail job = newJob(MemberNodeHarvestJob.class).withIdentity("job-" + key.getValue(), groupName).usingJobData("mnIdentifier", key.getValue()).build();
+            Trigger trigger = newTrigger().withIdentity("trigger-" + key.getValue(), groupName).startNow().withSchedule(cronSchedule(crontabEntry)).build();
+            try {
+                scheduler.scheduleJob(job, trigger);
+            } catch (SchedulerException ex) {
+                logger.error("Unable to initialize job key " + key.getValue() + " with schedule " + crontabEntry + "for scheduling: ", ex);
             }
+
+        }
     }
+
     @Override
     public void entryAdded(EntryEvent<NodeReference, Node> event) {
         logger.info("Node Entry added key=" + event.getKey().getValue());
-        try {
-            Thread.sleep(2000L);
-        } catch (InterruptedException ex) {
-            Logger.getLogger(HarvestSchedulingManager.class.getName()).log(Level.SEVERE, null, ex);
-        }
-
-        Partition partition = partitionService.getPartition(event.getKey());
-        Member ownerMember = partition.getOwner();
-
-        if (localMember.equals(ownerMember)) {
-            try {
-                this.manageHarvest();
-            } catch (SchedulerException ex) {
-                throw new IllegalStateException("Unable to initialize jobs for scheduling: " + ex.getMessage());
-            }
-        }
+        /*
+         * try { Thread.sleep(2000L); } catch (InterruptedException ex) {
+         * Logger.getLogger(HarvestSchedulingManager.class.getName()).log(Level.SEVERE, null, ex); }
+         *
+         * Partition partition = partitionService.getPartition(event.getKey()); Member ownerMember =
+         * partition.getOwner();
+         *
+         * if (localMember.equals(ownerMember)) { try { this.manageHarvest(); } catch (SchedulerException ex) { throw
+         * new IllegalStateException("Unable to initialize jobs for scheduling: " + ex.getMessage()); } }
+         */
     }
 
     @Override
@@ -243,14 +256,11 @@ public class HarvestSchedulingManager implements ApplicationContextAware, EntryL
         Member ownerMember = partition.getOwner();
 
         if (localMember.equals(ownerMember)) {
-            logger.warn("Should not be here");
-            // try {
-                // need a mechanism to turn off the job, update the crontab entry if node is still active
-                // and schedule it again
-            // } catch (SchedulerException ex) {
-            //    throw new IllegalStateException("Unable to initialize jobs for scheduling: " + ex.getMessage());
-            // }
-
+            try {
+                this.manageHarvest();
+            } catch (SchedulerException ex) {
+                throw new IllegalStateException("Unable to initialize jobs for scheduling: " + ex.getMessage());
+            }
         }
     }
 
