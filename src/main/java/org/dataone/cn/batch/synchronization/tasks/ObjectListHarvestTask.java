@@ -90,7 +90,7 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
         NodeAccess nodeAccess = new NodeAccess();
         // logger is not  be serializable, but no need to make it transient imo
         Logger logger = Logger.getLogger(ObjectListHarvestTask.class.getName());
-        logger.info(d1NodeReference +"- ObjectListHarvestTask Start");
+        logger.info(d1NodeReference.getValue() +"- ObjectListHarvestTask Start");
         HazelcastInstance hazelcast = Hazelcast.getDefaultInstance();
         BlockingQueue<SyncObject> hzSyncObjectQueue = hazelcast.getQueue("hzSyncObjectQueue");
         // Need the LinkedHashMap to preserver insertion order
@@ -108,7 +108,7 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
         // make certain it is still after the lastModified date
         if (startHarvestDate.before(now)) {
             // if not then do not run (we should be running this less than every ten seconds for a membernode
-            logger.debug(d1NodeReference +"- starting retrieval " + d1Node.getBaseURL() + " with startDate of " + DateTimeMarshaller.serializeDateToUTC(startHarvestDate) + " and endDate of " + DateTimeMarshaller.serializeDateToUTC(now));
+            logger.debug(d1NodeReference.getValue() +"- starting retrieval " + d1Node.getBaseURL() + " with startDate of " + DateTimeMarshaller.serializeDateToUTC(startHarvestDate) + " and endDate of " + DateTimeMarshaller.serializeDateToUTC(now));
             do {
                 // read upto a 1000 objects (the default, but it can be overwritten)
                 // from ListObjects and process before retrieving more
@@ -122,7 +122,7 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
                             lastMofidiedDate = objectInfo.getDateSysMetadataModified();
                         }
                         hzSyncObjectQueue.put(syncObject);
-                        logger.debug(d1NodeReference +"- syncTask " + syncObject.getPid() + " placed on Queue");
+                        logger.debug(d1NodeReference.getValue() +"- syncTask " + syncObject.getPid() + " placed on Queue");
                     }
                 } else {
                     readQueue = null;
@@ -134,9 +134,9 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
                 nodeAccess.setDateLastHarvested(d1NodeReference, lastMofidiedDate);
             }
         } else {
-            logger.warn(d1NodeReference +"- Difference between Node's LastHarvested Date and Current Date time was less than 10 seconds");
+            logger.warn(d1NodeReference.getValue() +"- Difference between Node's LastHarvested Date and Current Date time was less than 10 seconds");
         }
-        logger.info(d1NodeReference + "- ObjectListHarvestTask End");
+        logger.info(d1NodeReference.getValue() + "- ObjectListHarvestTask End");
         // return the date of completion of the task
         return new Date();
     }
@@ -177,15 +177,15 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
 
             }
         } catch (NotAuthorized ex) {
-            logger.error(d1NodeReference +"- " + ex.serialize(ex.FMT_XML));
+            logger.error(d1NodeReference.getValue() +"- " + ex.serialize(ex.FMT_XML));
         } catch (InvalidRequest ex) {
-            logger.error(d1NodeReference +"- " + ex.serialize(ex.FMT_XML));
+            logger.error(d1NodeReference.getValue() +"- " + ex.serialize(ex.FMT_XML));
         } catch (NotImplemented ex) {
-            logger.error(d1NodeReference +"- " + ex.serialize(ex.FMT_XML));
+            logger.error(d1NodeReference.getValue() +"- " + ex.serialize(ex.FMT_XML));
         } catch (ServiceFailure ex) {
-            logger.error(d1NodeReference +"- " + ex.serialize(ex.FMT_XML));
+            logger.error(d1NodeReference.getValue() +"- " + ex.serialize(ex.FMT_XML));
         } catch (InvalidToken ex) {
-            logger.error(d1NodeReference +"- " + ex.serialize(ex.FMT_XML));
+            logger.error(d1NodeReference.getValue() +"- " + ex.serialize(ex.FMT_XML));
         }
 
         return writeQueue;
