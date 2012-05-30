@@ -40,10 +40,12 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.logging.Level;
 import org.apache.log4j.Logger;
+import org.dataone.cn.batch.exceptions.ExecutionDisabledException;
 import org.dataone.cn.batch.synchronization.NodeCommFactory;
 import org.dataone.cn.batch.synchronization.type.NodeComm;
 import org.dataone.cn.batch.synchronization.type.NodeCommState;
 import org.dataone.cn.batch.synchronization.type.SyncObject;
+import org.dataone.configuration.Settings;
 import org.dataone.service.exceptions.ServiceFailure;
 import org.dataone.service.types.v1.Node;
 import org.dataone.service.types.v1.NodeReference;
@@ -75,8 +77,15 @@ public class SyncObjectTask implements Callable<String> {
     private static final String taskName = "SYNCOBJECT";
     private static final long threadTimeout = 60000L; //900000L represents fifteen minutes, for testing use 60000L
 
+    /**
+     *
+     * Method to be called in a separately executing thread. 
+     * 
+     * @return String
+     * @throws Exception
+     */
     @Override
-    public String call() {
+    public String call() throws Exception {
 
         logger.info("Starting SyncObjectTask");
         BlockingQueue<SyncObject> hzSyncObjectQueue = hazelcast.getQueue("hzSyncObjectQueue");
@@ -102,16 +111,20 @@ public class SyncObjectTask implements Callable<String> {
         SyncObject task = null;
         try {
             do {
-                try {
+                boolean activateJob = Boolean.parseBoolean(Settings.getConfiguration().getString("Synchronization.active"));
+                if (activateJob) {
                     task = hzSyncObjectQueue.poll(90L, TimeUnit.SECONDS);
-                } catch (InterruptedException ex) {
-                    // XXX this causes a nasty infinite loop of continuous failures.
-                    // if poll causes an exception...
-                    // probably should check for TIMEOUT exceptions
-                    // and any other causes this thread to die
-                    //
+                } else {
+                    // do not listen to Sync Object queue, just finish up with any active tasks
+                    // clearning out the futures map
+                    // to allow for eventual shutdown
+                    if (futuresMap.isEmpty()) {
+                        // ok futures Map is empty, no need to keep spinning here, shut this thread down
+                        logger.info("All Tasks are complete. Shutting down\n");
+                        throw new ExecutionDisabledException();
+                    }
+                    Thread.sleep(10000L); // ten seconds
                     task = null;
-                    logger.warn(ex.getMessage());
                 }
                 // first check all the futures of past tasks to see if any have finished
                 // XXX is this code doing anything useful?
@@ -179,9 +192,7 @@ public class SyncObjectTask implements Callable<String> {
                                     submitSynchronizationFailed(futureTask, hzNodes.get(nodeReference).getBaseURL());
                                 }
                             }
-                        } catch (Exception ex) {
-                            ex.printStackTrace();
-                        }
+                        } 
                     }
                     if (!removalList.isEmpty()) {
                         for (Future key : removalList) {

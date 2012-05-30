@@ -60,32 +60,11 @@ public class NodeCommD1ClientFactory implements NodeCommFactory {
             hzclient = HazelcastClientInstance.getHazelcastClient();
             CertificateManager.getInstance().setCertificateLocation(clientCertificateLocation);
         }
-/*        MNode mNode = new MNode(mnUrl);
 
-        LocalHostNode metacatNode = new LocalHostNode(Settings.getConfiguration().getString("Synchronization.cn_base_url")); */
         D1Client d1client = new D1Client();
         CNode cNode = d1client.getCN();
         MNode mNode = d1client.getMN(mnUrl);
         NodeComm nodeComm = new NodeComm(mNode, cNode, cNode, hzclient);
         return nodeComm;
     }
-
-    // CNode adds version to the url, but, we can not allow that to happen
-    // because the cn metacat interface does not have versions
-    // it is always of the latest version of implementation
-/*    private class LocalHostNode extends CNode implements CNCore, CNRead {
-
-        private String nodeBaseServiceUrl;
-
-        public LocalHostNode(String nodeBaseServiceUrl) {
-            super(nodeBaseServiceUrl);
-            this.nodeBaseServiceUrl = nodeBaseServiceUrl;
-        }
-
-        @Override
-        public String getNodeBaseServiceUrl() {
-            D1Url url = new D1Url(this.nodeBaseServiceUrl);
-            return url.getUrl();
-        }
-    } */
 }

@@ -45,10 +45,7 @@ import com.hazelcast.core.HazelcastInstance;
 import java.text.ParseException;
 import java.util.Set;
 import org.dataone.cn.hazelcast.HazelcastLdapStore;
-import org.quartz.JobKey;
-import org.quartz.Scheduler;
-import org.quartz.SchedulerException;
-import org.quartz.Trigger;
+import org.quartz.*;
 import org.quartz.impl.matchers.GroupMatcher;
 import org.springframework.beans.BeansException;
 import org.springframework.context.ApplicationContext;
@@ -72,6 +69,7 @@ import static org.quartz.JobBuilder.*;
 public class HarvestSchedulingManager implements ApplicationContextAware, EntryListener<NodeReference, Node>, MigrationListener {
 
     public static Log logger = LogFactory.getLog(HarvestSchedulingManager.class);
+    // Quartz GroupName for Jobs and Triggers, should be unique for a set of jobs that are related
     private static String groupName = "MemberNodeHarvesting";
     private HazelcastInstance hazelcast;
     private HazelcastLdapStore hazelcastLdapStore;
@@ -81,7 +79,16 @@ public class HarvestSchedulingManager implements ApplicationContextAware, EntryL
     Member localMember;
 
     /*
-     * initialize the scheduler at bean creation, also add in migration and entry listeners populate the hzNodes map
+    /* 
+     * Called by Spring to bootstrap Synchronization
+     * 
+     * it will initialize Quartz
+     * it will schedule membernodes for harvesting
+     * 
+     * it also adds a listener for changes in the hazelcast Nodes map and hz partitioner
+     * Change in hzNodes or migration of partitions may entail rebalancing of quartz jobs
+
+     * it populates the hzNodes map
      *
      *
      */
@@ -111,13 +118,15 @@ public class HarvestSchedulingManager implements ApplicationContextAware, EntryL
     }
 
     /**
-     * will perform the recalculation of the scheduler. if scheduler is running, it will be disabled All jobs will be
-     * deleted for this node All nodes that are considered 'local' by hazelcast will be scheduled with synchronization
-     * jobs
+     * will perform the recalculation of the scheduler. 
+     * if scheduler is running, it will be disabled All jobs will be
+     * deleted for this node All nodes that are considered 'local' by hazelcast 
+     * will be scheduled with synchronization jobs
      *
-     *
+     * Seems that the listeners could call this in parallel, and it should
+     * be an atomic operation, so it is synchronized
      */
-    public void manageHarvest() throws SchedulerException {
+    public synchronized void manageHarvest() throws SchedulerException {
 
         // halt all operations
         if (scheduler.isStarted()) {
@@ -200,8 +209,10 @@ public class HarvestSchedulingManager implements ApplicationContextAware, EntryL
 
     /*
      * Create the specific Trigger and Job that should be executed by Quartz
-     *
-     * @param NodeReference @param Node
+     * only if the MN is UP and available for synchronization
+     * 
+     * @param NodeReference 
+     * @param Node
      *
      */
     private void addHarvest(NodeReference key, Node node) {
@@ -209,13 +220,20 @@ public class HarvestSchedulingManager implements ApplicationContextAware, EntryL
                 && node.isSynchronize() && node.getType().equals(NodeType.MN)) {
 
             String crontabEntry = this.getCrontabEntry(node);
-            logger.info("scheduling  key " + key.getValue() + " with schedule " + crontabEntry);
+
             // the current mn node is owned by this hazelcast cn node member
             // so schedule a job based on the settings of the node
-            JobDetail job = newJob(MemberNodeHarvestJob.class).withIdentity("job-" + key.getValue(), groupName).usingJobData("mnIdentifier", key.getValue()).build();
-            Trigger trigger = newTrigger().withIdentity("trigger-" + key.getValue(), groupName).startNow().withSchedule(cronSchedule(crontabEntry)).build();
+            JobKey jobKey = new JobKey("job-" + key.getValue(), groupName);
             try {
-                scheduler.scheduleJob(job, trigger);
+                if (!scheduler.checkExists(jobKey)) {
+                    JobDetail job = newJob(MemberNodeHarvestJob.class).withIdentity(jobKey).usingJobData("mnIdentifier", key.getValue()).build();
+                    TriggerKey triggerKey = new TriggerKey("trigger-" + key.getValue(), groupName);
+                    Trigger trigger = newTrigger().withIdentity(triggerKey).startNow().withSchedule(cronSchedule(crontabEntry)).build();
+                    logger.info("scheduling  key " + key.getValue() + " with schedule " + crontabEntry);
+                    scheduler.scheduleJob(job, trigger);
+                } else {
+                    logger.error("job-" + key.getValue() + " exists!");
+                }
             } catch (SchedulerException ex) {
                 logger.error("Unable to initialize job key " + key.getValue() + " with schedule " + crontabEntry + "for scheduling: ", ex);
             }
@@ -223,6 +241,15 @@ public class HarvestSchedulingManager implements ApplicationContextAware, EntryL
         }
     }
 
+    /* 
+     * monitor node additions
+     * 
+     * if a node is added to nodelist, this will be triggered
+     * does nothing now
+     * 
+     * @param EntryEvent<NodeReference, Node>
+     * 
+     */
     @Override
     public void entryAdded(EntryEvent<NodeReference, Node> event) {
         logger.info("Node Entry added key=" + event.getKey().getValue());
@@ -238,28 +265,43 @@ public class HarvestSchedulingManager implements ApplicationContextAware, EntryL
          */
     }
 
+    /*
+     * monitor node removals
+     * 
+     * if a node is removed from nodelist, this will be triggered
+     * does nothing now
+     * 
+     * @param EntryEvent<NodeReference, Node>
+     * 
+     */
     @Override
     public void entryRemoved(EntryEvent<NodeReference, Node> event) {
         logger.error("Entry removed key=" + event.getKey().getValue());
     }
-
+    /*
+     * monitor node changes/updates to hazelcast 
+     * 
+     * should only be noted if updateNodeCapabilities is called on the CN, or if
+     * the nodeApproval tool is run by administrator
+     * 
+     * may result in recalculation of Quartz job scheduling
+     * if any nodes are determined to be locally owned
+     * 
+     * @param EntryEvent<NodeReference, Node>
+     */
     @Override
     public void entryUpdated(EntryEvent<NodeReference, Node> event) {
         logger.info("Node Entry updated key=" + event.getKey().getValue());
+        synchronized(this) {
+            Partition partition = partitionService.getPartition(event.getKey());
+            Member ownerMember = partition.getOwner();
 
-        try {
-            Thread.sleep(2000L);
-        } catch (InterruptedException ex) {
-            Logger.getLogger(HarvestSchedulingManager.class.getName()).log(Level.SEVERE, null, ex);
-        }
-        Partition partition = partitionService.getPartition(event.getKey());
-        Member ownerMember = partition.getOwner();
-
-        if (localMember.equals(ownerMember)) {
-            try {
-                this.manageHarvest();
-            } catch (SchedulerException ex) {
-                throw new IllegalStateException("Unable to initialize jobs for scheduling: " + ex.getMessage());
+            if (localMember.equals(ownerMember)) {
+                try {
+                    this.manageHarvest();
+                } catch (SchedulerException ex) {
+                    throw new IllegalStateException("Unable to initialize jobs for scheduling: " + ex.getMessage());
+                }
             }
         }
     }

@@ -41,6 +41,7 @@ import org.quartz.JobExecutionContext;
 import org.quartz.JobExecutionException;
 import java.text.SimpleDateFormat;
 import java.text.ParseException;
+import org.dataone.cn.batch.exceptions.ExecutionDisabledException;
 
 /**
  * Quartz Job that starts off the hazelcast distributed execution of harvesting for a nodeList from a Membernode It
@@ -58,8 +59,7 @@ public class MemberNodeHarvestJob implements Job {
         Log logger = LogFactory.getLog(MemberNodeHarvestJob.class);
         JobExecutionException jex = null;
         NodeReference nodeReference = new NodeReference();
-        SimpleDateFormat format =
-                new SimpleDateFormat("EEE MMM dd yyyy HH:mm:ss zzz");
+        SimpleDateFormat format = new SimpleDateFormat("EEE MMM dd yyyy HH:mm:ss zzz");
         boolean nodeLocked = false;
         IMap<NodeReference, Node> hzNodes = null;
 
@@ -86,15 +86,32 @@ public class MemberNodeHarvestJob implements Job {
                     Date lastProcessingCompletedDate = null;
                     try {
                         lastProcessingCompletedDate = (Date) future.get();
+                    } catch (ExecutionDisabledException ex) {
+                        logger.error("ExecutionDisabledException: " + ex.getMessage() + "\n\t\tExecutionDisabledException: Will fire Job again\n");
+                        jex = new JobExecutionException();
+                        jex.setRefireImmediately(true);
+                        Thread.sleep(5000L);
                     } catch (InterruptedException ex) {
                         logger.error("InterruptedException: " + ex.getMessage());
                     } catch (ExecutionException ex) {
-                        logger.error("ExecutionException: " + ex.getMessage());
+                        if (ex.getCause() instanceof ExecutionDisabledException) {
+                            logger.error("ExecutionDisabledException: " + ex.getMessage() + "\n\tExecutionDisabledException: Will fire Job again\n");
+                            jex = new JobExecutionException();
+                            jex.setStackTrace(ex.getStackTrace());
+                            jex.setRefireImmediately(true);
+                            Thread.sleep(5000L);
+                        } else {
+                            logger.error("ExecutionException: " + ex.getMessage());
+                        }
                     }
 
                     // if the lastProcessingCompletedDate has changed then it should be persisted, but where?
                     // Does not need to be stored, maybe just printed?
-                    logger.info(mnIdentifier + "- ObjectListHarvestTask End at " + format.format(lastProcessingCompletedDate));
+                    if (lastProcessingCompletedDate == null) {
+                        logger.info(mnIdentifier + "- ObjectListHarvestTask did not finish.");
+                    } else {
+                        logger.info(mnIdentifier + "- ObjectListHarvestTask End at " + format.format(lastProcessingCompletedDate));
+                    }
                 }
             }
         } catch (Exception ex) {
