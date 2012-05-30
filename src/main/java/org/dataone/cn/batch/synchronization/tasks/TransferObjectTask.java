@@ -1,25 +1,20 @@
 /**
- * This work was created by participants in the DataONE project, and is
- * jointly copyrighted by participating institutions in DataONE. For 
- * more information on DataONE, see our web site at http://dataone.org.
+ * This work was created by participants in the DataONE project, and is jointly copyrighted by participating
+ * institutions in DataONE. For more information on DataONE, see our web site at http://dataone.org.
  *
- *   Copyright ${year}
+ * Copyright ${year}
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- * 
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations under the License.
+ *
  * $Id$
  */
-
 package org.dataone.cn.batch.synchronization.tasks;
 
 import com.hazelcast.core.Hazelcast;
@@ -105,11 +100,12 @@ public class TransferObjectTask implements Callable<Void> {
      * lastly write the data (systemMetadata and any storage types of information) to Storage. The lock will then be
      * released
      *
-     * @author waltz
+     * @return null
+     * @throws Exception
      *
      */
     @Override
-    public Void call() {
+    public Void call() throws Exception {
         Lock lock = null;
         String lockPid = task.getPid();
         boolean isLocked = false;
@@ -122,7 +118,7 @@ public class TransferObjectTask implements Callable<Void> {
             isLocked = lock.tryLock(timeToWait, TimeUnit.SECONDS);
             if (isLocked) {
                 logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Processing task");
-                SystemMetadata systemMetadata = process(task.getNodeId(), task.getPid());
+                SystemMetadata systemMetadata = retrieveSystemMetadata();
                 if (systemMetadata != null) {
                     logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Writing task");
                     try {
@@ -204,16 +200,17 @@ public class TransferObjectTask implements Callable<Void> {
      * Authoritative Membernode (will be ignored if an update op) Add member node as a replica Add CN as a replica if
      * the object is not a Sci Data object
      *
-     * @param String The Node Id of the task @param String The pid of the task @return SystemMetadata @throws
-     * ServiceFailure @throws NotFound @author waltz
+     * @return SystemMetadata 
+     * 
      */
 
-    private SystemMetadata process(String memberNodeId, String pid) {
+    private SystemMetadata retrieveSystemMetadata() {
+        String memberNodeId = task.getNodeId();
         SystemMetadata systemMetadata = null;
         try {
             //            sciMetaFile = this.writeScienceMetadataToFile(objectInfo);
             Identifier identifier = new Identifier();
-            identifier.setValue(pid);
+            identifier.setValue(task.getPid());
             int tryAgain = 0;
             boolean needSystemMetadata = true;
 
@@ -238,93 +235,115 @@ public class TransferObjectTask implements Callable<Void> {
             } while (needSystemMetadata);
 
             logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Retrieved SystemMetadata Identifier:" + systemMetadata.getIdentifier().getValue() + " from node " + memberNodeId + " for ObjectInfo Identifier " + identifier.getValue());
-            NodeReference nodeReference = new NodeReference();
 
-            nodeReference.setValue(memberNodeId);
-            logger.debug("Task-" + task.getNodeId() + "-" + task.getPid() + " Retrieved nodeReference set");
-            List<Replica> replicaList = systemMetadata.getReplicaList();
-            boolean addOriginalReplica = true;
-            if (replicaList == null) {
-                replicaList = new ArrayList<Replica>();
-                systemMetadata.setReplicaList(replicaList);
-            }
-            if (!replicaList.isEmpty()) {
-                for (Replica replica : replicaList) {
-                    if (replica.getReplicaMemberNode().getValue().contentEquals(memberNodeId)) {
-                        replica.setReplicationStatus(ReplicationStatus.COMPLETED);
-                        replica.setReplicaVerified(new Date());
-                        addOriginalReplica = false;
-                    }
-                }
-
-            }
-            if (addOriginalReplica) {
-                Replica originalReplica = new Replica();
-                NodeReference originalReplicaReference = new NodeReference();
-                originalReplicaReference.setValue(memberNodeId);
-                originalReplica.setReplicaMemberNode(originalReplicaReference);
-                originalReplica.setReplicationStatus(ReplicationStatus.COMPLETED);
-                originalReplica.setReplicaVerified(new Date());
-                logger.debug("Task-" + task.getNodeId() + "-" + task.getPid() + " Retrieved originalReplica");
-                systemMetadata.addReplica(originalReplica);
-            }
-            logger.debug("Task-" + task.getNodeId() + "-" + task.getPid() + " Finished adding replica for original MN");
-            // data objects are not fully synchronized, only their metadata is
-            // synchronized,
-            // only set valid science metadata formats as having been replicated
-            logger.debug("Task-" + task.getNodeId() + "-" + task.getPid() + " Get Object Format");
-            ObjectFormat objectFormat = nodeCommunications.getCnCore().getFormat(systemMetadata.getFormatId());
-            if ((objectFormat != null) && !(objectFormat.getFormatType().equalsIgnoreCase("DATA"))) {
-                boolean hasNoCNReplica = true;
-                for (Replica replica : replicaList) {
-                    if (replica.getReplicaMemberNode().getValue().contentEquals(cnIdentifier)) {
-                        hasNoCNReplica = false;
-                    }
-                }
-                if (hasNoCNReplica) {
-                    NodeReference cnReference = new NodeReference();
-                    cnReference.setValue(cnIdentifier);
-                    Replica cnReplica = new Replica();
-                    cnReplica.setReplicaMemberNode(cnReference);
-                    cnReplica.setReplicationStatus(ReplicationStatus.COMPLETED);
-                    cnReplica.setReplicaVerified(new Date());
-                    systemMetadata.addReplica(cnReplica);
-                    logger.debug("Task-" + task.getNodeId() + "-" + task.getPid() + " Added CN as replica because formatType " + objectFormat.getFormatType() + " is sciMetadata");
-                }
-            }
-            NodeReference originMemberNode = new NodeReference();
-            originMemberNode.setValue(memberNodeId);
-            systemMetadata.setOriginMemberNode(originMemberNode);
-
-            NodeReference authoritativeMemberNode = new NodeReference();
-            authoritativeMemberNode.setValue(memberNodeId);
-            systemMetadata.setAuthoritativeMemberNode(authoritativeMemberNode);
         } catch (NotAuthorized ex) {
             logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + ex.serialize(ex.FMT_XML));
-            submitSynchronizationFailed(pid, ex);
+            submitSynchronizationFailed(task.getPid(), ex);
             return null;
         } catch (InvalidToken ex) {
             logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + ex.serialize(ex.FMT_XML));
-            submitSynchronizationFailed(pid, ex);
+            submitSynchronizationFailed(task.getPid(), ex);
             return null;
         } catch (ServiceFailure ex) {
             logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + ex.serialize(ex.FMT_XML));
-            submitSynchronizationFailed(pid, ex);
+            submitSynchronizationFailed(task.getPid(), ex);
             return null;
         } catch (NotFound ex) {
             logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + ex.serialize(ex.FMT_XML));
-            submitSynchronizationFailed(pid, ex);
+            submitSynchronizationFailed(task.getPid(), ex);
             return null;
         } catch (NotImplemented ex) {
             logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + ex.serialize(ex.FMT_XML));
-            submitSynchronizationFailed(pid, ex);
+            submitSynchronizationFailed(task.getPid(), ex);
             return null;
         } catch (Exception ex) {
             ex.printStackTrace();
 
             logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + " this didn't work", ex);
             ServiceFailure serviceFailure = new ServiceFailure("-1", ex.getMessage());
-            submitSynchronizationFailed(pid, serviceFailure);
+            submitSynchronizationFailed(task.getPid(), serviceFailure);
+            return null;
+        }
+        return systemMetadata;
+    }
+
+    /*
+     * Process the Task before creating it
+     *
+     * Set the membernode being synchronized as the Origin &
+     * Authoritative Membernode (will be ignored if an update op) 
+     * 
+     * Replaces replica list if provided by MN
+     * 
+     * Add member node as a replica Add CN as a replica if
+     * the object is not a Sci Data object
+     *
+     * @param SystemMetadata
+     * @return SystemMetadata 
+     * 
+     */
+    private SystemMetadata processSystemMetadata(SystemMetadata systemMetadata) {
+
+        try {
+
+            logger.debug("Task-" + task.getNodeId() + "-" + task.getPid() + " Processing SystemMetadata");
+            boolean addOriginalReplica = true;
+            /*
+             * DataONE Bug #2603 Synchronization should delete existing replicas on create
+             */
+            List<Replica> replicaList = new ArrayList<Replica>();
+            systemMetadata.setReplicaList(replicaList);
+
+            Replica originalReplica = new Replica();
+            NodeReference originalReplicaReference = new NodeReference();
+            originalReplicaReference.setValue(task.getNodeId());
+            originalReplica.setReplicaMemberNode(originalReplicaReference);
+            originalReplica.setReplicationStatus(ReplicationStatus.COMPLETED);
+            originalReplica.setReplicaVerified(new Date());
+            systemMetadata.addReplica(originalReplica);
+
+            logger.debug("Task-" + task.getNodeId() + "-" + task.getPid() + " Included replica for original MN");
+            // data objects are not fully synchronized, only their metadata is
+            // synchronized,
+            // only set valid science metadata formats as having been replicated
+            logger.debug("Task-" + task.getNodeId() + "-" + task.getPid() + " Get Object Format");
+            ObjectFormat objectFormat = nodeCommunications.getCnCore().getFormat(systemMetadata.getFormatId());
+            if ((objectFormat != null) && !(objectFormat.getFormatType().equalsIgnoreCase("DATA"))) {
+                NodeReference cnReference = new NodeReference();
+                cnReference.setValue(cnIdentifier);
+                Replica cnReplica = new Replica();
+                cnReplica.setReplicaMemberNode(cnReference);
+                cnReplica.setReplicationStatus(ReplicationStatus.COMPLETED);
+                cnReplica.setReplicaVerified(new Date());
+                systemMetadata.addReplica(cnReplica);
+                logger.debug("Task-" + task.getNodeId() + "-" + task.getPid() + " Added CN as replica because formatType " + objectFormat.getFormatType() + " is sciMetadata");
+            }
+            NodeReference originMemberNode = new NodeReference();
+            originMemberNode.setValue(task.getNodeId());
+            systemMetadata.setOriginMemberNode(originMemberNode);
+
+            NodeReference authoritativeMemberNode = new NodeReference();
+            authoritativeMemberNode.setValue(task.getNodeId());
+            systemMetadata.setAuthoritativeMemberNode(authoritativeMemberNode);
+
+        } catch (ServiceFailure ex) {
+            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + ex.serialize(ex.FMT_XML));
+            submitSynchronizationFailed(task.getPid(), ex);
+            return null;
+        } catch (NotFound ex) {
+            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + ex.serialize(ex.FMT_XML));
+            submitSynchronizationFailed(task.getPid(), ex);
+            return null;
+        } catch (NotImplemented ex) {
+            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + ex.serialize(ex.FMT_XML));
+            submitSynchronizationFailed(task.getPid(), ex);
+            return null;
+        } catch (Exception ex) {
+            ex.printStackTrace();
+
+            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + " this didn't work", ex);
+            ServiceFailure serviceFailure = new ServiceFailure("-1", ex.getMessage());
+            submitSynchronizationFailed(task.getPid(), serviceFailure);
             return null;
         }
         return systemMetadata;
@@ -333,7 +352,8 @@ public class TransferObjectTask implements Callable<Void> {
     /*
      * Determine if the object should be created as a new entry, updated or ignored
      *
-     * @param SystemMetadata systemMetdata from the MN @throws VersionMismatch @author waltz
+     * @param SystemMetadata systemMetdata from the MN 
+     * @throws VersionMismatch
      */
     private void write(SystemMetadata systemMetadata) throws VersionMismatch {
         // is this an update or create?
@@ -366,8 +386,11 @@ public class TransferObjectTask implements Callable<Void> {
             }
             // create, update or ignore
             if (doCreate) {
-                logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Create sysMeta");
-                createObject(systemMetadata);
+                systemMetadata = processSystemMetadata(systemMetadata);
+                if (systemMetadata != null) {
+                    logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Create sysMeta");
+                    createObject(systemMetadata);
+                }
             } else {
                 // determine if this is a valid update
                 SystemMetadata cnSystemMetadata = hzSystemMetaMap.get(systemMetadata.getIdentifier());
@@ -438,9 +461,18 @@ public class TransferObjectTask implements Callable<Void> {
      * Create the object if a resource or sci meta object. Register systemmetadata if a sci data object.
      *
      *
-     * @param SystemMetadata systemMetdata from the MN @throws InvalidRequest @throws ServiceFailure @throws NotFound
-     * @throws InsufficientResources @throws NotImplemented @throws InvalidToken @throws NotAuthorized @throws
-     * InvalidSystemMetadata @throws IdentifierNotUnique @throws UnsupportedType @author waltz
+     * @param SystemMetadata systemMetdata from the MN 
+     * @throws InvalidRequest 
+     * @throws ServiceFailure 
+     * @throws NotFound
+     * @throws InsufficientResources 
+     * @throws NotImplemented 
+     * @throws InvalidToken 
+     * @throws NotAuthorized 
+     * @throws InvalidSystemMetadata 
+     * @throws IdentifierNotUnique 
+     * @throws UnsupportedType
+     * 
      */
     private void createObject(SystemMetadata systemMetadata) throws InvalidRequest, ServiceFailure, NotFound, InsufficientResources, NotImplemented, InvalidToken, NotAuthorized, InvalidSystemMetadata, IdentifierNotUnique, UnsupportedType {
         Identifier d1Identifier = new Identifier();
@@ -491,9 +523,16 @@ public class TransferObjectTask implements Callable<Void> {
      * has changed that synchroniziation can update. Namely, The authoritative member node can update the obsoletedBy
      * field or if an existing replica is found, then the replica information is added to the systemMetadata.
      *
-     * @param SystemMetadata systemMetdata from the MN @throws InvalidRequest @throws ServiceFailure @throws NotFound
-     * @throws NotImplemented @throws InvalidToken @throws NotAuthorized @throws InvalidSystemMetadata @throws
-     * VersionMismatch @author waltz
+     * @param SystemMetadata systemMetdata from the MN 
+     * @throws InvalidRequest 
+     * @throws ServiceFailure 
+     * @throws NotFound
+     * @throws NotImplemented 
+     * @throws InvalidToken 
+     * @throws NotAuthorized
+     * @throws InvalidSystemMetadata
+     * @throwsVersionMismatch
+     * 
      */
     private void updateSystemMetadata(SystemMetadata newSystemMetadata) throws InvalidSystemMetadata, NotFound, NotImplemented, NotAuthorized, ServiceFailure, InvalidRequest, InvalidToken, VersionMismatch {
         // Only update the systemMetadata fields that can be updated by a membernode
@@ -510,8 +549,8 @@ public class TransferObjectTask implements Callable<Void> {
                 nodeCommunications.getCnCore().setObsoletedBy(session, pid, newSystemMetadata.getObsoletedBy(), cnSystemMetadata.getSerialVersion().longValue());
                 auditReplicaSystemMetadata(pid);
                 logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Updated ObsoletedBy");
-            } else if ( ((newSystemMetadata.getArchived()!= null) && newSystemMetadata.getArchived()) 
-                           && ( (cnSystemMetadata.getArchived() == null) || !cnSystemMetadata.getArchived()) ) {
+            } else if (((newSystemMetadata.getArchived() != null) && newSystemMetadata.getArchived())
+                    && ((cnSystemMetadata.getArchived() == null) || !cnSystemMetadata.getArchived())) {
                 logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Update Archived");
 
                 nodeCommunications.getCnCore().archive(session, pid);
@@ -554,8 +593,14 @@ public class TransferObjectTask implements Callable<Void> {
     /*
      * Inform Member Nodes that may have a copy to refresh their version of the systemmetadata
      *
-     * @param Identifier pid @throws InvalidRequest @throws ServiceFailure @throws NotFound @throws NotImplemented
-     * @throws InvalidToken @throws NotAuthorized @author waltz
+     * @param Identifier pid 
+     * @throws InvalidRequest 
+     * @throws ServiceFailure 
+     * @throws NotFound 
+     * @throws NotImplemented
+     * @throws InvalidToken 
+     * @throws NotAuthorized
+     * 
      */
     private void auditReplicaSystemMetadata(Identifier pid) throws InvalidToken, ServiceFailure, NotAuthorized, NotFound, InvalidRequest, NotImplemented {
         IMap<NodeReference, Node> hzNodes = hazelcast.getMap("hzNodes");
@@ -595,7 +640,8 @@ public class TransferObjectTask implements Callable<Void> {
     /*
      * Inform Member Nodes that synchronization task failed
      *
-     * @param String pid @param BaseException message showing reason of failure @author waltz
+     * @param String pid 
+     * @param BaseException message showing reason of failure
      *
      */
 
