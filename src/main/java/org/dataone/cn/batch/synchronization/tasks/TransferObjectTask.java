@@ -376,11 +376,11 @@ public class TransferObjectTask implements Callable<Void> {
                 Session verifySubmitter = new Session();
                 verifySubmitter.setSubject(systemMetadata.getSubmitter());
                 doCreate = reserveIdentifierService.hasReservation(verifySubmitter, systemMetadata.getSubmitter(), systemMetadata.getIdentifier());
-                logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Create sysMeta from reservation");
+                logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Create from reservation");
             } catch (NotFound ex) {
                 doCreate = true;
                 // assume if reserveIdentifierService has thrown NotFound exception SystemMetadata does not exist
-                logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Create sysMeta from Exception");
+                logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Create from Exception");
             } catch (IdentifierNotUnique ex) {
                 logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Pid Exists. Must be an Update");
             }
@@ -388,7 +388,6 @@ public class TransferObjectTask implements Callable<Void> {
             if (doCreate) {
                 systemMetadata = processSystemMetadata(systemMetadata);
                 if (systemMetadata != null) {
-                    logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Create sysMeta");
                     createObject(systemMetadata);
                 }
             } else {
