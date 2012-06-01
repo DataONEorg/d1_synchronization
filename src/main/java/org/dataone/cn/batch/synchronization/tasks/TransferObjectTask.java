@@ -231,6 +231,19 @@ public class TransferObjectTask implements Callable<Void> {
                         // only way to get out of loop if NotAuthorized keeps getting thrown
                         throw ex;
                     }
+                } catch (ServiceFailure ex) {
+                    if (tryAgain < 2) {
+                        ++tryAgain;
+                        logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + ex.serialize(ex.FMT_XML));
+                        try {
+                            Thread.sleep(5000L);
+                        } catch (InterruptedException ex1) {
+                            logger.warn("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + ex);
+                        }
+                    } else {
+                        // only way to get out of loop if NotAuthorized keeps getting thrown
+                        throw ex;
+                    }
                 }
             } while (needSystemMetadata);
 
@@ -492,6 +505,19 @@ public class TransferObjectTask implements Callable<Void> {
                     sciMetaStream = nodeCommunications.getMnRead().get(session, systemMetadata.getIdentifier());
                     needSciMetadata = false;
                 } catch (NotAuthorized ex) {
+                    if (tryAgain < 2) {
+                        ++tryAgain;
+                        logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + ex.serialize(ex.FMT_XML));
+                        try {
+                            Thread.sleep(5000L);
+                        } catch (InterruptedException ex1) {
+                            logger.warn("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + ex);
+                        }
+                    } else {
+                        // only way to get out of loop if NotAuthorized keeps getting thrown
+                        throw ex;
+                    }
+                } catch (ServiceFailure ex) {
                     if (tryAgain < 2) {
                         ++tryAgain;
                         logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + ex.serialize(ex.FMT_XML));
