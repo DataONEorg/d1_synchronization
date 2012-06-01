@@ -76,15 +76,15 @@ public class SyncFailedTask implements Callable<String> {
         try {
             nodeCommunications.getMnRead().synchronizationFailed(session, syncFailed);
         } catch (InvalidToken ex) {
-            logger.error(ex.serialize(ex.FMT_XML));
+            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + " " + ex.serialize(ex.FMT_XML));
         } catch (NotAuthorized ex) {
-            logger.error(ex.serialize(ex.FMT_XML));
+            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + " " + ex.serialize(ex.FMT_XML));
         } catch (NotImplemented ex) {
-            logger.error(ex.serialize(ex.FMT_XML));
+            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + " " + ex.serialize(ex.FMT_XML));
         } catch (ServiceFailure ex) {
-            logger.error(ex.serialize(ex.FMT_XML));
+            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + " " + ex.serialize(ex.FMT_XML));
         } catch (Exception ex) {
-            logger.error(ex.getMessage());
+            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + " " + ex.getMessage());
         }
     }
 }
