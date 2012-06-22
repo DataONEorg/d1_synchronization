@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="UTF-8" ?>
-<!-- Apache Commons Configuration -->
-<configuration>
-	<properties fileName="synchronization.properties"/>
-        <properties fileName="d1client.properties"/>
-        <properties fileName="ldapService.properties"/>
-        <properties fileName="registryLdap.properties"/>
-        <properties fileName="auth.properties"/>
-</configuration>
