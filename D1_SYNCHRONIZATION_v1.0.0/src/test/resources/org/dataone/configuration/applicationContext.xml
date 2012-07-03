@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans default-init-method="init" xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:util="http://www.springframework.org/schema/util"
+       xmlns:hz="http://www.hazelcast.com/schema/config"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+       http://www.springframework.org/schema/beans/spring-beans-3.0.xsd
+       http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util-3.0.xsd
+       http://www.hazelcast.com/schema/config http://www.hazelcast.com/schema/config/hazelcast-spring.xsd
+       http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-3.0.xsd" >
+
+
+<!--
+    Document   : applicationContext.xml
+    Created on : July 23, 2010, 12:58 AM
+    Author     : rwaltz
+    Description:
+        Purpose of the document follows.
+-->
+    <bean id="log4jInitialization"
+     class="org.springframework.beans.factory.config.MethodInvokingFactoryBean">
+     <property name="targetClass"
+      value="org.springframework.util.Log4jConfigurer" />
+       <property name="targetMethod" value="initLogging" />
+        <property name="arguments">
+        <list>
+           <value>classpath:org/dataone/cn/batch/harvest/config/log4j.properties</value>
+         </list>
+       </property>
+      </bean>
+    <bean id="mylog"
+    class="org.springframework.beans.factory.config.CommonsLogFactoryBean">
+        <property name="logName" value="log"/>
+    </bean>
+
+    <bean id="contextSourceConfiguration" class="org.dataone.cn.service.ldap.ContextSourceConfiguration" />
+
+    <bean id="contextSource" class="org.springframework.ldap.core.support.LdapContextSource"
+        factory-bean="contextSourceConfiguration" factory-method="getLdapContextSource" />
+    <bean id="ldapTemplate" class="org.springframework.ldap.core.LdapTemplate">
+        <constructor-arg ref="contextSource" />
+       <!-- <qualifier value="ldapTemplate"/> -->
+    </bean>
+    <context:annotation-config/>
+    <context:component-scan base-package="org.dataone.cn.service.ldap.impl.v1"  />
+    <context:component-scan base-package="org.dataone.cn.hazelcast.ldap"  />
+    <hz:hazelcast id="hazelcastInstance">
+        <hz:config>
+            <hz:group name="dev-unit-testing" password="dataone"/>
+            <hz:properties>
+                <hz:property name="hazelcast.merge.first.run.delay.seconds">120</hz:property>
+                <hz:property name="hazelcast.merge.next.run.delay.seconds">60</hz:property>
+            </hz:properties>
+            <hz:network port="5710" port-auto-increment="false">
+                <hz:join>
+                    <hz:multicast enabled="false"
+                                  multicast-group="224.2.2.3"
+                                  multicast-port="54327"/>
+                    <hz:tcp-ip enabled="true">
+                        <hz:members>127.0.0.1</hz:members>
+                    </hz:tcp-ip>
+                </hz:join>
+                <hz:symmetric-encryption enabled="true" algorithm="PBEWithMD5AndDES" salt="430asdfjweofgasdADF68978230jfh2012378asgfadfhweifASDFQWFDGAF" password="^fksos$@fA9829" iteration-count="25"/>
+            </hz:network>
+            <hz:queue name="hzSyncObjectQueue" max-size-per-jvm="0" />
+            <hz:map name="hzNodes"
+                    backup-count="1"
+                    max-size="0"
+                    eviction-percentage="30"
+                    read-backup-data="true"
+                    cache-value="true"
+                    merge-policy="hz.LATEST_UPDATE">
+                <hz:map-store enabled="true" implementation="hazelcastLdapStore" write-delay-seconds="0" />
+            </hz:map>
+        </hz:config>
+    </hz:hazelcast>
+    <hz:set id="lockObjectSet" instance-ref="hazelcastInstance" name="lockObjectSet"/>
+
+
+
+ <!--
+
+    <bean id="schedulerFactory" class="org.quartz.impl.StdSchedulerFactory" init-method="initialize"/>
+
+    <bean id="scheduler" factory-bean="schedulerFactory" factory-method="getScheduler"/>
+
+    <bean id="harvester" class="org.dataone.cn.batch.synchronization.HarvestSchedulingManager" init-method="init" >
+        <property name="scheduler" ref="scheduler" />
+        <property name="hazelcast" ref="hazelcastInstance" />
+        <property name="hazelcastLdapStore" ref="hazelcastLdapStore" />
+    </bean>
+
+
+   <bean name="rejectionExecutionHander" class="java.util.concurrent.ThreadPoolExecutor$AbortPolicy" />
+
+    <bean id="threadPoolTaskExecutor" class="org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor">
+        <property name="corePoolSize" value="5" />
+        <property name="maxPoolSize" value="10" />
+        <property name="queueCapacity" value="25" />
+        <property name="rejectedExecutionHandler" ref="rejectionExecutionHander" />
+        <property name="daemon" value="true" />
+        <property name="waitForTasksToCompleteOnShutdown" value="true" />
+    </bean>
+    <bean id="syncObjectTask" class="org.dataone.cn.batch.synchronization.tasks.SyncObjectTask">
+        <property name="threadPoolTaskExecutor" ref="threadPoolTaskExecutor" />
+        <property name="hazelcast" ref="hazelcastInstance" />
+        <property name="maxNumberOfClientsPerMemberNode" value="4" />
+    </bean>
+    <bean id="syncObjectExecutor" class="org.dataone.cn.batch.synchronization.SyncObjectExecutor" init-method="init" >
+        <property name="syncObjectTask" ref="syncObjectTask" />
+    </bean> -->
+</beans>

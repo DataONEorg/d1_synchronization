@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!--
+    Document   : LogReaderTestCase-context.xml
+    Created on : June 4, 2010, 1:58 AM
+    Author     : rwaltz
+    Description:
+        Purpose of the document follows.
+-->
+
+<beans  default-init-method="init"  xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:util="http://www.springframework.org/schema/util"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+       http://www.springframework.org/schema/beans/spring-beans-3.0.xsd
+       http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util-3.0.xsd">
+
+    <bean id="log4jInitialization"
+     class="org.springframework.beans.factory.config.MethodInvokingFactoryBean">
+        <property name="targetClass"
+      value="org.springframework.util.Log4jConfigurer" />
+        <property name="targetMethod" value="initLogging" />
+        <property name="arguments">
+            <list>
+                <value>classpath:org/dataone/cn/batch/harvest/config/log4j.properties</value>
+            </list>
+        </property>
+    </bean>
+
+    <bean id="testObjectListLocationResource" class="org.springframework.core.io.ClassPathResource">
+        <constructor-arg value="/org/dataone/cn/batch/harvest/samples/objectList1.xml"/>
+    </bean>
+    <bean id="testObjectListLocationFile"
+      factory-bean="testObjectListLocationResource"
+      factory-method="getFile"/>
+
+    <bean id="testEmtpyObjectListLocationResource" class="org.springframework.core.io.ClassPathResource">
+        <constructor-arg value="/org/dataone/cn/batch/harvest/samples/objectList2.xml"/>
+    </bean>
+    <bean id="testEmptyObjectListLocationFile"
+      factory-bean="testEmtpyObjectListLocationResource"
+      factory-method="getFile"/>
+
+    <bean id="testLyingCheatingObjectListLocationResource" class="org.springframework.core.io.ClassPathResource">
+        <constructor-arg value="/org/dataone/cn/batch/harvest/samples/objectList3.xml"/>
+    </bean>
+    <bean id="testLyingCheatingObjectListLocationFile"
+      factory-bean="testLyingCheatingObjectListLocationResource"
+      factory-method="getFile"/>
+
+
+    <bean id="testSamplesDirectoryResource" class="org.springframework.core.io.ClassPathResource">
+        <constructor-arg value="/org/dataone/cn/batch/harvest/samples"/>
+    </bean>
+
+    <bean id="testSamplesDirectoryFile"
+      factory-bean="testSamplesDirectoryResource"
+      factory-method="getFile"/>
+
+    <bean id="testSamplesDirectory"
+        factory-bean="testSamplesDirectoryFile"
+        factory-method="getAbsolutePath" />
+
+    <bean id="testTmpCacheDirectoryResource" class="org.springframework.core.io.ClassPathResource">
+        <constructor-arg value="/org/dataone/cn/batch/harvest/tmp"/>
+    </bean>
+    <bean id="testTmpCacheDirectoryFile"
+      factory-bean="testTmpCacheDirectoryResource"
+      factory-method="getFile"/>
+
+    <bean id="testTmpCacheDirectory"
+        factory-bean="testTmpCacheDirectoryFile"
+        factory-method="getAbsolutePath" />
+        
+    <bean id="objectPersistence" class="org.dataone.cn.batch.proto.harvest.persist.NodeMapPersistence" init-method="init">
+        <property name="persistentDataFileName" value="tmpNodeMapPersistentStore" />
+        <property name="persistentDataFileNamePath" ref="testSamplesDirectory" />
+    </bean>
+
+    
+    <bean id="mockMNRead" class="org.dataone.cn.batch.harvest.mock.MockMNRead" >
+         <property name="objectListFile" ref="testObjectListLocationFile" />
+    </bean>
+    <bean id="mockCNCore" class="org.dataone.cn.batch.harvest.mock.MockCNCore" />
+
+    <bean id="objectListQueueBuilder" class="org.dataone.cn.batch.proto.harvest.ObjectListQueueBuilder">
+        <property name="mnRead" ref="mockMNRead" />
+        <property name="mnIdentifier" value="r2d2" />
+        <property name="nodeMapPersistance" ref="objectPersistence" />
+    </bean>
+    <bean id="objectListQueueProcessor" class="org.dataone.cn.batch.proto.harvest.ObjectListQueueProcessor">
+        <property name="mnRead" ref="mockMNRead" />
+        <property name="mnIdentifier" value="r2d2" />
+        <property name="cnIdentifier" value="c3p0" />
+    </bean>
+    <bean id="objectListQueueWriter" class="org.dataone.cn.batch.proto.harvest.ObjectListQueueWriter">
+        <property name="mnRead" ref="mockMNRead" />
+        <property name="cnCore" ref="mockCNCore" />
+        <property name="mnIdentifier" value="r2d2" />
+        <property name="nodeMapPersistance" ref="objectPersistence" />
+    </bean>
+</beans>
