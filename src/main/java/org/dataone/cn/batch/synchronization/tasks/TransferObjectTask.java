@@ -200,8 +200,8 @@ public class TransferObjectTask implements Callable<Void> {
      * Authoritative Membernode (will be ignored if an update op) Add member node as a replica Add CN as a replica if
      * the object is not a Sci Data object
      *
-     * @return SystemMetadata 
-     * 
+     * @return SystemMetadata
+     *
      */
 
     private SystemMetadata retrieveSystemMetadata() {
@@ -283,17 +283,14 @@ public class TransferObjectTask implements Callable<Void> {
     /*
      * Process the Task before creating it
      *
-     * Set the membernode being synchronized as the Origin &
-     * Authoritative Membernode (will be ignored if an update op) 
-     * 
-     * Replaces replica list if provided by MN
-     * 
-     * Add member node as a replica Add CN as a replica if
-     * the object is not a Sci Data object
+     * Set the membernode being synchronized as the Origin & Authoritative Membernode (will be ignored if an update op)
      *
-     * @param SystemMetadata
-     * @return SystemMetadata 
-     * 
+     * Replaces replica list if provided by MN
+     *
+     * Add member node as a replica Add CN as a replica if the object is not a Sci Data object
+     *
+     * @param SystemMetadata @return SystemMetadata
+     *
      */
     private SystemMetadata processSystemMetadata(SystemMetadata systemMetadata) {
 
@@ -365,8 +362,7 @@ public class TransferObjectTask implements Callable<Void> {
     /*
      * Determine if the object should be created as a new entry, updated or ignored
      *
-     * @param SystemMetadata systemMetdata from the MN 
-     * @throws VersionMismatch
+     * @param SystemMetadata systemMetdata from the MN @throws VersionMismatch
      */
     private void write(SystemMetadata systemMetadata) throws VersionMismatch {
         // is this an update or create?
@@ -473,18 +469,10 @@ public class TransferObjectTask implements Callable<Void> {
      * Create the object if a resource or sci meta object. Register systemmetadata if a sci data object.
      *
      *
-     * @param SystemMetadata systemMetdata from the MN 
-     * @throws InvalidRequest 
-     * @throws ServiceFailure 
-     * @throws NotFound
-     * @throws InsufficientResources 
-     * @throws NotImplemented 
-     * @throws InvalidToken 
-     * @throws NotAuthorized 
-     * @throws InvalidSystemMetadata 
-     * @throws IdentifierNotUnique 
-     * @throws UnsupportedType
-     * 
+     * @param SystemMetadata systemMetdata from the MN @throws InvalidRequest @throws ServiceFailure @throws NotFound
+     * @throws InsufficientResources @throws NotImplemented @throws InvalidToken @throws NotAuthorized @throws
+     * InvalidSystemMetadata @throws IdentifierNotUnique @throws UnsupportedType
+     *
      */
     private void createObject(SystemMetadata systemMetadata) throws InvalidRequest, ServiceFailure, NotFound, InsufficientResources, NotImplemented, InvalidToken, NotAuthorized, InvalidSystemMetadata, IdentifierNotUnique, UnsupportedType {
         Identifier d1Identifier = new Identifier();
@@ -548,84 +536,80 @@ public class TransferObjectTask implements Callable<Void> {
      * has changed that synchroniziation can update. Namely, The authoritative member node can update the obsoletedBy
      * field or if an existing replica is found, then the replica information is added to the systemMetadata.
      *
-     * @param SystemMetadata systemMetdata from the MN 
-     * @throws InvalidRequest 
-     * @throws ServiceFailure 
-     * @throws NotFound
-     * @throws NotImplemented 
-     * @throws InvalidToken 
-     * @throws NotAuthorized
-     * @throws InvalidSystemMetadata
+     * @param SystemMetadata systemMetdata from the MN @throws InvalidRequest @throws ServiceFailure @throws NotFound
+     * @throws NotImplemented @throws InvalidToken @throws NotAuthorized @throws InvalidSystemMetadata
      * @throwsVersionMismatch
-     * 
+     *
      */
     private void updateSystemMetadata(SystemMetadata newSystemMetadata) throws InvalidSystemMetadata, NotFound, NotImplemented, NotAuthorized, ServiceFailure, InvalidRequest, InvalidToken, VersionMismatch {
         // Only update the systemMetadata fields that can be updated by a membernode
-        // dateSysMetadataModified
+        //
         // obsoletedBy
+        // archived
+        // replicas
+        //
         Identifier pid = new Identifier();
         pid.setValue(newSystemMetadata.getIdentifier().getValue());
         SystemMetadata cnSystemMetadata = hzSystemMetaMap.get(pid);
-        if (cnSystemMetadata.getAuthoritativeMemberNode().getValue().contentEquals(task.getNodeId())) {
-            // this is an update from the original memberNode
-            if ((cnSystemMetadata.getObsoletedBy() == null) && (newSystemMetadata.getObsoletedBy() != null)) {
-                logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Update ObsoletedBy");
 
-                nodeCommunications.getCnCore().setObsoletedBy(session, pid, newSystemMetadata.getObsoletedBy(), cnSystemMetadata.getSerialVersion().longValue());
-                auditReplicaSystemMetadata(pid);
-                logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Updated ObsoletedBy");
-            } else if (((newSystemMetadata.getArchived() != null) && newSystemMetadata.getArchived())
-                    && ((cnSystemMetadata.getArchived() == null) || !cnSystemMetadata.getArchived())) {
-                logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Update Archived");
+        if ((cnSystemMetadata.getObsoletedBy() == null) && (newSystemMetadata.getObsoletedBy() != null)) {
+            logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Update ObsoletedBy");
 
-                nodeCommunications.getCnCore().archive(session, pid);
-                auditReplicaSystemMetadata(pid);
-                logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Updated Archived");
-            }
-        } else {
-            boolean performUpdate = true;
-            // this may be an unrecorded replica
-            // membernodes may have replicas of dataone objects that were created
-            // before becoming a part of dataone
-            List<Replica> prevReplicaList = cnSystemMetadata.getReplicaList();
-            for (Replica replica : prevReplicaList) {
-                if (task.getNodeId().equals(replica.getReplicaMemberNode().getValue())) {
-                    performUpdate = false;
-                    break;
-                }
-            }
-            if (performUpdate) {
-                logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Update Replica");
-                Replica mnReplica = new Replica();
-                NodeReference nodeReference = new NodeReference();
-                nodeReference.setValue(task.getNodeId());
-                mnReplica.setReplicaMemberNode(nodeReference);
-                mnReplica.setReplicationStatus(ReplicationStatus.COMPLETED);
-                mnReplica.setReplicaVerified(new Date());
+            nodeCommunications.getCnCore().setObsoletedBy(session, pid, newSystemMetadata.getObsoletedBy(), cnSystemMetadata.getSerialVersion().longValue());
+            auditReplicaSystemMetadata(pid);
+            // serial version will be updated at this point, so get the new version
+            cnSystemMetadata = hzSystemMetaMap.get(pid);
+            logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Updated ObsoletedBy");
+        }
+        if (((newSystemMetadata.getArchived() != null) && newSystemMetadata.getArchived())
+                && ((cnSystemMetadata.getArchived() == null) || !cnSystemMetadata.getArchived())) {
+            logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Update Archived");
 
-                nodeCommunications.getCnReplication().updateReplicationMetadata(session, pid, mnReplica, cnSystemMetadata.getSerialVersion().longValue());
+            nodeCommunications.getCnCore().archive(session, pid);
+            auditReplicaSystemMetadata(pid);
+            // serial version will be updated at this point, so get the new version
+            cnSystemMetadata = hzSystemMetaMap.get(pid);
+            logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Updated Archived");
+        }
 
-                auditReplicaSystemMetadata(pid);
-                logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Updated Replica");
-            } else {
-                logger.warn(task.getNodeId() + "-" + task.getPid() + " Ignoring update from Replica MN");
+        boolean performUpdate = true;
+        // this may be an unrecorded replica
+        // membernodes may have replicas of dataone objects that were created
+        // before becoming a part of dataone
+        List<Replica> prevReplicaList = cnSystemMetadata.getReplicaList();
+        for (Replica replica : prevReplicaList) {
+            if (task.getNodeId().equals(replica.getReplicaMemberNode().getValue())) {
+                performUpdate = false;
+                break;
             }
         }
-        // perform audit of replicas to make certain they all are at the same serialVersion level, if no update
+        if (performUpdate) {
+            logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Update Replica");
+            Replica mnReplica = new Replica();
+            NodeReference nodeReference = new NodeReference();
+            nodeReference.setValue(task.getNodeId());
+            mnReplica.setReplicaMemberNode(nodeReference);
+            mnReplica.setReplicationStatus(ReplicationStatus.COMPLETED);
+            mnReplica.setReplicaVerified(new Date());
+
+            nodeCommunications.getCnReplication().updateReplicationMetadata(session, pid, mnReplica, cnSystemMetadata.getSerialVersion().longValue());
+
+            auditReplicaSystemMetadata(pid);
+            logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Updated Replica");
+        } else {
+            logger.warn(task.getNodeId() + "-" + task.getPid() + " Ignoring update from Replica MN");
+        }
+
+
 
     }
 
     /*
      * Inform Member Nodes that may have a copy to refresh their version of the systemmetadata
      *
-     * @param Identifier pid 
-     * @throws InvalidRequest 
-     * @throws ServiceFailure 
-     * @throws NotFound 
-     * @throws NotImplemented
-     * @throws InvalidToken 
-     * @throws NotAuthorized
-     * 
+     * @param Identifier pid @throws InvalidRequest @throws ServiceFailure @throws NotFound @throws NotImplemented
+     * @throws InvalidToken @throws NotAuthorized
+     *
      */
     private void auditReplicaSystemMetadata(Identifier pid) throws InvalidToken, ServiceFailure, NotAuthorized, NotFound, InvalidRequest, NotImplemented {
         IMap<NodeReference, Node> hzNodes = hazelcast.getMap("hzNodes");
@@ -665,8 +649,7 @@ public class TransferObjectTask implements Callable<Void> {
     /*
      * Inform Member Nodes that synchronization task failed
      *
-     * @param String pid 
-     * @param BaseException message showing reason of failure
+     * @param String pid @param BaseException message showing reason of failure
      *
      */
 
