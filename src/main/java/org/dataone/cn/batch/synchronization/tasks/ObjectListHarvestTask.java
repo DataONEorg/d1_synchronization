@@ -125,13 +125,36 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
             // if not then do not run (we should be running this less than every ten seconds for a membernode
             logger.debug(d1NodeReference.getValue() + "- starting retrieval " + d1Node.getBaseURL() + " with startDate of " + DateTimeMarshaller.serializeDateToUTC(startHarvestDate) + " and endDate of " + DateTimeMarshaller.serializeDateToUTC(now));
             do {
+                activateJob = Boolean.parseBoolean(Settings.getConfiguration().getString("Synchronization.active"));
+                if (!activateJob) {
+                    // throwing this exception will not update
+                    // last harvested date on the node, causing
+                    // a reharvesting of all records
+                    // if the DateLastHarvested was modified on the node
+                    // to be the most recent lastMofidiedDate, then
+                    // it is likely on the next run, records will be missed
+                    // since nodeList is not an ordered list
+                    ExecutionDisabledException ex = new ExecutionDisabledException(d1NodeReference.getValue() + "- Disabled");
+                    throw ex;
+                }
                 // read upto a 1000 objects (the default, but it can be overwritten)
                 // from ListObjects and process before retrieving more
                 if (start == 0 || (start < total)) {
                     readQueue = this.retrieve(d1Node, startHarvestDate, now);
                     int loopCount = 0;
                     while (((hzSyncObjectQueue.size() + readQueue.size()) > maxSyncObjectQueueSize) && (loopCount < 1440)) {
-
+                        activateJob = Boolean.parseBoolean(Settings.getConfiguration().getString("Synchronization.active"));
+                        if (!activateJob) {
+                            // throwing this exception will not update
+                            // last harvested date on the node, causing
+                            // a reharvesting of all records
+                            // if the DateLastHarvested was modified on the node
+                            // to be the most recent lastMofidiedDate, then
+                            // it is likely on the next run, records will be missed
+                            // since nodeList is not an ordered list
+                            ExecutionDisabledException ex = new ExecutionDisabledException(d1NodeReference.getValue() + "- Disabled");
+                            throw ex;
+                        }
                          logger.debug("Sleeping for 5 secs. hzSyncObjectQueue has " + hzSyncObjectQueue.size() + " # of objects.");
                          Thread.sleep(5000L);
 
@@ -147,11 +170,19 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
                     for (ObjectInfo objectInfo : readQueue) {
                         SyncObject syncObject = new SyncObject(d1Node.getIdentifier().getValue(), objectInfo.getIdentifier().getValue());
 
-                        if (objectInfo.getDateSysMetadataModified().after(lastMofidiedDate)) {
+                        if ((objectInfo.getDateSysMetadataModified().after(lastMofidiedDate)) && !(objectInfo.getDateSysMetadataModified().after(now))) {
+                            // increase the lastModifiedDate if the current record's modified date
+                            // is after the date currently specified.
+                            // However, if the date returned is past now, then an update must have
+                            // occurred between the time query was returned and this statement is processed
                             lastMofidiedDate = objectInfo.getDateSysMetadataModified();
                         }
-                        hzSyncObjectQueue.put(syncObject);
-                        logger.debug(d1NodeReference.getValue() + "- syncTask " + syncObject.getPid() + " placed on Queue");
+                        // process the unexpected update, the next time synchronization is run
+                        if (!objectInfo.getDateSysMetadataModified().after(now))
+                                {
+                                hzSyncObjectQueue.put(syncObject);
+                                logger.debug("placed on hzSyncObjectQueue- " +syncObject.getNodeId() + ":"+ syncObject.getPid());
+                                }
                     }
                 } else {
                     readQueue = null;
