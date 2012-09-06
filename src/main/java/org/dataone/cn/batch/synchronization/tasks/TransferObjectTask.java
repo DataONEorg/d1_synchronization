@@ -561,8 +561,11 @@ public class TransferObjectTask implements Callable<Void> {
      */
     private void updateSystemMetadata(SystemMetadata newSystemMetadata) throws InvalidSystemMetadata, NotFound, NotImplemented, NotAuthorized, ServiceFailure, InvalidRequest, InvalidToken, VersionMismatch {
         // Only update the systemMetadata fields that can be updated by a membernode
-        // dateSysMetadataModified
+        //
         // obsoletedBy
+        // archived
+        // replicas
+        //
         Identifier pid = new Identifier();
         pid.setValue(newSystemMetadata.getIdentifier().getValue());
         SystemMetadata cnSystemMetadata = hzSystemMetaMap.get(pid);
@@ -573,6 +576,7 @@ public class TransferObjectTask implements Callable<Void> {
 
                 nodeCommunications.getCnCore().setObsoletedBy(session, pid, newSystemMetadata.getObsoletedBy(), cnSystemMetadata.getSerialVersion().longValue());
                 auditReplicaSystemMetadata(pid);
+                // serial version will be updated at this point, so get the new version
                 logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Updated ObsoletedBy");
             } else if (((newSystemMetadata.getArchived() != null) && newSystemMetadata.getArchived())
                     && ((cnSystemMetadata.getArchived() == null) || !cnSystemMetadata.getArchived())) {
@@ -580,6 +584,7 @@ public class TransferObjectTask implements Callable<Void> {
 
                 nodeCommunications.getCnCore().archive(session, pid);
                 auditReplicaSystemMetadata(pid);
+                // serial version will be updated at this point, so get the new version
                 logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Updated Archived");
             }
         } else {
@@ -611,7 +616,7 @@ public class TransferObjectTask implements Callable<Void> {
                 logger.warn(task.getNodeId() + "-" + task.getPid() + " Ignoring update from Replica MN");
             }
         }
-        // perform audit of replicas to make certain they all are at the same serialVersion level, if no update
+        // perform audit of replicas to make certain they all are at the same serialVersion level, if no update ?
 
     }
 
