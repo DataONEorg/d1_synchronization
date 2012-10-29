@@ -104,7 +104,7 @@ public class SyncObjectTask implements Callable<String> {
         // be terminated.  Once the task is terminated, the membernode will need to be
         // informed of the synchronization failure. Hence, the
         // futures map will also hold the SyncObject submitted to the TransferObjectTask
-        HashMap<Future, HashMap<String, Object>> futuresMap = new HashMap<Future, HashMap<String, Object>>();
+        HashMap<FutureTask, HashMap<String, Object>> futuresMap = new HashMap<FutureTask, HashMap<String, Object>>();
 
         // futures may be repeately cancelled. cancelling a future is not immediate?
         List<Future> cancelledTaskList = new ArrayList<Future>();
@@ -136,7 +136,7 @@ public class SyncObjectTask implements Callable<String> {
                 if (!futuresMap.isEmpty()) {
                     ArrayList<Future> removalList = new ArrayList<Future>();
 
-                    for (Future future : futuresMap.keySet()) {
+                    for (FutureTask future : futuresMap.keySet()) {
                         logger.info("trying future " + future.toString());
                         try {
                             future.get(500L, TimeUnit.MILLISECONDS);
@@ -190,7 +190,11 @@ public class SyncObjectTask implements Callable<String> {
                                     NodeReference nodeReference = new NodeReference();
                                     nodeReference.setValue(futureTask.getNodeId());
                                     submitSynchronizationFailed(futureTask, hzNodes.get(nodeReference).getBaseURL());
+                                } else {
+                                    logger.warn("Task-" + futureTask.getNodeId() + "-" + futureTask.getPid() + "Unable to cancel the task");
                                 }
+                                //force removal from the thread pool. 
+                                taskExecutor.getThreadPoolExecutor().remove(future);
                             }
                         } 
                     }
@@ -262,11 +266,12 @@ public class SyncObjectTask implements Callable<String> {
                             TransferObjectTask transferObject = new TransferObjectTask(nodeCommunications, task);
                             FutureTask futureTask = new FutureTask(transferObject);
                             taskExecutor.execute(futureTask);
-
+                            
                             HashMap<String, Object> futureHash = new HashMap<String, Object>();
                             futureHash.put(nodecommName, nodeCommunications);
                             futureHash.put(taskName, task);
                             futuresMap.put(futureTask, futureHash);
+                            
                         } catch (TaskRejectedException ex) {
                             // Tasks maybe rejected because of the pool has filled up and no
                             // more tasks may be executed.
@@ -296,7 +301,7 @@ public class SyncObjectTask implements Callable<String> {
                     }
                 }
                 logger.debug("ActiveCount: " + taskExecutor.getActiveCount() + " Pool size " + taskExecutor.getPoolSize() + " Max Pool Size " + taskExecutor.getMaxPoolSize());
-                if ((taskExecutor.getPoolSize() + 5) > taskExecutor.getMaxPoolSize()) {
+                if ((taskExecutor.getPoolSize() + 10) > taskExecutor.getMaxPoolSize()) {
                     if ((taskExecutor.getPoolSize() == taskExecutor.getMaxPoolSize()) && futuresMap.isEmpty()) {
                         BlockingQueue<Runnable> blockingTaskQueue = taskExecutor.getThreadPoolExecutor().getQueue();
                         Runnable[] taskArray = {};
