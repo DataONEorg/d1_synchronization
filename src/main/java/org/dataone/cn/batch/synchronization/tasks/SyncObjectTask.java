@@ -106,8 +106,6 @@ public class SyncObjectTask implements Callable<String> {
         // futures map will also hold the SyncObject submitted to the TransferObjectTask
         HashMap<FutureTask, HashMap<String, Object>> futuresMap = new HashMap<FutureTask, HashMap<String, Object>>();
 
-        // futures may be repeately cancelled. cancelling a future is not immediate?
-        List<Future> cancelledTaskList = new ArrayList<Future>();
         SyncObject task = null;
         try {
             do {
@@ -137,24 +135,23 @@ public class SyncObjectTask implements Callable<String> {
                     ArrayList<Future> removalList = new ArrayList<Future>();
 
                     for (FutureTask future : futuresMap.keySet()) {
-                        logger.info("trying future " + future.toString());
+                        HashMap<String, Object> futureHash = futuresMap.get(future);
+                        SyncObject futureTask = (SyncObject) futureHash.get(taskName);
+                        NodeComm futureNodeComm = (NodeComm) futureHash.get(nodecommName);
+                        logger.debug("trying future Task-" + futureTask.getNodeId() + "-" + futureTask.getPid());
                         try {
-                            future.get(500L, TimeUnit.MILLISECONDS);
+                            future.get(250L, TimeUnit.MILLISECONDS);
                             // the future is now, reset the state of the NodeCommunication object
                             // so that it will be re-used
                             logger.debug("futureMap is done? " + future.isDone());
-                            HashMap<String, Object> futureHash = futuresMap.get(future);
-                            SyncObject futureTask = (SyncObject) futureHash.get(taskName);
-                            NodeComm futureNodeComm = (NodeComm) futureHash.get(nodecommName);
-                            logger.info("Task-" + futureTask.getNodeId() + "-" + futureTask.getPid() + " Returned from the Future :"  + futureNodeComm.getNumber() + ":");
+
+                            logger.debug("Task-" + futureTask.getNodeId() + "-" + futureTask.getPid() + " Returned from the Future :"  + futureNodeComm.getNumber() + ":");
 
                             futureNodeComm.setState(NodeCommState.AVAILABLE);
                             removalList.add(future);
                         } catch (CancellationException ex) {
-                            HashMap<String, Object> futureHash = futuresMap.get(future);
-                            SyncObject futureTask = (SyncObject) futureHash.get(taskName);
-                            NodeComm futureNodeComm = (NodeComm) futureHash.get(nodecommName);
-                            logger.info("Task-" + futureTask.getNodeId() + "-" + futureTask.getPid() + "The Future has been cancelled  " + ":(" + futureNodeComm.getNumber() + "):");
+                            
+                            logger.debug("Task-" + futureTask.getNodeId() + "-" + futureTask.getPid() + "The Future has been cancelled  " + ":(" + futureNodeComm.getNumber() + "):");
                             futureNodeComm.setState(NodeCommState.AVAILABLE);
                             removalList.add(future);
 
@@ -166,18 +163,13 @@ public class SyncObjectTask implements Callable<String> {
                             ex.printStackTrace();
                             logger.error(ex.getMessage());
 
-                            HashMap<String, Object> futureHash = futuresMap.get(future);
-                            SyncObject futureTask = (SyncObject) futureHash.get(taskName);
-                            NodeComm futureNodeComm = (NodeComm) futureHash.get(nodecommName);
                             futureNodeComm.setState(NodeCommState.AVAILABLE);
                             logger.error("Task-" + futureTask.getNodeId() + "-" + futureTask.getPid() + "An Exception is reported FROM the Future " + ":(" + futureNodeComm.getNumber() + "):");
                             futureNodeComm.setState(NodeCommState.AVAILABLE);
                             removalList.add(future);
                         } catch (TimeoutException ex) {
-                            HashMap<String, Object> futureHash = futuresMap.get(future);
-                            SyncObject futureTask = (SyncObject) futureHash.get(taskName);
-                            NodeComm futureNodeComm = (NodeComm) futureHash.get(nodecommName);
-                            logger.info("Task-" + futureTask.getNodeId() + "-" + futureTask.getPid() + "Waiting for the future " + ":(" + futureNodeComm.getNumber() + "):" + " since " + DateTimeMarshaller.serializeDateToUTC(futureNodeComm.getRunningStartDate()));
+                            
+                            logger.debug("Task-" + futureTask.getNodeId() + "-" + futureTask.getPid() + "Waiting for the future " + ":(" + futureNodeComm.getNumber() + "):" + " since " + DateTimeMarshaller.serializeDateToUTC(futureNodeComm.getRunningStartDate()));
                             Date now = new Date();
                             // if the thread is running longer than an hour, kill it
                             if ((now.getTime() - futureNodeComm.getRunningStartDate().getTime()) > threadTimeout) {
@@ -271,7 +263,7 @@ public class SyncObjectTask implements Callable<String> {
                             futureHash.put(nodecommName, nodeCommunications);
                             futureHash.put(taskName, task);
                             futuresMap.put(futureTask, futureHash);
-                            
+                            logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " submitted for execution");
                         } catch (TaskRejectedException ex) {
                             // Tasks maybe rejected because of the pool has filled up and no
                             // more tasks may be executed.
