@@ -24,6 +24,7 @@ package org.dataone.cn.batch.synchronization.type;
 
 import com.hazelcast.core.HazelcastInstance;
 import java.util.Date;
+import org.dataone.service.cn.impl.v1.NodeRegistryService;
 import org.dataone.service.cn.impl.v1.ReserveIdentifierService;
 import org.dataone.service.cn.v1.CNCore;
 import org.dataone.service.cn.v1.CNIdentity;
@@ -42,6 +43,7 @@ public class NodeComm {
     private CNReplication cnReplication;
     private HazelcastInstance hzClient;
     private ReserveIdentifierService reserveIdentifierService;
+    private NodeRegistryService nodeRegistryService;
     // helpful for debugging
     private Integer number;
 
@@ -49,7 +51,14 @@ public class NodeComm {
     private NodeCommState state;
     // help to determine if thread is blocking, used as timeout
     private Date runningStartDate;
-
+    public NodeComm(NodeRegistryService nodeRegistryService, HazelcastInstance hzClient) {
+        this.mnRead = null;
+        this.cnCore = null;
+        this.cnReplication = null;
+        this.reserveIdentifierService = null;
+        this.nodeRegistryService = nodeRegistryService;
+        this.hzClient = hzClient;
+    }
 
     public NodeComm(MNRead mnRead, CNCore cnCore, CNReplication cnReplication, ReserveIdentifierService reserveIdentifierService, HazelcastInstance hzClient) {
         this.mnRead = mnRead;
@@ -122,6 +131,14 @@ public class NodeComm {
 
     public void setReserveIdentifierService(ReserveIdentifierService reserveIdentifierService) {
         this.reserveIdentifierService = reserveIdentifierService;
+    }
+
+    public NodeRegistryService getNodeRegistryService() {
+        return nodeRegistryService;
+    }
+
+    public void setNodeRegistryService(NodeRegistryService nodeRegistryService) {
+        this.nodeRegistryService = nodeRegistryService;
     }
 
     
