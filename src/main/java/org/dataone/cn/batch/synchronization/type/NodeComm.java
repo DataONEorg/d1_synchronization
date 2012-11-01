@@ -24,7 +24,9 @@ package org.dataone.cn.batch.synchronization.type;
 
 import com.hazelcast.core.HazelcastInstance;
 import java.util.Date;
+import org.dataone.service.cn.impl.v1.ReserveIdentifierService;
 import org.dataone.service.cn.v1.CNCore;
+import org.dataone.service.cn.v1.CNIdentity;
 import org.dataone.service.cn.v1.CNReplication;
 import org.dataone.service.mn.tier1.v1.MNRead;
 
@@ -39,7 +41,7 @@ public class NodeComm {
     private CNCore cnCore;
     private CNReplication cnReplication;
     private HazelcastInstance hzClient;
-
+    private ReserveIdentifierService reserveIdentifierService;
     // helpful for debugging
     private Integer number;
 
@@ -49,10 +51,11 @@ public class NodeComm {
     private Date runningStartDate;
 
 
-    public NodeComm(MNRead mnRead, CNCore cnCore, CNReplication cnReplication, HazelcastInstance hzClient) {
+    public NodeComm(MNRead mnRead, CNCore cnCore, CNReplication cnReplication, ReserveIdentifierService reserveIdentifierService, HazelcastInstance hzClient) {
         this.mnRead = mnRead;
         this.cnCore = cnCore;
         this.cnReplication = cnReplication;
+        this.reserveIdentifierService = reserveIdentifierService;
         this.hzClient = hzClient;
     }
 
@@ -111,6 +114,14 @@ public class NodeComm {
 
     public void setCnReplication(CNReplication cnReplication) {
         this.cnReplication = cnReplication;
+    }
+
+    public ReserveIdentifierService getReserveIdentifierService() {
+        return reserveIdentifierService;
+    }
+
+    public void setReserveIdentifierService(ReserveIdentifierService reserveIdentifierService) {
+        this.reserveIdentifierService = reserveIdentifierService;
     }
 
     

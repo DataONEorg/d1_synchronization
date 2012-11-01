@@ -33,12 +33,20 @@ import org.dataone.client.auth.CertificateManager;
 import org.dataone.cn.batch.synchronization.type.NodeComm;
 import org.dataone.cn.hazelcast.HazelcastClientInstance;
 import org.dataone.configuration.Settings;
+import org.dataone.service.cn.impl.v1.ReserveIdentifierService;
 import org.dataone.service.cn.v1.CNCore;
 import org.dataone.service.exceptions.ServiceFailure;
 import org.dataone.service.util.D1Url;
 
 /**
- *
+ * Creates a CommNode (communication node) for use by the TransferObjectTask
+ * A CommNode is memberNode specific
+ * 
+ * Sets up instances that should be reused by the TransferObjectTask
+ * Assume that most of the instances are not thread-safe, in other words
+ * the instances created by this factory will be re-used by threads, but no two concurrent threads
+ * should access the same instances (with the exception of hazelcast client instance)
+ * 
  * @author waltz
  */
 public class NodeCommD1ClientFactory implements NodeCommFactory {
@@ -64,7 +72,8 @@ public class NodeCommD1ClientFactory implements NodeCommFactory {
         D1Client d1client = new D1Client();
         CNode cNode = d1client.getCN();
         MNode mNode = d1client.getMN(mnUrl);
-        NodeComm nodeComm = new NodeComm(mNode, cNode, cNode, hzclient);
+        ReserveIdentifierService reserveIdentifierService = new ReserveIdentifierService();
+        NodeComm nodeComm = new NodeComm(mNode, cNode, cNode, reserveIdentifierService, hzclient);
         return nodeComm;
     }
 }

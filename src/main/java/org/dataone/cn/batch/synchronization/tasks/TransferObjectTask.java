@@ -86,12 +86,13 @@ public class TransferObjectTask implements Callable<Void> {
     String cnIdentifier = Settings.getConfiguration().getString("cn.router.nodeId");
     String hzSystemMetaMapString = Settings.getConfiguration().getString("Synchronization.hzSystemMetaMap");
     IMap<Identifier, SystemMetadata> hzSystemMetaMap;
-    ReserveIdentifierService reserveIdentifierService = new ReserveIdentifierService();
+    ReserveIdentifierService reserveIdentifierService;
 
     public TransferObjectTask(NodeComm nodeCommunications, SyncObject task) {
         this.nodeCommunications = nodeCommunications;
         this.task = task;
-        hzSystemMetaMap = nodeCommunications.getHzClient().getMap(hzSystemMetaMapString);
+        this.hzSystemMetaMap = nodeCommunications.getHzClient().getMap(hzSystemMetaMapString);
+        this.reserveIdentifierService = nodeCommunications.getReserveIdentifierService();
     }
 
     /**
