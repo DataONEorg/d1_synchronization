@@ -51,10 +51,8 @@ public class NodeComm {
     private NodeCommState state;
     // help to determine if thread is blocking, used as timeout
     private Date runningStartDate;
-    public NodeComm(NodeRegistryService nodeRegistryService, HazelcastInstance hzClient) {
-        this.mnRead = null;
-        this.cnCore = null;
-        this.cnReplication = null;
+    public NodeComm(MNRead mnRead,  NodeRegistryService nodeRegistryService, HazelcastInstance hzClient) {
+        this.mnRead = mnRead;
         this.reserveIdentifierService = null;
         this.nodeRegistryService = nodeRegistryService;
         this.hzClient = hzClient;
