@@ -30,9 +30,10 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.log4j.Logger;
 import org.dataone.cn.batch.exceptions.ExecutionDisabledException;
-import org.dataone.cn.batch.synchronization.NodeCommD1ClientFactory;
+import org.dataone.cn.batch.exceptions.NodeCommUnavailable;
+import org.dataone.cn.batch.synchronization.NodeCommSyncObjectFactory;
 import org.dataone.cn.batch.synchronization.NodeCommFactory;
-import org.dataone.cn.batch.synchronization.NodeCommRegistryServiceFactory;
+import org.dataone.cn.batch.synchronization.NodeCommObjectListHarvestFactory;
 import org.dataone.cn.batch.synchronization.jobs.MemberNodeHarvestJob;
 import org.dataone.cn.batch.synchronization.type.NodeComm;
 import org.dataone.cn.batch.synchronization.type.SyncObject;
@@ -102,7 +103,7 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
         // Assuming that only one MN harvesting job is executing at at time
         // therefore the only one mnNodeComm per MemberNode is needed for all the runs of
         // the harvester
-        NodeCommFactory nodeCommFactory = NodeCommRegistryServiceFactory.getInstance();
+        NodeCommFactory nodeCommFactory = NodeCommObjectListHarvestFactory.getInstance();
         NodeComm mnNodeComm = nodeCommFactory.getNodeComm(d1NodeReference.getValue());
         NodeRegistryService nodeRegistryService = mnNodeComm.getNodeRegistryService();
         // logger is not  be serializable, but no need to make it transient imo
@@ -147,7 +148,7 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
                 // read upto a 1000 objects (the default, but it can be overwritten)
                 // from ListObjects and process before retrieving more
                 if (start == 0 || (start < total)) {
-                    readQueue = this.retrieve(d1Node, startHarvestDate, now);
+                    readQueue = this.retrieve(mnNodeComm, startHarvestDate, now);
                     int loopCount = 0;
                     while (((hzSyncObjectQueue.size() + readQueue.size()) > maxSyncObjectQueueSize) && (loopCount < 1440)) {
                         activateJob = Boolean.parseBoolean(Settings.getConfiguration().getString("Synchronization.active"));
@@ -217,20 +218,16 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
      * @param Date toDate
      * @return List<ObjectInfo>
      */
-    private List<ObjectInfo> retrieve(Node d1Node, Date fromDate, Date toDate) {
+    private List<ObjectInfo> retrieve(NodeComm nodeComm, Date fromDate, Date toDate) {
         // logger is not  be serializable, but no need to make it transient imo
         Logger logger = Logger.getLogger(ObjectListHarvestTask.class.getName());
 
-        NodeCommD1ClientFactory nodeCommClientFactory = new NodeCommD1ClientFactory();
-
         List<ObjectInfo> writeQueue = new ArrayList<ObjectInfo>();
-
 
         ObjectList objectList = null;
         Boolean replicationStatus = null;
 
         try {
-            NodeComm nodeComm = nodeCommClientFactory.getNodeComm(d1Node.getBaseURL());
             MNRead mnRead = nodeComm.getMnRead();
             // always execute for the first run (for start = 0)
             // otherwise skip because when the start is equal or greater
@@ -258,7 +255,7 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
             logger.error(d1NodeReference.getValue() + "- " + ex.serialize(ex.FMT_XML));
         } catch (InvalidToken ex) {
             logger.error(d1NodeReference.getValue() + "- " + ex.serialize(ex.FMT_XML));
-        }
+        } 
 
         return writeQueue;
     }

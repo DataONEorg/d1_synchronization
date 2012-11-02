@@ -1,25 +1,20 @@
 /**
- * This work was created by participants in the DataONE project, and is
- * jointly copyrighted by participating institutions in DataONE. For 
- * more information on DataONE, see our web site at http://dataone.org.
+ * This work was created by participants in the DataONE project, and is jointly copyrighted by participating
+ * institutions in DataONE. For more information on DataONE, see our web site at http://dataone.org.
  *
- *   Copyright ${year}
+ * Copyright ${year}
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
- * limitations under the License.
- * 
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations under the License.
+ *
  * $Id$
  */
-
 package org.dataone.cn.batch.synchronization.tasks;
 
 import com.hazelcast.core.HazelcastInstance;
@@ -41,7 +36,9 @@ import java.util.concurrent.TimeoutException;
 import java.util.logging.Level;
 import org.apache.log4j.Logger;
 import org.dataone.cn.batch.exceptions.ExecutionDisabledException;
+import org.dataone.cn.batch.exceptions.NodeCommUnavailable;
 import org.dataone.cn.batch.synchronization.NodeCommFactory;
+import org.dataone.cn.batch.synchronization.NodeCommSyncObjectFactory;
 import org.dataone.cn.batch.synchronization.type.NodeComm;
 import org.dataone.cn.batch.synchronization.type.NodeCommState;
 import org.dataone.cn.batch.synchronization.type.SyncObject;
@@ -56,12 +53,10 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 /**
  * Reads from the hzSyncObjectQueue synchronization tasks that need to be performed.
  *
- * Keeps track of the number of connections per membernode
- * and does not allow more than maxNumberOfClientsPerMemberNode
+ * Keeps track of the number of connections per membernode and does not allow more than maxNumberOfClientsPerMemberNode
  * threads to execute per MN
  *
- * It runs as a daemon thread by the SyncObjectExecutor, and
- * is run as an eternal loop unless an exception is thrown.
+ * It runs as a daemon thread by the SyncObjectExecutor, and is run as an eternal loop unless an exception is thrown.
  *
  *
  * @author waltz
@@ -79,8 +74,8 @@ public class SyncObjectTask implements Callable<String> {
 
     /**
      *
-     * Method to be called in a separately executing thread. 
-     * 
+     * Method to be called in a separately executing thread.
+     *
      * @return String
      * @throws Exception
      */
@@ -90,13 +85,7 @@ public class SyncObjectTask implements Callable<String> {
         logger.info("Starting SyncObjectTask");
         BlockingQueue<SyncObject> hzSyncObjectQueue = hazelcast.getQueue("hzSyncObjectQueue");
         IMap<NodeReference, Node> hzNodes = hazelcast.getMap("hzNodes");
-
-        // maintain a List of NodeComms for each membernode that will not
-        // exceed the maxNumberOfClientsPerMemberNode
-        // each NodeComm will have a state, NodeCommState, that
-        // will indicate if it is available for use by a future task
-        Map<String, List<NodeComm>> initializedMemberNodes = new HashMap<String, List<NodeComm>>();
-
+        NodeCommFactory nodeCommFactory = NodeCommSyncObjectFactory.getInstance();
         // the futures map is helpful in tracking the state of a TransferObjectTask
         // nodecomm is need in order determine how long the comm channels have been running
         // and unavailable for use by any other task.
@@ -131,6 +120,10 @@ public class SyncObjectTask implements Callable<String> {
                 } else {
                     logger.debug("Polling empty hzSyncObjectQueue");
                 }
+                // try to reap a thread. it may have completed successfully
+                // it may have been cancelled by something
+                // it may have thrown an exception and failed
+                // or it may be stuck/blocking/hanging and needs to be killed
                 if (!futuresMap.isEmpty()) {
                     ArrayList<Future> removalList = new ArrayList<Future>();
 
@@ -145,12 +138,12 @@ public class SyncObjectTask implements Callable<String> {
                             // so that it will be re-used
                             logger.debug("futureMap is done? " + future.isDone());
 
-                            logger.debug("Task-" + futureTask.getNodeId() + "-" + futureTask.getPid() + " Returned from the Future :"  + futureNodeComm.getNumber() + ":");
+                            logger.debug("Task-" + futureTask.getNodeId() + "-" + futureTask.getPid() + " Returned from the Future :" + futureNodeComm.getNumber() + ":");
 
                             futureNodeComm.setState(NodeCommState.AVAILABLE);
                             removalList.add(future);
                         } catch (CancellationException ex) {
-                            
+
                             logger.debug("Task-" + futureTask.getNodeId() + "-" + futureTask.getPid() + "The Future has been cancelled  " + ":(" + futureNodeComm.getNumber() + "):");
                             futureNodeComm.setState(NodeCommState.AVAILABLE);
                             removalList.add(future);
@@ -165,10 +158,10 @@ public class SyncObjectTask implements Callable<String> {
 
                             futureNodeComm.setState(NodeCommState.AVAILABLE);
                             logger.error("Task-" + futureTask.getNodeId() + "-" + futureTask.getPid() + "An Exception is reported FROM the Future " + ":(" + futureNodeComm.getNumber() + "):");
-                            futureNodeComm.setState(NodeCommState.AVAILABLE);
+
                             removalList.add(future);
                         } catch (TimeoutException ex) {
-                            
+
                             logger.debug("Task-" + futureTask.getNodeId() + "-" + futureTask.getPid() + "Waiting for the future " + ":(" + futureNodeComm.getNumber() + "):" + " since " + DateTimeMarshaller.serializeDateToUTC(futureNodeComm.getRunningStartDate()));
                             Date now = new Date();
                             // if the thread is running longer than an hour, kill it
@@ -181,6 +174,7 @@ public class SyncObjectTask implements Callable<String> {
                                     // we do not resubmit
                                     NodeReference nodeReference = new NodeReference();
                                     nodeReference.setValue(futureTask.getNodeId());
+                                    futureNodeComm.setState(NodeCommState.AVAILABLE);
                                     submitSynchronizationFailed(futureTask, hzNodes.get(nodeReference).getBaseURL());
                                 } else {
                                     logger.warn("Task-" + futureTask.getNodeId() + "-" + futureTask.getPid() + "Unable to cancel the task");
@@ -188,7 +182,7 @@ public class SyncObjectTask implements Callable<String> {
                                 //force removal from the thread pool. 
                                 taskExecutor.getThreadPoolExecutor().remove(future);
                             }
-                        } 
+                        }
                     }
                     if (!removalList.isEmpty()) {
                         for (Future key : removalList) {
@@ -196,69 +190,27 @@ public class SyncObjectTask implements Callable<String> {
                         }
                     }
                 }
-
+                // If task does need to be processed
+                // Try to get a communications object for it
+                // if no comm objects are in the comm object buffer, then stick
+                // the task back on the queue
                 if (task != null) {
-                    // Found a task now see if there is a comm object available
-                    // if so, then run it
-                    logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " received");
-                    NodeComm nodeCommunications = null;
-                    // investigate the task for membernode
-                    NodeReference nodeReference = new NodeReference();
-                    nodeReference.setValue(task.getNodeId());
-                    String memberNodeId = task.getNodeId();
-                    // grab a membernode client off of the stack of initialized clients
-                    if (initializedMemberNodes.containsKey(memberNodeId)) {
-                        List<NodeComm> nodeCommList = initializedMemberNodes.get(memberNodeId);
-                        // find a node comm that is not currently in use
-                        for (NodeComm nodeComm : nodeCommList) {
-                            if (nodeComm.getState().equals(NodeCommState.AVAILABLE)) {
-                                nodeCommunications = nodeComm;
-                                nodeCommunications.setState(NodeCommState.RUNNING);
-                                nodeCommunications.setRunningStartDate(new Date());
-                                break;
-                            }
-                        }
-                        if (nodeCommunications == null) {
-                            // no node Communications is available, see if we can create a new one
-                            if (nodeCommList.size() <= maxNumberOfClientsPerMemberNode) {
-                                try {
-                                    // create and add a new one
-                                    nodeCommunications = nodeCommunicationsFactory.getNodeComm(hzNodes.get(nodeReference).getBaseURL());
+                    try {
+                        // Found a task now see if there is a comm object available
+                        // if so, then run it
+                        logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " received");
+                        // investigate the task for membernode
+                        NodeReference nodeReference = new NodeReference();
+                        nodeReference.setValue(task.getNodeId());
+                        Node mnNode = hzNodes.get(nodeReference);
+                        NodeComm nodeCommunications = nodeCommFactory.getNodeComm(mnNode.getBaseURL());
 
-                                    nodeCommunications.setState(NodeCommState.RUNNING);
-                                    nodeCommunications.setNumber(nodeCommList.size() + 1);
-                                    nodeCommunications.setRunningStartDate(new Date());
-                                    nodeCommList.add(nodeCommunications);
-                                } catch (ServiceFailure ex) {
-                                    ex.printStackTrace();
-                                    logger.error(ex.getDescription());
-                                }
-                            }
-                        }
-                    } else {
-                        // The memberNode hash does not contain an array
-                        // that is assigned to this MemberNode
-                        // create it, get a node comm, and put it in the hash
-                        try {
-                            List<NodeComm> nodeCommList = new ArrayList<NodeComm>();
-                            nodeCommunications = nodeCommunicationsFactory.getNodeComm(hzNodes.get(nodeReference).getBaseURL());
-                            nodeCommunications.setState(NodeCommState.RUNNING);
-                            nodeCommunications.setNumber(nodeCommList.size() + 1);
-                            nodeCommunications.setRunningStartDate(new Date());
-                            nodeCommList.add(nodeCommunications);
-                            initializedMemberNodes.put(memberNodeId, nodeCommList);
-                        } catch (ServiceFailure ex) {
-                            ex.printStackTrace();
-                            logger.error(ex.getDescription());
-                        }
-                    }
-                    if (nodeCommunications != null) {
                         // finally, execute the new task!
                         try {
                             TransferObjectTask transferObject = new TransferObjectTask(nodeCommunications, task);
                             FutureTask futureTask = new FutureTask(transferObject);
                             taskExecutor.execute(futureTask);
-                            
+
                             HashMap<String, Object> futureHash = new HashMap<String, Object>();
                             futureHash.put(nodecommName, nodeCommunications);
                             futureHash.put(taskName, task);
@@ -273,12 +225,12 @@ public class SyncObjectTask implements Callable<String> {
                             nodeCommunications.setState(NodeCommState.AVAILABLE);
                             hzSyncObjectQueue.put(task);
                             try {
-                                Thread.sleep(10000L); // ten seconds
+                                Thread.sleep(5000L); // ten seconds
                             } catch (InterruptedException iex) {
                                 logger.debug("sleep interrupted");
                             }
                         }
-                    } else {
+                    } catch (NodeCommUnavailable ex) {
                         // Communication object is unavailable.  place the task back on the queue
                         // and sleep for 10 seconds
                         // maybe another node will have
@@ -286,14 +238,14 @@ public class SyncObjectTask implements Callable<String> {
                         logger.warn("No MN communication threads available at this time");
                         hzSyncObjectQueue.put(task);
                         try {
-                            Thread.sleep(10000L); // ten seconds
-                        } catch (InterruptedException ex) {
+                            Thread.sleep(5000L); // ten seconds
+                        } catch (InterruptedException ex1) {
                             logger.debug("sleep interrupted");
                         }
                     }
                 }
                 logger.debug("ActiveCount: " + taskExecutor.getActiveCount() + " Pool size " + taskExecutor.getPoolSize() + " Max Pool Size " + taskExecutor.getMaxPoolSize());
-                if ((taskExecutor.getPoolSize() + 10) > taskExecutor.getMaxPoolSize()) {
+                if ((taskExecutor.getActiveCount()) >= taskExecutor.getPoolSize()) {
                     if ((taskExecutor.getPoolSize() == taskExecutor.getMaxPoolSize()) && futuresMap.isEmpty()) {
                         BlockingQueue<Runnable> blockingTaskQueue = taskExecutor.getThreadPoolExecutor().getQueue();
                         Runnable[] taskArray = {};
@@ -336,8 +288,11 @@ public class SyncObjectTask implements Callable<String> {
             logger.error("ActiveCount: " + taskExecutor.getActiveCount() + " Pool size " + taskExecutor.getPoolSize() + " Max Pool Size " + taskExecutor.getMaxPoolSize());
 
         } catch (ServiceFailure ex) {
-           ex.printStackTrace();
-           logger.error(ex.getDescription());
+            ex.printStackTrace();
+            logger.error(ex.getDescription());
+        } catch (NodeCommUnavailable ex) {
+            ex.printStackTrace();
+            logger.error(ex.getMessage());
         }
     }
 
