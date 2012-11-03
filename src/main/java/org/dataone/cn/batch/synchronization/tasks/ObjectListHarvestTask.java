@@ -172,7 +172,7 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
                         //Sleep is 5 secs, looping 1440 should be 2 hrs of waiting..
                         // I'd say something has gone horribly wrong and so dying would be
                         // appropriate
-                        nodeRegistryService.setDateLastHarvested(d1NodeReference, lastMofidiedDate);
+                        nodeRegistryService.getNodeAccess().setDateLastHarvested(d1NodeReference, lastMofidiedDate);
                         throw new Exception("hzSyncObjectQueue has not had more than " + hzSyncObjectQueue.remainingCapacity() + " remaining capacity for 2 hrs.");
                     }
                     for (ObjectInfo objectInfo : readQueue) {
@@ -199,7 +199,7 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
 
             if (lastMofidiedDate.after(d1Node.getSynchronization().getLastHarvested())) {
                 // use nodeAccess directly to avoid hazelcast broadcasting the event
-                nodeRegistryService.setDateLastHarvested(d1NodeReference, lastMofidiedDate);
+                nodeRegistryService.getNodeAccess().setDateLastHarvested(d1NodeReference, lastMofidiedDate);
             }
         } else {
             logger.warn(d1NodeReference.getValue() + "- Difference between Node's LastHarvested Date and Current Date time was less than 10 seconds");

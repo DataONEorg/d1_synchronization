@@ -47,7 +47,7 @@ import org.dataone.service.util.D1Url;
 
 /**
  * 
- * Creates a CommNode (node communications) for use by the ObjectListHarvestTask.
+ * Creates a CommNode (node communications) pool for use by the ObjectListHarvestTask.
  * A CommNode object is memberNode specific
  *
  * Sets up instances that should be reused by the ObjectListHarvestTask 
