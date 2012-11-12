@@ -376,4 +376,9 @@ public class HarvestSchedulingManager implements ApplicationContextAware, EntryL
     public void setApplicationContext(ApplicationContext applicationContext) throws BeansException {
         this.applicationContext = applicationContext;
     }
+
+    @Override
+    public void migrationFailed(MigrationEvent migrationEvent) {
+         logger.warn("migrationFailed " + migrationEvent.getPartitionId());
+    }
 }
