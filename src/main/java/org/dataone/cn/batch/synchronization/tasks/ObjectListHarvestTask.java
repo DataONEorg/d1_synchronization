@@ -37,6 +37,7 @@ import org.dataone.cn.batch.synchronization.NodeCommObjectListHarvestFactory;
 import org.dataone.cn.batch.synchronization.jobs.MemberNodeHarvestJob;
 import org.dataone.cn.batch.synchronization.type.NodeComm;
 import org.dataone.cn.batch.synchronization.type.SyncObject;
+import org.dataone.cn.hazelcast.HazelcastInstanceFactory;
 import org.dataone.cn.ldap.NodeAccess;
 import org.dataone.configuration.Settings;
 import org.dataone.service.cn.impl.v1.NodeRegistryService;
@@ -109,7 +110,7 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
         // logger is not  be serializable, but no need to make it transient imo
         Logger logger = Logger.getLogger(ObjectListHarvestTask.class.getName());
         logger.info(d1NodeReference.getValue() + "- ObjectListHarvestTask Start");
-        HazelcastInstance hazelcast = Hazelcast.getDefaultInstance();
+        HazelcastInstance hazelcast = HazelcastInstanceFactory.getProcessingInstance();
         BlockingQueue<SyncObject> hzSyncObjectQueue = hazelcast.getQueue("hzSyncObjectQueue");
         // Need the LinkedHashMap to preserver insertion order
         Node d1Node = nodeRegistryService.getNode(d1NodeReference);
