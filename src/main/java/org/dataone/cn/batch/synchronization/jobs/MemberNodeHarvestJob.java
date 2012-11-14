@@ -42,6 +42,7 @@ import org.quartz.JobExecutionException;
 import java.text.SimpleDateFormat;
 import java.text.ParseException;
 import org.dataone.cn.batch.exceptions.ExecutionDisabledException;
+import org.dataone.cn.hazelcast.HazelcastInstanceFactory;
 
 /**
  * Quartz Job that starts off the hazelcast distributed execution of harvesting for a nodeList from a Membernode It
@@ -68,7 +69,7 @@ public class MemberNodeHarvestJob implements Job {
             if (activateJob) {
                 String mnIdentifier = jobContext.getMergedJobDataMap().getString("mnIdentifier");
                 logger.info(mnIdentifier + "- ObjectListHarvestTask Start");
-                HazelcastInstance hazelcast = Hazelcast.getDefaultInstance();
+                HazelcastInstance hazelcast = HazelcastInstanceFactory.getProcessingInstance();
 
                 hzNodes = hazelcast.getMap("hzNodes");
 

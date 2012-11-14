@@ -31,6 +31,7 @@ import org.apache.log4j.Logger;
 import org.dataone.client.MNode;
 import org.dataone.cn.batch.synchronization.type.NodeComm;
 import org.dataone.cn.batch.synchronization.type.SyncObject;
+import org.dataone.cn.hazelcast.HazelcastInstanceFactory;
 import org.dataone.configuration.Settings;
 import org.dataone.service.cn.impl.v1.ReserveIdentifierService;
 import org.dataone.service.exceptions.BaseException;
@@ -82,7 +83,7 @@ public class TransferObjectTask implements Callable<Void> {
     private Session session = null;
     // need this task queue if a failure occurs on the CN such that the task will
     // need to be processed on a separate CN
-    private HazelcastInstance hazelcast = Hazelcast.getDefaultInstance();
+    private HazelcastInstance hazelcast = HazelcastInstanceFactory.getProcessingInstance();
     String cnIdentifier = Settings.getConfiguration().getString("cn.router.nodeId");
     String hzSystemMetaMapString = Settings.getConfiguration().getString("Synchronization.hzSystemMetaMap");
     IMap<Identifier, SystemMetadata> hzSystemMetaMap;
