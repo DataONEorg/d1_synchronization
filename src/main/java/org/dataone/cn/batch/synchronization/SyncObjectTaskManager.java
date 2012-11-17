@@ -20,7 +20,6 @@ package org.dataone.cn.batch.synchronization;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
-import java.util.logging.Level;
 import org.apache.log4j.Logger;
 import org.dataone.cn.batch.exceptions.ExecutionDisabledException;
 import org.dataone.cn.batch.synchronization.tasks.SyncObjectTask;

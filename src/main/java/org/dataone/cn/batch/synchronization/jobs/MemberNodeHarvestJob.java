@@ -63,7 +63,7 @@ public class MemberNodeHarvestJob implements Job {
         SimpleDateFormat format = new SimpleDateFormat("EEE MMM dd yyyy HH:mm:ss zzz");
         boolean nodeLocked = false;
         IMap<NodeReference, Node> hzNodes = null;
-
+        String synchronizationExecutorName = Settings.getConfiguration().getString("dataone.hazelcast.synchronizationExecutorService");
         try {
             boolean activateJob = Boolean.parseBoolean(Settings.getConfiguration().getString("Synchronization.active"));
             if (activateJob) {
@@ -81,7 +81,7 @@ public class MemberNodeHarvestJob implements Job {
                 if (nodeLocked) {
 
                     ObjectListHarvestTask harvestTask = new ObjectListHarvestTask(nodeReference, batchSize);
-                    ExecutorService executor = Hazelcast.getExecutorService();
+                    ExecutorService executor = hazelcast.getExecutorService(synchronizationExecutorName);
                     DistributedTask dtask = new DistributedTask((Callable<Date>) harvestTask);
                     Future future = executor.submit(dtask);
                     Date lastProcessingCompletedDate = null;

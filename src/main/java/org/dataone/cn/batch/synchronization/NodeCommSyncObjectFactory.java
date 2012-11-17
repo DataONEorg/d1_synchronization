@@ -37,10 +37,7 @@ import org.dataone.cn.batch.synchronization.type.NodeCommState;
 import org.dataone.cn.hazelcast.HazelcastClientInstance;
 import org.dataone.configuration.Settings;
 import org.dataone.service.cn.impl.v1.ReserveIdentifierService;
-import org.dataone.service.cn.v1.CNCore;
 import org.dataone.service.exceptions.ServiceFailure;
-import org.dataone.service.types.v1.Node;
-import org.dataone.service.util.D1Url;
 
 /**
  * Creates/maintains a CommNode (node communications) pool for use by the TransferObjectTask

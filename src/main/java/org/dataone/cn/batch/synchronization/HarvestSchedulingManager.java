@@ -95,7 +95,7 @@ public class HarvestSchedulingManager implements ApplicationContextAware, EntryL
     public void init() {
         try {
             logger.info("HarvestingScheduler starting up");
-            partitionService = Hazelcast.getPartitionService();
+            partitionService = hazelcast.getPartitionService();
 
             localMember = hazelcast.getCluster().getLocalMember();
             hazelcastLdapStore.loadAllKeys();
@@ -322,7 +322,6 @@ public class HarvestSchedulingManager implements ApplicationContextAware, EntryL
         // try to determine if a Node has migrated home servers
         if (localMember.equals(migrationEvent.getNewOwner()) || localMember.equals(migrationEvent.getOldOwner())) {
             Integer partitionId = migrationEvent.getPartitionId();
-            PartitionService partitionService = Hazelcast.getPartitionService();
 
             IMap<NodeReference, Node> hzNodes = hazelcast.getMap("hzNodes");
 

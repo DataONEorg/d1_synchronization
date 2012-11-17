@@ -17,10 +17,8 @@
  */
 package org.dataone.cn.batch.synchronization.tasks;
 
-import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
 import java.io.Serializable;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -30,15 +28,12 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.log4j.Logger;
 import org.dataone.cn.batch.exceptions.ExecutionDisabledException;
-import org.dataone.cn.batch.exceptions.NodeCommUnavailable;
-import org.dataone.cn.batch.synchronization.NodeCommSyncObjectFactory;
 import org.dataone.cn.batch.synchronization.NodeCommFactory;
 import org.dataone.cn.batch.synchronization.NodeCommObjectListHarvestFactory;
 import org.dataone.cn.batch.synchronization.jobs.MemberNodeHarvestJob;
 import org.dataone.cn.batch.synchronization.type.NodeComm;
 import org.dataone.cn.batch.synchronization.type.SyncObject;
 import org.dataone.cn.hazelcast.HazelcastInstanceFactory;
-import org.dataone.cn.ldap.NodeAccess;
 import org.dataone.configuration.Settings;
 import org.dataone.service.cn.impl.v1.NodeRegistryService;
 import org.dataone.service.exceptions.InvalidRequest;
@@ -53,7 +48,6 @@ import org.dataone.service.types.v1.ObjectInfo;
 import org.dataone.service.types.v1.ObjectList;
 import org.dataone.service.types.v1.Session;
 import org.dataone.service.util.DateTimeMarshaller;
-import org.joda.time.DateTime;
 import org.joda.time.MutableDateTime;
 
 /**
@@ -89,6 +83,7 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
      */
     @Override
     public Date call() throws Exception {
+        String synchronizationObjectQueue = Settings.getConfiguration().getString("dataone.hazelcast.synchronizationObjectQueue");
         boolean activateJob = Boolean.parseBoolean(Settings.getConfiguration().getString("Synchronization.active"));
         Integer maxSyncObjectQueueSize = Settings.getConfiguration().getInt("Synchronization.max_syncobjectqueue_size");
         if (!activateJob) {
@@ -111,7 +106,7 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
         Logger logger = Logger.getLogger(ObjectListHarvestTask.class.getName());
         logger.info(d1NodeReference.getValue() + "- ObjectListHarvestTask Start");
         HazelcastInstance hazelcast = HazelcastInstanceFactory.getProcessingInstance();
-        BlockingQueue<SyncObject> hzSyncObjectQueue = hazelcast.getQueue("hzSyncObjectQueue");
+        BlockingQueue<SyncObject> hzSyncObjectQueue = hazelcast.getQueue(synchronizationObjectQueue);
         // Need the LinkedHashMap to preserver insertion order
         Node d1Node = nodeRegistryService.getNode(d1NodeReference);
         Date lastMofidiedDate = d1Node.getSynchronization().getLastHarvested();
