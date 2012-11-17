@@ -25,7 +25,6 @@ package org.dataone.cn.batch.synchronization;
 import org.dataone.cn.batch.exceptions.NodeCommUnavailable;
 import org.dataone.cn.batch.synchronization.type.NodeComm;
 import org.dataone.service.exceptions.ServiceFailure;
-import org.dataone.service.types.v1.Node;
 
 /**
  * Provides an interface for access to NodeComm objects that should be pooled for re-use.

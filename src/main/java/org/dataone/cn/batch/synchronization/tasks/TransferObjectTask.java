@@ -17,7 +17,6 @@
  */
 package org.dataone.cn.batch.synchronization.tasks;
 
-import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.IMap;
 import java.io.InputStream;
@@ -85,7 +84,9 @@ public class TransferObjectTask implements Callable<Void> {
     // need to be processed on a separate CN
     private HazelcastInstance hazelcast = HazelcastInstanceFactory.getProcessingInstance();
     String cnIdentifier = Settings.getConfiguration().getString("cn.router.nodeId");
-    String hzSystemMetaMapString = Settings.getConfiguration().getString("Synchronization.hzSystemMetaMap");
+    String synchronizationObjectQueue = Settings.getConfiguration().getString("dataone.hazelcast.synchronizationObjectQueue");
+    String hzNodesName = Settings.getConfiguration().getString("dataone.hazelcast.nodes");
+    String hzSystemMetaMapString = Settings.getConfiguration().getString("dataone.hazelcast.systemMetadata");
     IMap<Identifier, SystemMetadata> hzSystemMetaMap;
     ReserveIdentifierService reserveIdentifierService;
 
@@ -148,7 +149,7 @@ public class TransferObjectTask implements Callable<Void> {
                                 logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + " " + iex.getMessage());
 
                             }
-                            hazelcast.getQueue("hzSyncObjectQueue").put(task);
+                            hazelcast.getQueue(synchronizationObjectQueue).put(task);
                             task.setAttempt(task.getAttempt() + 1);
                         } else {
                             logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + " Pid altered before processing complete! Unable to process");
@@ -174,7 +175,7 @@ public class TransferObjectTask implements Callable<Void> {
                             logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + " " + iex.getMessage());
 
                         }
-                        hazelcast.getQueue("hzSyncObjectQueue").put(task);
+                        hazelcast.getQueue(synchronizationObjectQueue).put(task);
 
                     } else {
                         logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + " Pid Locked! Unable to process pid " + task.getPid() + " from node " + task.getNodeId());
@@ -635,7 +636,7 @@ public class TransferObjectTask implements Callable<Void> {
      *
      */
     private void auditReplicaSystemMetadata(Identifier pid) throws InvalidToken, ServiceFailure, NotAuthorized, NotFound, InvalidRequest, NotImplemented {
-        IMap<NodeReference, Node> hzNodes = hazelcast.getMap("hzNodes");
+        IMap<NodeReference, Node> hzNodes = hazelcast.getMap(hzNodesName);
         SystemMetadata cnSystemMetadata = hzSystemMetaMap.get(pid);
         if (cnSystemMetadata != null) {
             List<Replica> prevReplicaList = cnSystemMetadata.getReplicaList();

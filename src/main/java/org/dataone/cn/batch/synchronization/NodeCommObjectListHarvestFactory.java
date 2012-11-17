@@ -19,16 +19,10 @@ package org.dataone.cn.batch.synchronization;
 
 import com.hazelcast.core.HazelcastInstance;
 import java.io.File;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.dataone.client.CNode;
 import org.dataone.client.D1Client;
 import org.dataone.client.MNode;
 import org.dataone.client.auth.CertificateManager;
@@ -37,13 +31,11 @@ import org.dataone.cn.batch.synchronization.type.NodeComm;
 import org.dataone.cn.hazelcast.HazelcastClientInstance;
 import org.dataone.configuration.Settings;
 import org.dataone.service.cn.impl.v1.NodeRegistryService;
-import org.dataone.service.cn.impl.v1.ReserveIdentifierService;
-import org.dataone.service.cn.v1.CNCore;
 import org.dataone.service.exceptions.NotFound;
 import org.dataone.service.exceptions.ServiceFailure;
 import org.dataone.service.types.v1.Node;
 import org.dataone.service.types.v1.NodeReference;
-import org.dataone.service.util.D1Url;
+
 
 /**
  * 

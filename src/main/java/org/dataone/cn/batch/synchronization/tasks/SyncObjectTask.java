@@ -22,18 +22,14 @@ import com.hazelcast.core.IMap;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.logging.Level;
 import org.apache.log4j.Logger;
 import org.dataone.cn.batch.exceptions.ExecutionDisabledException;
 import org.dataone.cn.batch.exceptions.NodeCommUnavailable;
@@ -83,8 +79,10 @@ public class SyncObjectTask implements Callable<String> {
     public String call() throws Exception {
 
         logger.info("Starting SyncObjectTask");
-        BlockingQueue<SyncObject> hzSyncObjectQueue = hazelcast.getQueue("hzSyncObjectQueue");
-        IMap<NodeReference, Node> hzNodes = hazelcast.getMap("hzNodes");
+        String hzNodesName = Settings.getConfiguration().getString("dataone.hazelcast.nodes");
+        String synchronizationObjectQueue = Settings.getConfiguration().getString("dataone.hazelcast.synchronizationObjectQueue");
+        BlockingQueue<SyncObject> hzSyncObjectQueue = hazelcast.getQueue(synchronizationObjectQueue);
+        IMap<NodeReference, Node> hzNodes = hazelcast.getMap(hzNodesName);
         NodeCommFactory nodeCommFactory = NodeCommSyncObjectFactory.getInstance();
         // the futures map is helpful in tracking the state of a TransferObjectTask
         // nodecomm is need in order determine how long the comm channels have been running
