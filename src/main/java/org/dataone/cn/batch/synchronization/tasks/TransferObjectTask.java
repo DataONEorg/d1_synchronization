@@ -409,7 +409,7 @@ public class TransferObjectTask implements Callable<Void> {
             } else {
                 // determine if this is a valid update
                 SystemMetadata cnSystemMetadata = hzSystemMetaMap.get(systemMetadata.getIdentifier());
-                if (cnSystemMetadata != null) {
+                if (cnSystemMetadata != null && cnSystemMetadata.getChecksum() != null) {
                     Checksum existingChecksum = cnSystemMetadata.getChecksum(); // maybe an update, maybe duplicate, maybe a conflicting pid
                     Checksum newChecksum = systemMetadata.getChecksum();
                     if (!existingChecksum.getAlgorithm().equalsIgnoreCase(systemMetadata.getChecksum().getAlgorithm())) {
@@ -428,7 +428,11 @@ public class TransferObjectTask implements Callable<Void> {
                         submitSynchronizationFailed(systemMetadata.getIdentifier().getValue(), notUnique);
                     }
                 } else {
-                    logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + " is null when get called from Hazelcast " + hzSystemMetaMapString + " Map");
+                    if (cnSystemMetadata == null) {
+                        logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + " cn's systemMetadata is null when get called from Hazelcast " + hzSystemMetaMapString + " Map");
+                    } else {
+                        logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + " cn's systemMetadata's checksum is null when get called from Hazelcast " + hzSystemMetaMapString + " Map");
+                    }
                 }
             }
         } catch (VersionMismatch ex) {
