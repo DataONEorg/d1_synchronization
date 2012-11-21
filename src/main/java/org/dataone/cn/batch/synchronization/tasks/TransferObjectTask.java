@@ -409,7 +409,7 @@ public class TransferObjectTask implements Callable<Void> {
             } else {
                 // determine if this is a valid update
                 SystemMetadata cnSystemMetadata = hzSystemMetaMap.get(systemMetadata.getIdentifier());
-                if (systemMetadata != null) {
+                if (cnSystemMetadata != null) {
                     Checksum existingChecksum = cnSystemMetadata.getChecksum(); // maybe an update, maybe duplicate, maybe a conflicting pid
                     Checksum newChecksum = systemMetadata.getChecksum();
                     if (!existingChecksum.getAlgorithm().equalsIgnoreCase(systemMetadata.getChecksum().getAlgorithm())) {
