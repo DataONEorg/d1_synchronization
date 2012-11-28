@@ -45,6 +45,7 @@ import com.hazelcast.core.HazelcastInstance;
 import java.text.ParseException;
 import java.util.Set;
 import org.dataone.cn.hazelcast.HazelcastLdapStore;
+import org.dataone.configuration.Settings;
 import org.quartz.*;
 import org.quartz.impl.matchers.GroupMatcher;
 import org.springframework.beans.BeansException;
@@ -77,7 +78,7 @@ public class HarvestSchedulingManager implements ApplicationContextAware, EntryL
     ApplicationContext applicationContext;
     PartitionService partitionService;
     Member localMember;
-
+    private static final String hzNodesName = Settings.getConfiguration().getString("dataone.hazelcast.nodes");
     /*
     /* 
      * Called by Spring to bootstrap Synchronization
@@ -108,7 +109,7 @@ public class HarvestSchedulingManager implements ApplicationContextAware, EntryL
 
             this.manageHarvest();
             partitionService.addMigrationListener(this);
-            IMap<NodeReference, Node> hzNodes = hazelcast.getMap("hzNodes");
+            IMap<NodeReference, Node> hzNodes = hazelcast.getMap(hzNodesName);
             hzNodes.addEntryListener(this, true);
         } catch (IOException ex) {
             throw new IllegalStateException("Loading properties file failedUnable to initialize jobs for scheduling: " + ex.getMessage());
@@ -148,7 +149,7 @@ public class HarvestSchedulingManager implements ApplicationContextAware, EntryL
             }
         }
         // populate the nodeList
-        IMap<NodeReference, Node> hzNodes = hazelcast.getMap("hzNodes");
+        IMap<NodeReference, Node> hzNodes = hazelcast.getMap(hzNodesName);
 
         logger.info("Node map has " + hzNodes.size() + " entries");
         // construct new jobs and triggers based on ownership of nodes in the nodeList
@@ -323,7 +324,7 @@ public class HarvestSchedulingManager implements ApplicationContextAware, EntryL
         if (localMember.equals(migrationEvent.getNewOwner()) || localMember.equals(migrationEvent.getOldOwner())) {
             Integer partitionId = migrationEvent.getPartitionId();
 
-            IMap<NodeReference, Node> hzNodes = hazelcast.getMap("hzNodes");
+            IMap<NodeReference, Node> hzNodes = hazelcast.getMap(hzNodesName);
 
             List<Integer> nodePartitions = new ArrayList<Integer>();
             for (NodeReference key : hzNodes.keySet()) {

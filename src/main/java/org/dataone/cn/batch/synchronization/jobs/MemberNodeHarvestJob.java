@@ -103,6 +103,7 @@ public class MemberNodeHarvestJob implements Job {
                             Thread.sleep(5000L);
                         } else {
                             logger.error("ExecutionException: " + ex.getMessage());
+                            ex.printStackTrace();
                         }
                     }
 
