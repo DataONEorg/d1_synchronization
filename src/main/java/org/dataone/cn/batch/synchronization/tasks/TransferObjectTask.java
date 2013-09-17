@@ -17,21 +17,26 @@
  */
 package org.dataone.cn.batch.synchronization.tasks;
 
-import com.hazelcast.core.HazelcastInstance;
-import com.hazelcast.core.IMap;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.io.InputStream;
+import java.io.UnsupportedEncodingException;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
+
+import org.apache.commons.io.IOUtils;
 import org.apache.log4j.Logger;
 import org.dataone.client.MNode;
 import org.dataone.cn.batch.synchronization.type.NodeComm;
 import org.dataone.cn.batch.synchronization.type.SyncObject;
 import org.dataone.cn.hazelcast.HazelcastInstanceFactory;
 import org.dataone.configuration.Settings;
+import org.dataone.ore.ResourceMapFactory;
 import org.dataone.service.cn.impl.v1.ReserveIdentifierService;
 import org.dataone.service.exceptions.BaseException;
 import org.dataone.service.exceptions.IdentifierNotUnique;
@@ -56,6 +61,11 @@ import org.dataone.service.types.v1.ReplicationStatus;
 import org.dataone.service.types.v1.Service;
 import org.dataone.service.types.v1.Session;
 import org.dataone.service.types.v1.SystemMetadata;
+import org.dspace.foresite.OREException;
+import org.dspace.foresite.OREParserException;
+
+import com.hazelcast.core.HazelcastInstance;
+import com.hazelcast.core.IMap;
 
 /**
  * Transfer an object from a MemberNode(MN) to a CoordinatingNode(CN). Executes as a thread that is executed by the
@@ -493,14 +503,17 @@ public class TransferObjectTask implements Callable<Void> {
      * @throws UnsupportedType
      *
      */
-    private void createObject(SystemMetadata systemMetadata) throws InvalidRequest, ServiceFailure, NotFound, InsufficientResources, NotImplemented, InvalidToken, NotAuthorized, InvalidSystemMetadata, IdentifierNotUnique, UnsupportedType {
+    private void createObject(SystemMetadata systemMetadata) throws InvalidRequest, ServiceFailure,
+            NotFound, InsufficientResources, NotImplemented, InvalidToken, NotAuthorized,
+            InvalidSystemMetadata, IdentifierNotUnique, UnsupportedType {
         Identifier d1Identifier = new Identifier();
         d1Identifier.setValue(systemMetadata.getIdentifier().getValue());
         // All though this should take place when the object is processsed, it needs to be
         // performed here due to the way last DateSysMetadataModified is used to
         // determine the next batch of records to retreive from a MemberNode
         systemMetadata.setDateSysMetadataModified(new Date());
-        ObjectFormat objectFormat = nodeCommunications.getCnCore().getFormat(systemMetadata.getFormatId());
+        ObjectFormat objectFormat = nodeCommunications.getCnCore().getFormat(
+                systemMetadata.getFormatId());
         if ((objectFormat != null) && !objectFormat.getFormatType().equalsIgnoreCase("DATA")) {
             InputStream sciMetaStream = null;
             // get the scimeta object and then feed it to metacat
@@ -508,17 +521,21 @@ public class TransferObjectTask implements Callable<Void> {
             boolean needSciMetadata = true;
             do {
                 try {
-                    logger.debug("Task-" + task.getNodeId() + "-" + task.getPid() + " getting ScienceMetadata ");
-                    sciMetaStream = nodeCommunications.getMnRead().get(session, systemMetadata.getIdentifier());
+                    logger.debug("Task-" + task.getNodeId() + "-" + task.getPid()
+                            + " getting ScienceMetadata ");
+                    sciMetaStream = nodeCommunications.getMnRead().get(
+                            systemMetadata.getIdentifier());
                     needSciMetadata = false;
                 } catch (NotAuthorized ex) {
                     if (tryAgain < 2) {
                         ++tryAgain;
-                        logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + ex.serialize(ex.FMT_XML));
+                        logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n"
+                                + ex.serialize(BaseException.FMT_XML));
                         try {
                             Thread.sleep(5000L);
                         } catch (InterruptedException ex1) {
-                            logger.warn("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + ex);
+                            logger.warn("Task-" + task.getNodeId() + "-" + task.getPid() + "\n"
+                                    + ex);
                         }
                     } else {
                         // only way to get out of loop if NotAuthorized keeps getting thrown
@@ -527,11 +544,13 @@ public class TransferObjectTask implements Callable<Void> {
                 } catch (ServiceFailure ex) {
                     if (tryAgain < 2) {
                         ++tryAgain;
-                        logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + ex.serialize(ex.FMT_XML));
+                        logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n"
+                                + ex.serialize(BaseException.FMT_XML));
                         try {
                             Thread.sleep(5000L);
                         } catch (InterruptedException ex1) {
-                            logger.warn("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + ex);
+                            logger.warn("Task-" + task.getNodeId() + "-" + task.getPid() + "\n"
+                                    + ex);
                         }
                     } else {
                         // only way to get out of loop if NotAuthorized keeps getting thrown
@@ -539,15 +558,69 @@ public class TransferObjectTask implements Callable<Void> {
                     }
                 }
             } while (needSciMetadata);
-            logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Creating Object");
 
-            d1Identifier = nodeCommunications.getCnCore().create(session, d1Identifier, sciMetaStream, systemMetadata);
+            if (isResource(objectFormat)) {
+                byte[] resourceBytes = null;
+                try {
+                    resourceBytes = IOUtils.toByteArray(sciMetaStream);
+                } catch (IOException e) {
+                    throw new InsufficientResources("413",
+                            "Unable to create ByteArrayInputStream for pid: "
+                                    + systemMetadata.getIdentifier().getValue() + " with message: "
+                                    + e.getMessage());
+                }
+                if (resourceBytes != null) {
+                    sciMetaStream = new ByteArrayInputStream(resourceBytes);
+                    validateResource(resourceBytes);
+                }
+            }
+
+            logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Creating Object");
+            d1Identifier = nodeCommunications.getCnCore().create(d1Identifier, sciMetaStream,
+                    systemMetadata);
             logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Created Object");
         } else {
-            logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Registering SystemMetadata");
-            nodeCommunications.getCnCore().registerSystemMetadata(session, d1Identifier, systemMetadata);
-            logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Registered SystemMetadata");
+            logger.info("Task-" + task.getNodeId() + "-" + task.getPid()
+                    + " Registering SystemMetadata");
+            nodeCommunications.getCnCore().registerSystemMetadata(d1Identifier, systemMetadata);
+            logger.info("Task-" + task.getNodeId() + "-" + task.getPid()
+                    + " Registered SystemMetadata");
         }
+    }
+
+    private boolean validateResource(byte[] resourceBytes) throws UnsupportedType {
+        boolean valid = false;
+        if (resourceBytes != null) {
+            InputStream resourceStream = null;
+            try {
+                resourceStream = new ByteArrayInputStream(resourceBytes);
+                ResourceMapFactory.getInstance().parseResourceMap(resourceStream);
+                valid = true;
+            } catch (UnsupportedEncodingException e) {
+                throw new UnsupportedType("Invalid Resource Map",
+                        "Unable to parse document as a resource map: " + e.getMessage());
+            } catch (OREException e) {
+                throw new UnsupportedType("Invalid Resource Map",
+                        "Unable to parse document as a resource map: " + e.getMessage());
+            } catch (URISyntaxException e) {
+                throw new UnsupportedType("Invalid Resource Map",
+                        "Unable to parse document as a resource map: " + e.getMessage());
+            } catch (OREParserException e) {
+                throw new UnsupportedType("Invalid Resource Map",
+                        "Unable to parse document as a resource map: " + e.getMessage());
+            } finally {
+                IOUtils.closeQuietly(resourceStream);
+            }
+        }
+        return valid;
+    }
+
+    private boolean isResource(ObjectFormat format) {
+        boolean isResource = false;
+        if (format != null && format.getFormatType().equalsIgnoreCase("RESOURCE")) {
+            isResource = true;
+        }
+        return isResource;
     }
 
     /*
