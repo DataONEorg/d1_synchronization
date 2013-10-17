@@ -218,7 +218,7 @@ public class TransferObjectTask implements Callable<Void> {
      */
 
     private SystemMetadata retrieveSystemMetadata() {
-        String memberNodeId = task.getNodeId();
+        String memberNodeId = task.getNodeId();     
         SystemMetadata systemMetadata = null;
         try {
             //            sciMetaFile = this.writeScienceMetadataToFile(objectInfo);
@@ -245,7 +245,7 @@ public class TransferObjectTask implements Callable<Void> {
                         throw ex;
                     }
                 } catch (ServiceFailure ex) {
-                    if (tryAgain < 2) {
+                    if (tryAgain < 6) {
                         ++tryAgain;
                         logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + ex.serialize(ex.FMT_XML));
                         try {
@@ -259,7 +259,12 @@ public class TransferObjectTask implements Callable<Void> {
                     }
                 }
             } while (needSystemMetadata);
-
+            if (!task.getPid().contentEquals(systemMetadata.getIdentifier().getValue())) {
+                InvalidSystemMetadata invalidSystemMetadata = new InvalidSystemMetadata("567100", "Identifier " + task.getPid() + " retrieved from getObjectList is different from that contained in systemMetadata " + systemMetadata.getIdentifier().getValue());
+                logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + invalidSystemMetadata.serialize(invalidSystemMetadata.FMT_XML));
+                submitSynchronizationFailed(task.getPid(), invalidSystemMetadata);
+                return null;
+            }
             logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Retrieved SystemMetadata Identifier:" + systemMetadata.getIdentifier().getValue() + " from node " + memberNodeId + " for ObjectInfo Identifier " + identifier.getValue());
 
         } catch (NotAuthorized ex) {
@@ -311,7 +316,7 @@ public class TransferObjectTask implements Callable<Void> {
     private SystemMetadata processSystemMetadata(SystemMetadata systemMetadata) {
 
         try {
-
+            IMap<NodeReference, Node> hzNodes = hazelcast.getMap(hzNodesName);
             logger.debug("Task-" + task.getNodeId() + "-" + task.getPid() + " Processing SystemMetadata");
             boolean addOriginalReplica = true;
             /*
@@ -344,13 +349,27 @@ public class TransferObjectTask implements Callable<Void> {
                 systemMetadata.addReplica(cnReplica);
                 logger.debug("Task-" + task.getNodeId() + "-" + task.getPid() + " Added CN as replica because formatType " + objectFormat.getFormatType() + " is sciMetadata");
             }
+            // the origin membernode may be different from the node
+            // being harvested.  
+            //if (systemMetadata.getOriginMemberNode() == null || systemMetadata.getOriginMemberNode().getValue().isEmpty() ) {
             NodeReference originMemberNode = new NodeReference();
             originMemberNode.setValue(task.getNodeId());
             systemMetadata.setOriginMemberNode(originMemberNode);
-
+            // }
+            // Do not override the authoritative MemberNode assigned by a MemberNode
+            // part of redmine Task #3062
+            // if (systemMetadata.getAuthoritativeMemberNode() == null || systemMetadata.getAuthoritativeMemberNode().getValue().isEmpty() ) {
+//                InvalidSystemMetadata invalidSystemMetadata = new InvalidSystemMetadata("567100", "Identifier " + task.getPid() + " does not contain valid AuthoritativeNode Entry ");
+//                logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + invalidSystemMetadata.serialize(invalidSystemMetadata.FMT_XML));
+//                submitSynchronizationFailed(task.getPid(), invalidSystemMetadata);
+//                return null;
+                // while I agree with the above comment, Authoritative MemberNode is a field that is optional
+                // but it is important for the usefulness of an object
+                // so for now, fill it in if it is empty
             NodeReference authoritativeMemberNode = new NodeReference();
             authoritativeMemberNode.setValue(task.getNodeId());
             systemMetadata.setAuthoritativeMemberNode(authoritativeMemberNode);
+            //}
 
         } catch (ServiceFailure ex) {
             logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + ex.serialize(ex.FMT_XML));
@@ -414,7 +433,18 @@ public class TransferObjectTask implements Callable<Void> {
             if (doCreate) {
                 systemMetadata = processSystemMetadata(systemMetadata);
                 if (systemMetadata != null) {
-                    createObject(systemMetadata);
+                    // if (systemMetadata.getOriginMemberNode().getValue().contentEquals(systemMetadata.getAuthoritativeMemberNode().getValue())) {
+                        createObject(systemMetadata);
+                    //} else {
+                        // the object does not yet exist and a replica is attempting to create the object
+                        // this can not be performed until the original object is created.
+                        // replicas can not be synchronized before the original object
+                        // because the original object will have different information in the systemMetadata
+                     //   InvalidRequest invalidRequest = new InvalidRequest("567121", "Authoritative MemberNode " + systemMetadata.getAuthoritativeMemberNode().getValue() + " is different than Origin Member Node " + systemMetadata.getOriginMemberNode().getValue() + ". Replicas may not be synchronized before the Original Object has been created");
+                      //  logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + invalidRequest.serialize(invalidRequest.FMT_XML));
+                      //  submitSynchronizationFailed(systemMetadata.getIdentifier().getValue(), invalidRequest);    
+                      //  logger.warn(task.getNodeId() + "-" + task.getPid() + " Ignoring create from Replica MN");
+                    //}
                 }
             } else {
                 // determine if this is a valid update
@@ -542,7 +572,7 @@ public class TransferObjectTask implements Callable<Void> {
                         throw ex;
                     }
                 } catch (ServiceFailure ex) {
-                    if (tryAgain < 2) {
+                    if (tryAgain < 6) {
                         ++tryAgain;
                         logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n"
                                 + ex.serialize(BaseException.FMT_XML));
@@ -666,6 +696,13 @@ public class TransferObjectTask implements Callable<Void> {
                 auditReplicaSystemMetadata(pid);
                 // serial version will be updated at this point, so get the new version
                 logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Updated Archived");
+            } else {
+                // attempt to determine what the MN was updating and report back with
+                // synchronizationFailed
+                InvalidRequest invalidRequest = new InvalidRequest("567123", "Synchronization unable to process the update request. Only archived and obsoletedBy may be updated");
+                logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + invalidRequest.serialize(invalidRequest.FMT_XML));
+                submitSynchronizationFailed(pid.getValue(), invalidRequest);
+                logger.warn(task.getNodeId() + "-" + task.getPid() + " Ignoring update from MN. Only archived and obsoletedBy may be updated");
             }
         } else {
             boolean performUpdate = true;
@@ -693,6 +730,12 @@ public class TransferObjectTask implements Callable<Void> {
                 auditReplicaSystemMetadata(pid);
                 logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Updated Replica");
             } else {
+
+                // attempt to determine what the MN was updating and report back with
+                // synchronizationFailed
+                InvalidRequest invalidRequest = new InvalidRequest("567123", "Not Authorized Node to perform Updates. Synchronization unable to process the update request. Only archived and obsoletedBy may be updated from Authorized Node");
+                logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + invalidRequest.serialize(invalidRequest.FMT_XML));
+                submitSynchronizationFailed(pid.getValue(), invalidRequest);
                 logger.warn(task.getNodeId() + "-" + task.getPid() + " Ignoring update from Replica MN");
             }
         }

@@ -68,7 +68,7 @@ public class MemberNodeHarvestJob implements Job {
             boolean activateJob = Boolean.parseBoolean(Settings.getConfiguration().getString("Synchronization.active"));
             if (activateJob) {
                 String mnIdentifier = jobContext.getMergedJobDataMap().getString("mnIdentifier");
-                logger.info(mnIdentifier + "- ObjectListHarvestTask Start");
+                logger.info(mnIdentifier + "- Execute Service ObjectListHarvestTask Start");
                 HazelcastInstance hazelcast = HazelcastInstanceFactory.getProcessingInstance();
 
                 hzNodes = hazelcast.getMap("hzNodes");
@@ -110,9 +110,9 @@ public class MemberNodeHarvestJob implements Job {
                     // if the lastProcessingCompletedDate has changed then it should be persisted, but where?
                     // Does not need to be stored, maybe just printed?
                     if (lastProcessingCompletedDate == null) {
-                        logger.info(mnIdentifier + "- ObjectListHarvestTask did not finish.");
+                        logger.info(mnIdentifier + "- Execute Service ObjectListHarvestTask did not finish.");
                     } else {
-                        logger.info(mnIdentifier + "- ObjectListHarvestTask End at " + format.format(lastProcessingCompletedDate));
+                        logger.info(mnIdentifier + "- Execute Service ObjectListHarvestTask End at " + format.format(lastProcessingCompletedDate));
                     }
                 }
             }
