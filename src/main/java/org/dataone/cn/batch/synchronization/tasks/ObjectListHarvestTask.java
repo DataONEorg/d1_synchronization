@@ -90,6 +90,7 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
             ExecutionDisabledException ex = new ExecutionDisabledException(d1NodeReference.getValue() + "- Disabled");
             throw ex;
         }
+        logger.info(d1NodeReference.getValue() + "- Calling ObjectListHarvestTask");
         // we are going to write directly to ldap for the updateLastHarvested
         // because we do not want hazelcast to spam us about
         // all of these updates since we have a listener in HarvestSchedulingManager
@@ -104,7 +105,6 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
         NodeRegistryService nodeRegistryService = mnNodeComm.getNodeRegistryService();
         // logger is not  be serializable, but no need to make it transient imo
         Logger logger = Logger.getLogger(ObjectListHarvestTask.class.getName());
-        logger.info(d1NodeReference.getValue() + "- ObjectListHarvestTask Start");
         HazelcastInstance hazelcast = HazelcastInstanceFactory.getProcessingInstance();
         BlockingQueue<SyncObject> hzSyncObjectQueue = hazelcast.getQueue(synchronizationObjectQueue);
         // Need the LinkedHashMap to preserver insertion order
