@@ -681,29 +681,44 @@ public class TransferObjectTask implements Callable<Void> {
         SystemMetadata cnSystemMetadata = hzSystemMetaMap.get(pid);
         if (cnSystemMetadata.getAuthoritativeMemberNode().getValue().contentEquals(task.getNodeId())) {
             // this is an update from the original memberNode
-            if ((cnSystemMetadata.getObsoletedBy() == null) && (newSystemMetadata.getObsoletedBy() != null)) {
+
+        	boolean validChange = false;
+        	if ((cnSystemMetadata.getObsoletedBy() == null) && (newSystemMetadata.getObsoletedBy() != null)) {
                 logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Update ObsoletedBy");
 
                 nodeCommunications.getCnCore().setObsoletedBy(session, pid, newSystemMetadata.getObsoletedBy(), cnSystemMetadata.getSerialVersion().longValue());
-                auditReplicaSystemMetadata(pid);
+//                auditReplicaSystemMetadata(pid);
                 // serial version will be updated at this point, so get the new version
                 logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Updated ObsoletedBy");
-            } else if (((newSystemMetadata.getArchived() != null) && newSystemMetadata.getArchived())
+                validChange = true;
+            }
+        	if (((newSystemMetadata.getArchived() != null) && newSystemMetadata.getArchived())
                     && ((cnSystemMetadata.getArchived() == null) || !cnSystemMetadata.getArchived())) {
                 logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Update Archived");
 
                 nodeCommunications.getCnCore().archive(session, pid);
-                auditReplicaSystemMetadata(pid);
+//                auditReplicaSystemMetadata(pid);
                 // serial version will be updated at this point, so get the new version
                 logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Updated Archived");
-            } else {
-                // attempt to determine what the MN was updating and report back with
-                // synchronizationFailed
-                InvalidRequest invalidRequest = new InvalidRequest("567123", "Synchronization unable to process the update request. Only archived and obsoletedBy may be updated");
-                logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + invalidRequest.serialize(invalidRequest.FMT_XML));
-                submitSynchronizationFailed(pid.getValue(), invalidRequest);
-                logger.warn(task.getNodeId() + "-" + task.getPid() + " Ignoring update from MN. Only archived and obsoletedBy may be updated");
-            }
+                validChange = true;
+        	} 
+        	if (validChange) {
+        		auditReplicaSystemMetadata(pid);
+        	
+        	} else {
+        		// TODO: refactor to assume less about how we got here and whether or not to throw an exception
+        	    // 
+        		// a simple reharvest may lead to getting to this point, so check
+        		// the sysmeta modified date before throwing an exception
+        		if (newSystemMetadata.getDateSysMetadataModified().after(cnSystemMetadata.getDateSysMetadataModified())) {
+        			// something has changed, and we should probably investigate,
+        			// but for now just assume that an out-of-bounds change was attempted.
+        			InvalidRequest invalidRequest = new InvalidRequest("567123", "Synchronization unable to process the update request. Only archived and obsoletedBy may be updated");
+        			logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + invalidRequest.serialize(invalidRequest.FMT_XML));
+        			submitSynchronizationFailed(pid.getValue(), invalidRequest);
+        			logger.warn(task.getNodeId() + "-" + task.getPid() + " Ignoring update from MN. Only archived and obsoletedBy may be updated");
+        		}
+        	}
         } else {
             boolean performUpdate = true;
             // this may be an unrecorded replica
@@ -766,7 +781,7 @@ public class TransferObjectTask implements Callable<Void> {
                 Node node = hzNodes.get(replica.getReplicaMemberNode());
                 if (node.getType().equals(NodeType.MN)) {
                     boolean isTier3 = false;
-                    // Find out if a teir 3 node, if not then do not callback since it is not implemented
+                    // Find out if a tier 3 node, if not then do not callback since it is not implemented
                     for (Service service : node.getServices().getServiceList()) {
                         if (service.getName().equals("MNStorage") && service.getAvailable()) {
                             isTier3 = true;
