@@ -5,7 +5,7 @@
 	<artifactId>d1_synchronization</artifactId>
 	<packaging>jar</packaging>
 	<name>DataONE_Synchronization</name>
-	<version>1.2.0</version>
+	<version>1.2.1</version>
 	<description>Cn Member Node Synchronization</description>
         <url>http://dataone.org</url>
     <properties>
