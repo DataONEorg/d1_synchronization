@@ -35,14 +35,14 @@ import org.dataone.cn.batch.synchronization.type.NodeComm;
 import org.dataone.cn.batch.synchronization.type.SyncObject;
 import org.dataone.cn.hazelcast.HazelcastInstanceFactory;
 import org.dataone.configuration.Settings;
-import org.dataone.service.cn.impl.v1.NodeRegistryService;
+import org.dataone.service.cn.impl.v2.NodeRegistryService;
 import org.dataone.service.exceptions.InvalidRequest;
 import org.dataone.service.exceptions.InvalidToken;
 import org.dataone.service.exceptions.NotAuthorized;
 import org.dataone.service.exceptions.NotImplemented;
 import org.dataone.service.exceptions.ServiceFailure;
-import org.dataone.service.mn.tier1.v1.MNRead;
-import org.dataone.service.types.v1.Node;
+import org.dataone.service.mn.tier1.v2.MNRead;
+import org.dataone.service.types.v2.Node;
 import org.dataone.service.types.v1.NodeReference;
 import org.dataone.service.types.v1.ObjectInfo;
 import org.dataone.service.types.v1.ObjectList;
@@ -101,7 +101,7 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
         // therefore the only one mnNodeComm per MemberNode is needed for all the runs of
         // the harvester
         NodeCommFactory nodeCommFactory = NodeCommObjectListHarvestFactory.getInstance();
-        NodeComm mnNodeComm = nodeCommFactory.getNodeComm(d1NodeReference.getValue());
+        NodeComm mnNodeComm = nodeCommFactory.getNodeComm(d1NodeReference);
         NodeRegistryService nodeRegistryService = mnNodeComm.getNodeRegistryService();
         // logger is not  be serializable, but no need to make it transient imo
         Logger logger = Logger.getLogger(ObjectListHarvestTask.class.getName());
@@ -224,12 +224,17 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
         Boolean replicationStatus = null;
 
         try {
-            MNRead mnRead = nodeComm.getMnRead();
+            Object mnRead = nodeComm.getMnRead();
+            if (mnRead instanceof MNRead) {
+                objectList = ((MNRead) mnRead).listObjects(session, fromDate, toDate, null, null, replicationStatus, start, batchSize);
+            }
+            if (mnRead instanceof org.dataone.service.mn.tier1.v1.MNRead) {
+                objectList = ((org.dataone.service.mn.tier1.v1.MNRead) mnRead).listObjects(session, fromDate, toDate, null, replicationStatus, start, batchSize);
+            }
             // always execute for the first run (for start = 0)
             // otherwise skip because when the start is equal or greater
             // then total, then all objects have been harvested
 
-            objectList = mnRead.listObjects(session, fromDate, toDate, null, replicationStatus, start, batchSize);
             // if objectList is null or the count is 0 or the list is empty, then
             // there is nothing to process
             if (!((objectList == null)

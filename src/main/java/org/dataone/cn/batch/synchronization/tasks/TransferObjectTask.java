@@ -31,13 +31,14 @@ import java.util.concurrent.locks.Lock;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.log4j.Logger;
-import org.dataone.client.MNode;
+import org.dataone.cn.batch.exceptions.NodeCommUnavailable;
+import org.dataone.cn.batch.synchronization.NodeCommSyncObjectFactory;
 import org.dataone.cn.batch.synchronization.type.NodeComm;
 import org.dataone.cn.batch.synchronization.type.SyncObject;
 import org.dataone.cn.hazelcast.HazelcastInstanceFactory;
 import org.dataone.configuration.Settings;
 import org.dataone.ore.ResourceMapFactory;
-import org.dataone.service.cn.impl.v1.ReserveIdentifierService;
+import org.dataone.service.cn.impl.v2.ReserveIdentifierService;
 import org.dataone.service.exceptions.BaseException;
 import org.dataone.service.exceptions.IdentifierNotUnique;
 import org.dataone.service.exceptions.InsufficientResources;
@@ -50,17 +51,19 @@ import org.dataone.service.exceptions.NotImplemented;
 import org.dataone.service.exceptions.ServiceFailure;
 import org.dataone.service.exceptions.UnsupportedType;
 import org.dataone.service.exceptions.VersionMismatch;
+import org.dataone.service.mn.tier1.v2.MNRead;
 import org.dataone.service.types.v1.Checksum;
 import org.dataone.service.types.v1.Identifier;
-import org.dataone.service.types.v1.Node;
+import org.dataone.service.types.v2.Node;
 import org.dataone.service.types.v1.NodeReference;
 import org.dataone.service.types.v1.NodeType;
-import org.dataone.service.types.v1.ObjectFormat;
+import org.dataone.service.types.v2.ObjectFormat;
 import org.dataone.service.types.v1.Replica;
 import org.dataone.service.types.v1.ReplicationStatus;
 import org.dataone.service.types.v1.Service;
 import org.dataone.service.types.v1.Session;
-import org.dataone.service.types.v1.SystemMetadata;
+import org.dataone.service.types.v2.SystemMetadata;
+import org.dataone.service.util.TypeMarshaller;
 import org.dspace.foresite.OREException;
 import org.dspace.foresite.OREParserException;
 
@@ -229,8 +232,17 @@ public class TransferObjectTask implements Callable<Void> {
 
             do {
                 try {
-                    systemMetadata = nodeCommunications.getMnRead().getSystemMetadata(null, identifier);
-                    needSystemMetadata = false;
+                	Object mnRead = nodeCommunications.getMnRead();
+                	if (mnRead instanceof MNRead) {
+                		systemMetadata = ((MNRead) mnRead).getSystemMetadata(null, identifier);
+                		needSystemMetadata = false;
+                	}
+                	else if (mnRead instanceof org.dataone.service.mn.tier1.v1.MNRead) {
+                		org.dataone.service.types.v1.SystemMetadata oldSystemMetadata = ((org.dataone.service.mn.tier1.v1.MNRead) mnRead).getSystemMetadata(null, identifier);
+                		systemMetadata = TypeMarshaller.convertTypeFromType(oldSystemMetadata, SystemMetadata.class);
+                		needSystemMetadata = false;
+                	}
+                	
                 } catch (NotAuthorized ex) {
                     if (tryAgain < 2) {
                         ++tryAgain;
@@ -455,7 +467,13 @@ public class TransferObjectTask implements Callable<Void> {
                     if (!existingChecksum.getAlgorithm().equalsIgnoreCase(systemMetadata.getChecksum().getAlgorithm())) {
                         // we can't check algorithms that do not match, so get MN to recalculate with original checksum
                         logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Try to retrieve a checksum from membernode that matches the checksum of existing systemMetadata");
-                        newChecksum = nodeCommunications.getMnRead().getChecksum(session, systemMetadata.getIdentifier(), existingChecksum.getAlgorithm());
+                        Object mnRead = nodeCommunications.getMnRead();
+                    	if (mnRead instanceof MNRead) {
+                    		newChecksum = ((MNRead) mnRead).getChecksum(session, systemMetadata.getIdentifier(), existingChecksum.getAlgorithm());
+                    	}
+                    	else if (mnRead instanceof org.dataone.service.mn.tier1.v1.MNRead) {
+                    		newChecksum = ((org.dataone.service.mn.tier1.v1.MNRead) mnRead).getChecksum(session, systemMetadata.getIdentifier(), existingChecksum.getAlgorithm());
+                    	}
                     }
                     if (newChecksum.getValue().contentEquals(existingChecksum.getValue())) {
                         // how do we determine what is unique about this and whether it should be processed?
@@ -553,9 +571,19 @@ public class TransferObjectTask implements Callable<Void> {
                 try {
                     logger.debug("Task-" + task.getNodeId() + "-" + task.getPid()
                             + " getting ScienceMetadata ");
-                    sciMetaStream = nodeCommunications.getMnRead().get(
-                            systemMetadata.getIdentifier());
-                    needSciMetadata = false;
+                    
+                    
+                    Object mnRead = nodeCommunications.getMnRead();
+                	if (mnRead instanceof MNRead) {
+                		sciMetaStream = ((MNRead) mnRead).get(null, systemMetadata.getIdentifier());
+                        needSciMetadata = false;
+                	}
+                	else if (mnRead instanceof org.dataone.service.mn.tier1.v1.MNRead) {
+                		sciMetaStream = ((org.dataone.service.mn.tier1.v1.MNRead) mnRead).get(null, systemMetadata.getIdentifier());
+                        needSciMetadata = false;
+                	}
+                    
+                    
                 } catch (NotAuthorized ex) {
                     if (tryAgain < 2) {
                         ++tryAgain;
@@ -606,13 +634,13 @@ public class TransferObjectTask implements Callable<Void> {
             }
 
             logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Creating Object");
-            d1Identifier = nodeCommunications.getCnCore().create(d1Identifier, sciMetaStream,
+            d1Identifier = nodeCommunications.getCnCore().create(null, d1Identifier, sciMetaStream,
                     systemMetadata);
             logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Created Object");
         } else {
             logger.info("Task-" + task.getNodeId() + "-" + task.getPid()
                     + " Registering SystemMetadata");
-            nodeCommunications.getCnCore().registerSystemMetadata(d1Identifier, systemMetadata);
+            nodeCommunications.getCnCore().registerSystemMetadata(null, d1Identifier, systemMetadata);
             logger.info("Task-" + task.getNodeId() + "-" + task.getPid()
                     + " Registered SystemMetadata");
         }
@@ -789,14 +817,26 @@ public class TransferObjectTask implements Callable<Void> {
                         }
                     }
                     if (isTier3) {
-                        String mnUrl = node.getBaseURL();
 
-                        MNode mnNode = new MNode(mnUrl);
-                        SystemMetadata mnSystemMetadata = mnNode.getSystemMetadata(session, cnSystemMetadata.getIdentifier());
-
-                        if (mnSystemMetadata.getSerialVersion() != cnSystemMetadata.getSerialVersion()) {
-
-                            mnNode.systemMetadataChanged(session, cnSystemMetadata.getIdentifier(), cnSystemMetadata.getSerialVersion().longValue(), cnSystemMetadata.getDateSysMetadataModified());
+                        NodeComm nodeComm = null;
+						try {
+							nodeComm = NodeCommSyncObjectFactory.getInstance().getNodeComm(node.getIdentifier());
+						} catch (NodeCommUnavailable e) {
+							throw new ServiceFailure("0000", e.getMessage());
+						}
+                        
+                        Object mNode = nodeComm.getMnRead();
+                        if (mNode instanceof MNRead) {
+                        	SystemMetadata mnSystemMetadata = ((MNRead) mNode).getSystemMetadata(session, cnSystemMetadata.getIdentifier());
+                            if (mnSystemMetadata.getSerialVersion() != cnSystemMetadata.getSerialVersion()) {
+                            	((MNRead) mNode).systemMetadataChanged(session, cnSystemMetadata.getIdentifier(), cnSystemMetadata.getSerialVersion().longValue(), cnSystemMetadata.getDateSysMetadataModified());
+                            }
+                        }
+                        else if (mNode instanceof org.dataone.client.v1.MNode) {
+                        	org.dataone.service.types.v1.SystemMetadata mnSystemMetadata = ((org.dataone.client.v1.MNode) mNode).getSystemMetadata(session, cnSystemMetadata.getIdentifier());
+                            if (mnSystemMetadata.getSerialVersion() != cnSystemMetadata.getSerialVersion()) {
+                            	((org.dataone.client.v1.MNode) mNode).systemMetadataChanged(session, cnSystemMetadata.getIdentifier(), cnSystemMetadata.getSerialVersion().longValue(), cnSystemMetadata.getDateSysMetadataModified());
+                            }
                         }
                     }
                 }

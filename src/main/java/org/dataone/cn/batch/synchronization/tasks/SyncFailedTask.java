@@ -33,6 +33,7 @@ import org.dataone.service.exceptions.NotAuthorized;
 import org.dataone.service.exceptions.NotImplemented;
 import org.dataone.service.exceptions.ServiceFailure;
 import org.dataone.service.exceptions.SynchronizationFailed;
+import org.dataone.service.mn.tier1.v2.MNRead;
 import org.dataone.service.types.v1.Session;
 
 /**
@@ -74,7 +75,15 @@ public class SyncFailedTask implements Callable<String> {
         syncFailed.setPid(pid);
         syncFailed.setNodeId(nodeId);
         try {
-            nodeCommunications.getMnRead().synchronizationFailed(session, syncFailed);
+        	
+        	Object mnRead = nodeCommunications.getMnRead();
+            if (mnRead instanceof MNRead) {
+                ((MNRead) mnRead).synchronizationFailed(session, syncFailed);;
+            }
+            if (mnRead instanceof org.dataone.service.mn.tier1.v1.MNRead) {
+               ((org.dataone.service.mn.tier1.v1.MNRead) mnRead).synchronizationFailed(session, syncFailed);
+            }
+            
         } catch (InvalidToken ex) {
             logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + " " + ex.serialize(ex.FMT_XML));
         } catch (NotAuthorized ex) {

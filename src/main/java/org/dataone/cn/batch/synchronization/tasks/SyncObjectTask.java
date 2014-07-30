@@ -40,7 +40,7 @@ import org.dataone.cn.batch.synchronization.type.NodeCommState;
 import org.dataone.cn.batch.synchronization.type.SyncObject;
 import org.dataone.configuration.Settings;
 import org.dataone.service.exceptions.ServiceFailure;
-import org.dataone.service.types.v1.Node;
+import org.dataone.service.types.v2.Node;
 import org.dataone.service.types.v1.NodeReference;
 import org.dataone.service.util.DateTimeMarshaller;
 import org.springframework.core.task.TaskRejectedException;
@@ -173,7 +173,7 @@ public class SyncObjectTask implements Callable<String> {
                                     NodeReference nodeReference = new NodeReference();
                                     nodeReference.setValue(futureTask.getNodeId());
                                     futureNodeComm.setState(NodeCommState.AVAILABLE);
-                                    submitSynchronizationFailed(futureTask, hzNodes.get(nodeReference).getBaseURL());
+                                    submitSynchronizationFailed(futureTask, nodeReference);
                                 } else {
                                     logger.warn("Task-" + futureTask.getNodeId() + "-" + futureTask.getPid() + "Unable to cancel the task");
                                 }
@@ -201,7 +201,7 @@ public class SyncObjectTask implements Callable<String> {
                         NodeReference nodeReference = new NodeReference();
                         nodeReference.setValue(task.getNodeId());
                         Node mnNode = hzNodes.get(nodeReference);
-                        NodeComm nodeCommunications = nodeCommFactory.getNodeComm(mnNode.getBaseURL());
+                        NodeComm nodeCommunications = nodeCommFactory.getNodeComm(mnNode.getIdentifier());
 
                         // finally, execute the new task!
                         try {
@@ -267,13 +267,13 @@ public class SyncObjectTask implements Callable<String> {
         }
     }
 
-    private void submitSynchronizationFailed(SyncObject task, String mnBaseUrl) {
+    private void submitSynchronizationFailed(SyncObject task, NodeReference mnNodeId) {
         // we do not care about if this returns, because if this
         // submission fails, then it would be somewhat futile to
         // repeatedly try to submit failing submisssions...
         try {
             logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Submit SyncFailed");
-            NodeComm nodeCommunications = nodeCommunicationsFactory.getNodeComm(mnBaseUrl);
+            NodeComm nodeCommunications = nodeCommunicationsFactory.getNodeComm(mnNodeId);
             SyncFailedTask syncFailedTask = new SyncFailedTask(nodeCommunications, task);
 
             FutureTask futureTask = new FutureTask(syncFailedTask);
