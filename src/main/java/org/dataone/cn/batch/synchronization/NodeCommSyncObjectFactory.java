@@ -27,17 +27,22 @@ import java.io.File;
 import java.util.*;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.dataone.client.CNode;
-import org.dataone.client.D1Client;
-import org.dataone.client.MNode;
+import org.dataone.client.v2.CNode;
+import org.dataone.client.v2.itk.D1Client;
 import org.dataone.client.auth.CertificateManager;
 import org.dataone.cn.batch.exceptions.NodeCommUnavailable;
 import org.dataone.cn.batch.synchronization.type.NodeComm;
 import org.dataone.cn.batch.synchronization.type.NodeCommState;
 import org.dataone.cn.hazelcast.HazelcastClientInstance;
 import org.dataone.configuration.Settings;
-import org.dataone.service.cn.impl.v1.ReserveIdentifierService;
+import org.dataone.service.cn.impl.v2.NodeRegistryService;
+import org.dataone.service.cn.impl.v2.ReserveIdentifierService;
+import org.dataone.service.exceptions.NotFound;
+import org.dataone.service.exceptions.NotImplemented;
 import org.dataone.service.exceptions.ServiceFailure;
+import org.dataone.service.types.v1.NodeReference;
+import org.dataone.service.types.v1.Service;
+import org.dataone.service.types.v2.Node;
 
 /**
  * Creates/maintains a CommNode (node communications) pool for use by the TransferObjectTask
@@ -54,7 +59,6 @@ public class NodeCommSyncObjectFactory implements NodeCommFactory {
 
     public final static Log logger = LogFactory.getLog(NodeCommSyncObjectFactory.class);
     private static HazelcastInstance hzclient;
-    private static D1Client d1client = new D1Client();
     private String clientCertificateLocation =
             Settings.getConfiguration().getString("D1Client.certificate.directory")
             + File.separator + Settings.getConfiguration().getString("D1Client.certificate.filename");
@@ -64,7 +68,7 @@ public class NodeCommSyncObjectFactory implements NodeCommFactory {
         // exceed the maxNumberOfClientsPerMemberNode
         // each NodeComm will have a state, NodeCommState, that
         // will indicate if it is available for use by a future task
-    private static Map<String, List<NodeComm>> initializedMemberNodes = new HashMap<String, List<NodeComm>>();
+    private static Map<NodeReference, List<NodeComm>> initializedMemberNodes = new HashMap<NodeReference, List<NodeComm>>();
     private static NodeCommFactory nodeCommFactory = null;
     private NodeCommSyncObjectFactory() {
         
@@ -76,18 +80,18 @@ public class NodeCommSyncObjectFactory implements NodeCommFactory {
         return nodeCommFactory;
     }
     @Override
-    public NodeComm getNodeComm(String mnNodeUrl) throws ServiceFailure, NodeCommUnavailable {
-        return this.getNodeComm(mnNodeUrl, null);
+    public NodeComm getNodeComm(NodeReference mnNodeId) throws ServiceFailure, NodeCommUnavailable {
+        return this.getNodeComm(mnNodeId, null);
     }
 
     @Override
-    public NodeComm getNodeComm(String mnNodeUrl, String hzConfigLocation) throws ServiceFailure, NodeCommUnavailable {
+    public NodeComm getNodeComm(NodeReference mnNodeId, String hzConfigLocation) throws ServiceFailure, NodeCommUnavailable {
 
                     NodeComm nodeCommunications = null;
 
                     // grab a membernode client off of the stack of initialized clients
-                    if (initializedMemberNodes.containsKey(mnNodeUrl)) {
-                        List<NodeComm> nodeCommList = initializedMemberNodes.get(mnNodeUrl);
+                    if (initializedMemberNodes.containsKey(mnNodeId)) {
+                        List<NodeComm> nodeCommList = initializedMemberNodes.get(mnNodeId);
                         // find a node comm that is not currently in use
                         for (NodeComm nodeComm : nodeCommList) {
                             if (nodeComm.getState().equals(NodeCommState.AVAILABLE)) {
@@ -101,7 +105,7 @@ public class NodeCommSyncObjectFactory implements NodeCommFactory {
                             // no node Communications is available, see if we can create a new one
                             if (nodeCommList.size() <= maxNumberOfClientsPerMemberNode) {
                                     // create and add a new one
-                                    nodeCommunications = createNodeComm(mnNodeUrl, hzConfigLocation);
+                                    nodeCommunications = createNodeComm(mnNodeId, hzConfigLocation);
 
                                     nodeCommunications.setState(NodeCommState.RUNNING);
                                     nodeCommunications.setNumber(nodeCommList.size() + 1);
@@ -117,12 +121,12 @@ public class NodeCommSyncObjectFactory implements NodeCommFactory {
                         // that is assigned to this MemberNode
                         // create it, get a node comm, and put it in the hash
                             List<NodeComm> nodeCommList = new ArrayList<NodeComm>();
-                            nodeCommunications = createNodeComm(mnNodeUrl, hzConfigLocation);
+                            nodeCommunications = createNodeComm(mnNodeId, hzConfigLocation);
                             nodeCommunications.setState(NodeCommState.RUNNING);
                             nodeCommunications.setNumber(nodeCommList.size() + 1);
                             nodeCommunications.setRunningStartDate(new Date());
                             nodeCommList.add(nodeCommunications);
-                            initializedMemberNodes.put(mnNodeUrl, nodeCommList);
+                            initializedMemberNodes.put(mnNodeId, nodeCommList);
 
                     }
                     if (nodeCommunications == null) {
@@ -130,16 +134,38 @@ public class NodeCommSyncObjectFactory implements NodeCommFactory {
                     }
                     return nodeCommunications;
     }
-    private NodeComm createNodeComm(String mnUrl, String hzConfigLocation) throws ServiceFailure {
+    
+    private NodeComm createNodeComm(NodeReference mnNodeId, String hzConfigLocation) throws ServiceFailure {
         if (hzclient == null) {
             hzclient = HazelcastClientInstance.getHazelcastClient();
             CertificateManager.getInstance().setCertificateLocation(clientCertificateLocation);
         }
 
+        CNode cNode = null;
+        try {
+        	cNode = D1Client.getCN();
+        } catch(NotImplemented e) {
+        	throw new ServiceFailure("0000", e.getMessage());
+        }
         
-        CNode cNode = d1client.getCN();
-        MNode mNode = d1client.getMN(mnUrl);
         ReserveIdentifierService reserveIdentifierService = new ReserveIdentifierService();
+        
+        // figure out what client impl to use for this node, default to v1
+        Object mNode = D1Client.getMN(mnNodeId);
+        NodeRegistryService nodeRegistryService = new NodeRegistryService();
+        Node node = null;
+        try {
+            node = nodeRegistryService.getNode(mnNodeId);
+            for (Service service: node.getServices().getServiceList()) {
+            	if (service.getVersion().equals("v2")) {
+            		mNode = org.dataone.client.v2.itk.D1Client.getMN(mnNodeId);
+            		break;
+            	}
+            }
+        } catch (NotFound ex) {
+            throw new ServiceFailure("0000", ex.getDescription());
+        }
+        
         NodeComm nodeComm = new NodeComm(mNode, cNode, cNode, reserveIdentifierService, hzclient);
         return nodeComm;
     }

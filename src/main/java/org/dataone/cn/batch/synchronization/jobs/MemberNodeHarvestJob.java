@@ -17,32 +17,30 @@
  */
 package org.dataone.cn.batch.synchronization.jobs;
 
-import com.hazelcast.core.DistributedTask;
-import com.hazelcast.core.Hazelcast;
-import com.hazelcast.core.HazelcastInstance;
-import com.hazelcast.core.IMap;
+import java.text.SimpleDateFormat;
 import java.util.Date;
-import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.dataone.cn.batch.exceptions.ExecutionDisabledException;
 import org.dataone.cn.batch.synchronization.tasks.ObjectListHarvestTask;
+import org.dataone.cn.hazelcast.HazelcastInstanceFactory;
 import org.dataone.configuration.Settings;
-import org.dataone.service.types.v1.Node;
+import org.dataone.service.types.v2.Node;
 import org.dataone.service.types.v1.NodeReference;
 import org.quartz.DisallowConcurrentExecution;
 import org.quartz.Job;
 import org.quartz.JobExecutionContext;
 import org.quartz.JobExecutionException;
-import java.text.SimpleDateFormat;
-import java.text.ParseException;
-import org.dataone.cn.batch.exceptions.ExecutionDisabledException;
-import org.dataone.cn.hazelcast.HazelcastInstanceFactory;
+
+import com.hazelcast.core.DistributedTask;
+import com.hazelcast.core.HazelcastInstance;
+import com.hazelcast.core.IMap;
 
 /**
  * Quartz Job that starts off the hazelcast distributed execution of harvesting for a nodeList from a Membernode It

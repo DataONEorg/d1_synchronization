@@ -23,18 +23,18 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.dataone.client.D1Client;
-import org.dataone.client.MNode;
 import org.dataone.client.auth.CertificateManager;
+import org.dataone.client.v1.itk.D1Client;
 import org.dataone.cn.batch.exceptions.NodeCommUnavailable;
 import org.dataone.cn.batch.synchronization.type.NodeComm;
 import org.dataone.cn.hazelcast.HazelcastClientInstance;
 import org.dataone.configuration.Settings;
-import org.dataone.service.cn.impl.v1.NodeRegistryService;
+import org.dataone.service.cn.impl.v2.NodeRegistryService;
 import org.dataone.service.exceptions.NotFound;
 import org.dataone.service.exceptions.ServiceFailure;
-import org.dataone.service.types.v1.Node;
+import org.dataone.service.types.v2.Node;
 import org.dataone.service.types.v1.NodeReference;
+import org.dataone.service.types.v1.Service;
 
 
 /**
@@ -57,9 +57,8 @@ public class NodeCommObjectListHarvestFactory implements NodeCommFactory {
     private static String clientCertificateLocation =
             Settings.getConfiguration().getString("D1Client.certificate.directory")
             + File.separator + Settings.getConfiguration().getString("D1Client.certificate.filename");
-    private static ConcurrentMap<String, NodeComm> initializedMemberNodes = new ConcurrentHashMap<String, NodeComm>();
+    private static ConcurrentMap<NodeReference, NodeComm> initializedMemberNodes = new ConcurrentHashMap<NodeReference, NodeComm>();
     private static NodeCommFactory nodeCommFactory = null;
-    private static D1Client d1client = new D1Client();
     private NodeCommObjectListHarvestFactory() {
     }
 
@@ -71,12 +70,12 @@ public class NodeCommObjectListHarvestFactory implements NodeCommFactory {
     }
 
     @Override
-    public NodeComm getNodeComm(String mnNodeId) throws ServiceFailure, NodeCommUnavailable {
+    public NodeComm getNodeComm(NodeReference mnNodeId) throws ServiceFailure, NodeCommUnavailable {
         return this.getNodeComm(mnNodeId, null);
     }
 
     @Override
-    public NodeComm getNodeComm(String mnNodeId, String hzConfigLocation) throws ServiceFailure, NodeCommUnavailable {
+    public NodeComm getNodeComm(NodeReference mnNodeId, String hzConfigLocation) throws ServiceFailure, NodeCommUnavailable {
 
         if (initializedMemberNodes.containsKey(mnNodeId)) {
             return initializedMemberNodes.get(mnNodeId);
@@ -85,17 +84,23 @@ public class NodeCommObjectListHarvestFactory implements NodeCommFactory {
                 hzclient = HazelcastClientInstance.getHazelcastClient();
                 CertificateManager.getInstance().setCertificateLocation(clientCertificateLocation);
             }
-            NodeReference nodeReference = new NodeReference();
-            nodeReference.setValue(mnNodeId);
+        
+            // figure out what client impl to use for this node, default to v1
+            Object mNode = D1Client.getMN(mnNodeId);
             NodeRegistryService nodeRegistryService = new NodeRegistryService();
-            Node mnNode;
+            Node node = null;
             try {
-                mnNode = nodeRegistryService.getNode(nodeReference);
+                node = nodeRegistryService.getNode(mnNodeId);
+                for (Service service: node.getServices().getServiceList()) {
+                	if (service.getVersion().equals("v2")) {
+                		mNode = org.dataone.client.v2.itk.D1Client.getMN(mnNodeId);
+                		break;
+                	}
+                }
             } catch (NotFound ex) {
                 throw new NodeCommUnavailable(ex.getDescription());
             }
             
-            MNode mNode = d1client.getMN(mnNode.getBaseURL());
             NodeComm nodeComm = new NodeComm(mNode, nodeRegistryService, hzclient);
             initializedMemberNodes.putIfAbsent(mnNodeId, nodeComm);
             return nodeComm;

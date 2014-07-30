@@ -24,12 +24,10 @@ package org.dataone.cn.batch.synchronization.type;
 
 import com.hazelcast.core.HazelcastInstance;
 import java.util.Date;
-import org.dataone.service.cn.impl.v1.NodeRegistryService;
-import org.dataone.service.cn.impl.v1.ReserveIdentifierService;
-import org.dataone.service.cn.v1.CNCore;
-import org.dataone.service.cn.v1.CNIdentity;
-import org.dataone.service.cn.v1.CNReplication;
-import org.dataone.service.mn.tier1.v1.MNRead;
+import org.dataone.service.cn.impl.v2.NodeRegistryService;
+import org.dataone.service.cn.impl.v2.ReserveIdentifierService;
+import org.dataone.service.cn.v2.CNCore;
+import org.dataone.service.cn.v2.CNReplication;
 
 /**
  * Assemble and manage communication channels used by TransferObjectTask
@@ -38,7 +36,7 @@ import org.dataone.service.mn.tier1.v1.MNRead;
  */
 public class NodeComm {
 
-    private MNRead mnRead;
+    private Object mnRead;
     private CNCore cnCore;
     private CNReplication cnReplication;
     private HazelcastInstance hzClient;
@@ -51,14 +49,14 @@ public class NodeComm {
     private NodeCommState state;
     // help to determine if thread is blocking, used as timeout
     private Date runningStartDate;
-    public NodeComm(MNRead mnRead,  NodeRegistryService nodeRegistryService, HazelcastInstance hzClient) {
+    public NodeComm(Object mnRead,  NodeRegistryService nodeRegistryService, HazelcastInstance hzClient) {
         this.mnRead = mnRead;
         this.reserveIdentifierService = null;
         this.nodeRegistryService = nodeRegistryService;
         this.hzClient = hzClient;
     }
 
-    public NodeComm(MNRead mnRead, CNCore cnCore, CNReplication cnReplication, ReserveIdentifierService reserveIdentifierService, HazelcastInstance hzClient) {
+    public NodeComm(Object mnRead, CNCore cnCore, CNReplication cnReplication, ReserveIdentifierService reserveIdentifierService, HazelcastInstance hzClient) {
         this.mnRead = mnRead;
         this.cnCore = cnCore;
         this.cnReplication = cnReplication;
@@ -66,11 +64,11 @@ public class NodeComm {
         this.hzClient = hzClient;
     }
 
-    public MNRead getMnRead() {
+    public Object getMnRead() {
         return mnRead;
     }
 
-    public void setMnRead(MNRead mnRead) {
+    public void setMnRead(Object mnRead) {
         this.mnRead = mnRead;
     }
 

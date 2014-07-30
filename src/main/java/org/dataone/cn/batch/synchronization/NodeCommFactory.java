@@ -25,6 +25,7 @@ package org.dataone.cn.batch.synchronization;
 import org.dataone.cn.batch.exceptions.NodeCommUnavailable;
 import org.dataone.cn.batch.synchronization.type.NodeComm;
 import org.dataone.service.exceptions.ServiceFailure;
+import org.dataone.service.types.v1.NodeReference;
 
 /**
  * Provides an interface for access to NodeComm objects that should be pooled for re-use.
@@ -38,6 +39,6 @@ import org.dataone.service.exceptions.ServiceFailure;
  */
 public interface NodeCommFactory {
 
-    public NodeComm getNodeComm(String mnNode) throws ServiceFailure, NodeCommUnavailable;
-    public NodeComm getNodeComm(String mnNode, String hzConfigLocation) throws ServiceFailure, NodeCommUnavailable;
+    public NodeComm getNodeComm(NodeReference mnNode) throws ServiceFailure, NodeCommUnavailable;
+    public NodeComm getNodeComm(NodeReference mnNode, String hzConfigLocation) throws ServiceFailure, NodeCommUnavailable;
 }

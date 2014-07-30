@@ -29,9 +29,10 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Date;
+
 import org.apache.commons.codec.net.URLCodec;
 import org.apache.log4j.Logger;
-import org.dataone.service.cn.v1.CNCore;
+import org.dataone.service.cn.v2.CNCore;
 import org.dataone.service.exceptions.IdentifierNotUnique;
 import org.dataone.service.exceptions.InsufficientResources;
 import org.dataone.service.exceptions.InvalidRequest;
@@ -44,17 +45,16 @@ import org.dataone.service.exceptions.ServiceFailure;
 import org.dataone.service.exceptions.UnsupportedType;
 import org.dataone.service.exceptions.VersionMismatch;
 import org.dataone.service.types.v1.ChecksumAlgorithmList;
-import org.dataone.service.types.v1.Event;
 import org.dataone.service.types.v1.Identifier;
-import org.dataone.service.types.v1.Log;
-import org.dataone.service.types.v1.NodeList;
-import org.dataone.service.types.v1.ObjectFormat;
 import org.dataone.service.types.v1.ObjectFormatIdentifier;
-import org.dataone.service.types.v1.ObjectFormatList;
 import org.dataone.service.types.v1.Session;
 import org.dataone.service.types.v1.Subject;
-import org.dataone.service.types.v1.SubjectInfo;
-import org.dataone.service.types.v1.SystemMetadata;
+import org.dataone.service.types.v2.Log;
+import org.dataone.service.types.v2.Node;
+import org.dataone.service.types.v2.NodeList;
+import org.dataone.service.types.v2.ObjectFormat;
+import org.dataone.service.types.v2.ObjectFormatList;
+import org.dataone.service.types.v2.SystemMetadata;
 import org.dataone.service.util.TypeMarshaller;
 import org.jibx.runtime.JiBXException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -142,7 +142,7 @@ public class MockCNCore implements CNCore {
     }
 
     @Override
-    public Log getLogRecords(Session session, Date fromDate, Date toDate, Event event, String pidFilter, Integer start, Integer count) throws InvalidToken, InvalidRequest, ServiceFailure, NotAuthorized, NotImplemented, InsufficientResources {
+    public Log getLogRecords(Session session, Date fromDate, Date toDate, String event, String pidFilter, Integer start, Integer count) throws InvalidToken, InvalidRequest, ServiceFailure, NotAuthorized, NotImplemented, InsufficientResources {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
@@ -154,7 +154,7 @@ public class MockCNCore implements CNCore {
 
     @Override
     public Identifier delete(Session session, Identifier pid)
-    throws InvalidToken, ServiceFailure, InvalidRequest, NotAuthorized, NotFound, NotImplemented {
+    throws InvalidToken, ServiceFailure, NotAuthorized, NotFound, NotImplemented {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
@@ -193,56 +193,27 @@ public class MockCNCore implements CNCore {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
-    @Override
-    public Log getLogRecords(Date fromDate, Date toDate, Event event, String pidFilter, Integer start, Integer count) throws InvalidToken, InvalidRequest, ServiceFailure, NotAuthorized, NotImplemented, InsufficientResources {
+	@Override
+	public Node getCapabilities() throws NotImplemented, ServiceFailure {
         throw new UnsupportedOperationException("Not supported yet.");
-    }
 
-    @Override
-    public Identifier reserveIdentifier(Identifier pid) throws InvalidToken, ServiceFailure, NotAuthorized, IdentifierNotUnique, NotImplemented, InvalidRequest {
+	}
+
+	@Override
+	public boolean updateSystemMetadata(Session session, Identifier pid,
+			SystemMetadata sysmeta) throws NotImplemented, NotAuthorized,
+			ServiceFailure, InvalidRequest, InvalidSystemMetadata, InvalidToken {
         throw new UnsupportedOperationException("Not supported yet.");
-    }
 
-    @Override
-    public Identifier generateIdentifier(String scheme, String fragment) throws InvalidToken, ServiceFailure, NotAuthorized, NotImplemented, InvalidRequest {
+	}
+
+	@Override
+	public Identifier archive(Session session, Identifier id)
+			throws InvalidToken, ServiceFailure, NotAuthorized, NotFound,
+			NotImplemented {
         throw new UnsupportedOperationException("Not supported yet.");
-    }
 
-    @Override
-    public boolean hasReservation(Subject subject, Identifier pid) throws InvalidToken, ServiceFailure, NotFound, NotAuthorized, NotImplemented, InvalidRequest, IdentifierNotUnique {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public Identifier create(Identifier pid, InputStream object, SystemMetadata sysmeta) throws InvalidToken, ServiceFailure, NotAuthorized, IdentifierNotUnique, UnsupportedType, InsufficientResources, InvalidSystemMetadata, NotImplemented, InvalidRequest {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public Identifier registerSystemMetadata(Identifier pid, SystemMetadata sysmeta) throws NotImplemented, NotAuthorized, ServiceFailure, InvalidRequest, InvalidSystemMetadata, InvalidToken {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public boolean setObsoletedBy(Identifier pid, Identifier obsoletedByPid, long serialVersion) throws NotImplemented, NotFound, NotAuthorized, ServiceFailure, InvalidRequest, InvalidToken, VersionMismatch {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public Identifier archive(Identifier pid) throws InvalidToken, ServiceFailure, NotAuthorized, NotFound, NotImplemented {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public Identifier archive(Session session, Identifier pid) throws InvalidToken, ServiceFailure, InvalidRequest, NotAuthorized, NotFound, NotImplemented {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public Identifier delete(Identifier pid) throws InvalidToken, ServiceFailure, NotAuthorized, NotFound, NotImplemented {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
+	}
 
 
 }
