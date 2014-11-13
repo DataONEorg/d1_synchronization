@@ -18,9 +18,11 @@
 package org.dataone.cn.batch.synchronization.tasks;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
+import java.math.BigInteger;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Date;
@@ -34,10 +36,8 @@ import org.apache.log4j.Logger;
 import org.dataone.client.MNode;
 import org.dataone.cn.batch.synchronization.type.NodeComm;
 import org.dataone.cn.batch.synchronization.type.SyncObject;
-import org.dataone.cn.hazelcast.HazelcastInstanceFactory;
 import org.dataone.configuration.Settings;
 import org.dataone.ore.ResourceMapFactory;
-import org.dataone.service.cn.impl.v1.ReserveIdentifierService;
 import org.dataone.service.exceptions.BaseException;
 import org.dataone.service.exceptions.IdentifierNotUnique;
 import org.dataone.service.exceptions.InsufficientResources;
@@ -61,8 +61,11 @@ import org.dataone.service.types.v1.ReplicationStatus;
 import org.dataone.service.types.v1.Service;
 import org.dataone.service.types.v1.Session;
 import org.dataone.service.types.v1.SystemMetadata;
+import org.dataone.service.types.v1.util.ChecksumUtil;
+import org.dataone.service.util.TypeMarshaller;
 import org.dspace.foresite.OREException;
 import org.dspace.foresite.OREParserException;
+import org.jibx.runtime.JiBXException;
 
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.IMap;
@@ -86,6 +89,11 @@ import com.hazelcast.core.IMap;
  */
 public class TransferObjectTask implements Callable<Void> {
 
+    private static final BigInteger CHECKSUM_VERIFICATION_SIZE_BYPASS_THRESHOLD = Settings
+            .getConfiguration().getBigInteger(
+                    "Synchronization.checksum.verify.size.bypass.threshold",
+                    BigInteger.valueOf(10000000));
+
     Logger logger = Logger.getLogger(TransferObjectTask.class.getName());
     private NodeComm nodeCommunications;
     private SyncObject task;
@@ -94,9 +102,11 @@ public class TransferObjectTask implements Callable<Void> {
     // need to be processed on a separate CN
     private HazelcastInstance hazelcast = HazelcastInstanceFactory.getProcessingInstance();
     String cnIdentifier = Settings.getConfiguration().getString("cn.router.nodeId");
-    String synchronizationObjectQueue = Settings.getConfiguration().getString("dataone.hazelcast.synchronizationObjectQueue");
+    String synchronizationObjectQueue = Settings.getConfiguration().getString(
+            "dataone.hazelcast.synchronizationObjectQueue");
     String hzNodesName = Settings.getConfiguration().getString("dataone.hazelcast.nodes");
-    String hzSystemMetaMapString = Settings.getConfiguration().getString("dataone.hazelcast.systemMetadata");
+    String hzSystemMetaMapString = Settings.getConfiguration().getString(
+            "dataone.hazelcast.systemMetadata");
     IMap<Identifier, SystemMetadata> hzSystemMetaMap;
     ReserveIdentifierService reserveIdentifierService;
 
@@ -124,7 +134,8 @@ public class TransferObjectTask implements Callable<Void> {
         boolean isLocked = false;
         try {
             // this will be from the hazelcast client running against metacat
-            logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Locking task of attempt " + task.getAttempt());
+            logger.info("Task-" + task.getNodeId() + "-" + task.getPid()
+                    + " Locking task of attempt " + task.getAttempt());
             long timeToWait = 1;
 
             lock = hazelcast.getLock(lockPid);
@@ -138,7 +149,12 @@ public class TransferObjectTask implements Callable<Void> {
                         write(systemMetadata);
                     } catch (VersionMismatch ex) {
 
-                        logger.warn("Task-" + task.getNodeId() + "-" + task.getPid() + " Pid altered before processing complete! Placing back on hzSyncObjectQueue of attempt " + task.getAttempt());
+                        logger.warn("Task-"
+                                + task.getNodeId()
+                                + "-"
+                                + task.getPid()
+                                + " Pid altered before processing complete! Placing back on hzSyncObjectQueue of attempt "
+                                + task.getAttempt());
                         if (task.getAttempt() == 1) {
                             /*
                              * Member node should be informed to update its systemMetadata. If the member node is unable
@@ -156,13 +172,15 @@ public class TransferObjectTask implements Callable<Void> {
                             try {
                                 Thread.sleep(10000L);
                             } catch (InterruptedException iex) {
-                                logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + " " + iex.getMessage());
+                                logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + " "
+                                        + iex.getMessage());
 
                             }
                             hazelcast.getQueue(synchronizationObjectQueue).put(task);
                             task.setAttempt(task.getAttempt() + 1);
                         } else {
-                            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + " Pid altered before processing complete! Unable to process");
+                            logger.error("Task-" + task.getNodeId() + "-" + task.getPid()
+                                    + " Pid altered before processing complete! Unable to process");
                         }
 
                     }
@@ -172,7 +190,9 @@ public class TransferObjectTask implements Callable<Void> {
                     // there should be a max # of attempts from locking
                     if (task.getAttempt() < 100) {
 
-                        logger.warn("Task-" + task.getNodeId() + "-" + task.getPid() + " Pid Locked! Placing back on hzSyncObjectQueue of attempt " + task.getAttempt());
+                        logger.warn("Task-" + task.getNodeId() + "-" + task.getPid()
+                                + " Pid Locked! Placing back on hzSyncObjectQueue of attempt "
+                                + task.getAttempt());
 
                         /*
                          * allow a maximum number of attempts before permanent failure
@@ -182,17 +202,23 @@ public class TransferObjectTask implements Callable<Void> {
                         try {
                             Thread.sleep(1000L);
                         } catch (InterruptedException iex) {
-                            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + " " + iex.getMessage());
+                            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + " "
+                                    + iex.getMessage());
 
                         }
                         hazelcast.getQueue(synchronizationObjectQueue).put(task);
 
                     } else {
-                        logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + " Pid Locked! Unable to process pid " + task.getPid() + " from node " + task.getNodeId());
+                        logger.error("Task-" + task.getNodeId() + "-" + task.getPid()
+                                + " Pid Locked! Unable to process pid " + task.getPid()
+                                + " from node " + task.getNodeId());
                     }
                 } catch (InterruptedException ex) {
-                    logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + " Pid Locked! Unable to process pid " + task.getPid() + " from node " + task.getNodeId());
-                    ServiceFailure serviceFailure = new ServiceFailure("564001", "Checksum does not match existing object with same pid");
+                    logger.error("Task-" + task.getNodeId() + "-" + task.getPid()
+                            + " Pid Locked! Unable to process pid " + task.getPid() + " from node "
+                            + task.getNodeId());
+                    ServiceFailure serviceFailure = new ServiceFailure("564001",
+                            "Checksum does not match existing object with same pid");
 
                 }
             }
@@ -206,6 +232,7 @@ public class TransferObjectTask implements Callable<Void> {
         }
         return null;
     }
+
     /*
      * Process the Task before writing it out to storage
      *
@@ -218,7 +245,7 @@ public class TransferObjectTask implements Callable<Void> {
      */
 
     private SystemMetadata retrieveSystemMetadata() {
-        String memberNodeId = task.getNodeId();     
+        String memberNodeId = task.getNodeId();
         SystemMetadata systemMetadata = null;
         try {
             //            sciMetaFile = this.writeScienceMetadataToFile(objectInfo);
@@ -229,16 +256,19 @@ public class TransferObjectTask implements Callable<Void> {
 
             do {
                 try {
-                    systemMetadata = nodeCommunications.getMnRead().getSystemMetadata(null, identifier);
+                    systemMetadata = nodeCommunications.getMnRead().getSystemMetadata(null,
+                            identifier);
                     needSystemMetadata = false;
                 } catch (NotAuthorized ex) {
                     if (tryAgain < 2) {
                         ++tryAgain;
-                        logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + ex.serialize(ex.FMT_XML));
+                        logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n"
+                                + ex.serialize(ex.FMT_XML));
                         try {
                             Thread.sleep(5000L);
                         } catch (InterruptedException ex1) {
-                            logger.warn("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + ex);
+                            logger.warn("Task-" + task.getNodeId() + "-" + task.getPid() + "\n"
+                                    + ex);
                         }
                     } else {
                         // only way to get out of loop if NotAuthorized keeps getting thrown
@@ -247,11 +277,13 @@ public class TransferObjectTask implements Callable<Void> {
                 } catch (ServiceFailure ex) {
                     if (tryAgain < 6) {
                         ++tryAgain;
-                        logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + ex.serialize(ex.FMT_XML));
+                        logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n"
+                                + ex.serialize(ex.FMT_XML));
                         try {
                             Thread.sleep(5000L);
                         } catch (InterruptedException ex1) {
-                            logger.warn("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + ex);
+                            logger.warn("Task-" + task.getNodeId() + "-" + task.getPid() + "\n"
+                                    + ex);
                         }
                     } else {
                         // only way to get out of loop if NotAuthorized keeps getting thrown
@@ -260,37 +292,52 @@ public class TransferObjectTask implements Callable<Void> {
                 }
             } while (needSystemMetadata);
             if (!task.getPid().contentEquals(systemMetadata.getIdentifier().getValue())) {
-                InvalidSystemMetadata invalidSystemMetadata = new InvalidSystemMetadata("567100", "Identifier " + task.getPid() + " retrieved from getObjectList is different from that contained in systemMetadata " + systemMetadata.getIdentifier().getValue());
-                logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + invalidSystemMetadata.serialize(invalidSystemMetadata.FMT_XML));
+                InvalidSystemMetadata invalidSystemMetadata = new InvalidSystemMetadata(
+                        "567100",
+                        "Identifier "
+                                + task.getPid()
+                                + " retrieved from getObjectList is different from that contained in systemMetadata "
+                                + systemMetadata.getIdentifier().getValue());
+                logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n"
+                        + invalidSystemMetadata.serialize(invalidSystemMetadata.FMT_XML));
                 submitSynchronizationFailed(task.getPid(), invalidSystemMetadata);
                 return null;
             }
-            logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Retrieved SystemMetadata Identifier:" + systemMetadata.getIdentifier().getValue() + " from node " + memberNodeId + " for ObjectInfo Identifier " + identifier.getValue());
+            logger.info("Task-" + task.getNodeId() + "-" + task.getPid()
+                    + " Retrieved SystemMetadata Identifier:"
+                    + systemMetadata.getIdentifier().getValue() + " from node " + memberNodeId
+                    + " for ObjectInfo Identifier " + identifier.getValue());
 
         } catch (NotAuthorized ex) {
-            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + ex.serialize(ex.FMT_XML));
+            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n"
+                    + ex.serialize(ex.FMT_XML));
             submitSynchronizationFailed(task.getPid(), ex);
             return null;
         } catch (InvalidToken ex) {
-            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + ex.serialize(ex.FMT_XML));
+            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n"
+                    + ex.serialize(ex.FMT_XML));
             submitSynchronizationFailed(task.getPid(), ex);
             return null;
         } catch (ServiceFailure ex) {
-            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + ex.serialize(ex.FMT_XML));
+            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n"
+                    + ex.serialize(ex.FMT_XML));
             submitSynchronizationFailed(task.getPid(), ex);
             return null;
         } catch (NotFound ex) {
-            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + ex.serialize(ex.FMT_XML));
+            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n"
+                    + ex.serialize(ex.FMT_XML));
             submitSynchronizationFailed(task.getPid(), ex);
             return null;
         } catch (NotImplemented ex) {
-            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + ex.serialize(ex.FMT_XML));
+            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n"
+                    + ex.serialize(ex.FMT_XML));
             submitSynchronizationFailed(task.getPid(), ex);
             return null;
         } catch (Exception ex) {
             ex.printStackTrace();
 
-            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + " this didn't work", ex);
+            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n"
+                    + " this didn't work", ex);
             ServiceFailure serviceFailure = new ServiceFailure("-1", ex.getMessage());
             submitSynchronizationFailed(task.getPid(), serviceFailure);
             return null;
@@ -317,7 +364,8 @@ public class TransferObjectTask implements Callable<Void> {
 
         try {
             IMap<NodeReference, Node> hzNodes = hazelcast.getMap(hzNodesName);
-            logger.debug("Task-" + task.getNodeId() + "-" + task.getPid() + " Processing SystemMetadata");
+            logger.debug("Task-" + task.getNodeId() + "-" + task.getPid()
+                    + " Processing SystemMetadata");
             boolean addOriginalReplica = true;
             /*
              * DataONE Bug #2603 Synchronization should delete existing replicas on create
@@ -333,12 +381,14 @@ public class TransferObjectTask implements Callable<Void> {
             originalReplica.setReplicaVerified(new Date());
             systemMetadata.addReplica(originalReplica);
 
-            logger.debug("Task-" + task.getNodeId() + "-" + task.getPid() + " Included replica for original MN");
+            logger.debug("Task-" + task.getNodeId() + "-" + task.getPid()
+                    + " Included replica for original MN");
             // data objects are not fully synchronized, only their metadata is
             // synchronized,
             // only set valid science metadata formats as having been replicated
             logger.debug("Task-" + task.getNodeId() + "-" + task.getPid() + " Get Object Format");
-            ObjectFormat objectFormat = nodeCommunications.getCnCore().getFormat(systemMetadata.getFormatId());
+            ObjectFormat objectFormat = nodeCommunications.getCnCore().getFormat(
+                    systemMetadata.getFormatId());
             if ((objectFormat != null) && !(objectFormat.getFormatType().equalsIgnoreCase("DATA"))) {
                 NodeReference cnReference = new NodeReference();
                 cnReference.setValue(cnIdentifier);
@@ -347,46 +397,54 @@ public class TransferObjectTask implements Callable<Void> {
                 cnReplica.setReplicationStatus(ReplicationStatus.COMPLETED);
                 cnReplica.setReplicaVerified(new Date());
                 systemMetadata.addReplica(cnReplica);
-                logger.debug("Task-" + task.getNodeId() + "-" + task.getPid() + " Added CN as replica because formatType " + objectFormat.getFormatType() + " is sciMetadata");
+                logger.debug("Task-" + task.getNodeId() + "-" + task.getPid()
+                        + " Added CN as replica because formatType " + objectFormat.getFormatType()
+                        + " is sciMetadata");
             }
             // the origin membernode may be different from the node
             // being harvested.  
-            //if (systemMetadata.getOriginMemberNode() == null || systemMetadata.getOriginMemberNode().getValue().isEmpty() ) {
-            NodeReference originMemberNode = new NodeReference();
-            originMemberNode.setValue(task.getNodeId());
-            systemMetadata.setOriginMemberNode(originMemberNode);
-            // }
+            if (systemMetadata.getOriginMemberNode() == null
+                    || systemMetadata.getOriginMemberNode().getValue().isEmpty()) {
+                NodeReference originMemberNode = new NodeReference();
+                originMemberNode.setValue(task.getNodeId());
+                systemMetadata.setOriginMemberNode(originMemberNode);
+            }
             // Do not override the authoritative MemberNode assigned by a MemberNode
             // part of redmine Task #3062
-            // if (systemMetadata.getAuthoritativeMemberNode() == null || systemMetadata.getAuthoritativeMemberNode().getValue().isEmpty() ) {
-//                InvalidSystemMetadata invalidSystemMetadata = new InvalidSystemMetadata("567100", "Identifier " + task.getPid() + " does not contain valid AuthoritativeNode Entry ");
-//                logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + invalidSystemMetadata.serialize(invalidSystemMetadata.FMT_XML));
-//                submitSynchronizationFailed(task.getPid(), invalidSystemMetadata);
-//                return null;
+            if (systemMetadata.getAuthoritativeMemberNode() == null
+                    || systemMetadata.getAuthoritativeMemberNode().getValue().isEmpty()) {
+                //                InvalidSystemMetadata invalidSystemMetadata = new InvalidSystemMetadata("567100", "Identifier " + task.getPid() + " does not contain valid AuthoritativeNode Entry ");
+                //                logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + invalidSystemMetadata.serialize(invalidSystemMetadata.FMT_XML));
+                //                submitSynchronizationFailed(task.getPid(), invalidSystemMetadata);
+                //                return null;
                 // while I agree with the above comment, Authoritative MemberNode is a field that is optional
                 // but it is important for the usefulness of an object
                 // so for now, fill it in if it is empty
-            NodeReference authoritativeMemberNode = new NodeReference();
-            authoritativeMemberNode.setValue(task.getNodeId());
-            systemMetadata.setAuthoritativeMemberNode(authoritativeMemberNode);
-            //}
+                NodeReference authoritativeMemberNode = new NodeReference();
+                authoritativeMemberNode.setValue(task.getNodeId());
+                systemMetadata.setAuthoritativeMemberNode(authoritativeMemberNode);
+            }
 
         } catch (ServiceFailure ex) {
-            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + ex.serialize(ex.FMT_XML));
+            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n"
+                    + ex.serialize(ex.FMT_XML));
             submitSynchronizationFailed(task.getPid(), ex);
             return null;
         } catch (NotFound ex) {
-            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + ex.serialize(ex.FMT_XML));
+            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n"
+                    + ex.serialize(ex.FMT_XML));
             submitSynchronizationFailed(task.getPid(), ex);
             return null;
         } catch (NotImplemented ex) {
-            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + ex.serialize(ex.FMT_XML));
+            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n"
+                    + ex.serialize(ex.FMT_XML));
             submitSynchronizationFailed(task.getPid(), ex);
             return null;
         } catch (Exception ex) {
             ex.printStackTrace();
 
-            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + " this didn't work", ex);
+            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n"
+                    + " this didn't work", ex);
             ServiceFailure serviceFailure = new ServiceFailure("-1", ex.getMessage());
             submitSynchronizationFailed(task.getPid(), serviceFailure);
             return null;
@@ -405,8 +463,8 @@ public class TransferObjectTask implements Callable<Void> {
 
         try {
 
-            logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Getting sysMeta from CN");
-
+            logger.info("Task-" + task.getNodeId() + "-" + task.getPid()
+                    + " Getting sysMeta from CN");
 
             // use the identity manager to determine if the PID already exists or is previously
             // reserved. 
@@ -420,93 +478,126 @@ public class TransferObjectTask implements Callable<Void> {
             try {
                 Session verifySubmitter = new Session();
                 verifySubmitter.setSubject(systemMetadata.getSubmitter());
-                doCreate = reserveIdentifierService.hasReservation(verifySubmitter, systemMetadata.getSubmitter(), systemMetadata.getIdentifier());
-                logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Create from reservation");
+                doCreate = reserveIdentifierService.hasReservation(verifySubmitter,
+                        systemMetadata.getSubmitter(), systemMetadata.getIdentifier());
+                logger.info("Task-" + task.getNodeId() + "-" + task.getPid()
+                        + " Create from reservation");
             } catch (NotFound ex) {
                 doCreate = true;
                 // assume if reserveIdentifierService has thrown NotFound exception SystemMetadata does not exist
-                logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Create from Exception");
+                logger.info("Task-" + task.getNodeId() + "-" + task.getPid()
+                        + " Create from Exception");
             } catch (IdentifierNotUnique ex) {
-                logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Pid Exists. Must be an Update");
+                logger.info("Task-" + task.getNodeId() + "-" + task.getPid()
+                        + " Pid Exists. Must be an Update");
             }
             // create, update or ignore
             if (doCreate) {
                 systemMetadata = processSystemMetadata(systemMetadata);
                 if (systemMetadata != null) {
                     // if (systemMetadata.getOriginMemberNode().getValue().contentEquals(systemMetadata.getAuthoritativeMemberNode().getValue())) {
-                        createObject(systemMetadata);
+                    createObject(systemMetadata);
                     //} else {
-                        // the object does not yet exist and a replica is attempting to create the object
-                        // this can not be performed until the original object is created.
-                        // replicas can not be synchronized before the original object
-                        // because the original object will have different information in the systemMetadata
-                     //   InvalidRequest invalidRequest = new InvalidRequest("567121", "Authoritative MemberNode " + systemMetadata.getAuthoritativeMemberNode().getValue() + " is different than Origin Member Node " + systemMetadata.getOriginMemberNode().getValue() + ". Replicas may not be synchronized before the Original Object has been created");
-                      //  logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + invalidRequest.serialize(invalidRequest.FMT_XML));
-                      //  submitSynchronizationFailed(systemMetadata.getIdentifier().getValue(), invalidRequest);    
-                      //  logger.warn(task.getNodeId() + "-" + task.getPid() + " Ignoring create from Replica MN");
+                    // the object does not yet exist and a replica is attempting to create the object
+                    // this can not be performed until the original object is created.
+                    // replicas can not be synchronized before the original object
+                    // because the original object will have different information in the systemMetadata
+                    //   InvalidRequest invalidRequest = new InvalidRequest("567121", "Authoritative MemberNode " + systemMetadata.getAuthoritativeMemberNode().getValue() + " is different than Origin Member Node " + systemMetadata.getOriginMemberNode().getValue() + ". Replicas may not be synchronized before the Original Object has been created");
+                    //  logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + invalidRequest.serialize(invalidRequest.FMT_XML));
+                    //  submitSynchronizationFailed(systemMetadata.getIdentifier().getValue(), invalidRequest);    
+                    //  logger.warn(task.getNodeId() + "-" + task.getPid() + " Ignoring create from Replica MN");
                     //}
                 }
             } else {
                 // determine if this is a valid update
-                SystemMetadata cnSystemMetadata = hzSystemMetaMap.get(systemMetadata.getIdentifier());
+                SystemMetadata cnSystemMetadata = hzSystemMetaMap.get(systemMetadata
+                        .getIdentifier());
                 if (cnSystemMetadata != null && cnSystemMetadata.getChecksum() != null) {
                     Checksum existingChecksum = cnSystemMetadata.getChecksum(); // maybe an update, maybe duplicate, maybe a conflicting pid
                     Checksum newChecksum = systemMetadata.getChecksum();
-                    if (!existingChecksum.getAlgorithm().equalsIgnoreCase(systemMetadata.getChecksum().getAlgorithm())) {
+                    if (!existingChecksum.getAlgorithm().equalsIgnoreCase(
+                            systemMetadata.getChecksum().getAlgorithm())) {
                         // we can't check algorithms that do not match, so get MN to recalculate with original checksum
-                        logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Try to retrieve a checksum from membernode that matches the checksum of existing systemMetadata");
-                        newChecksum = nodeCommunications.getMnRead().getChecksum(session, systemMetadata.getIdentifier(), existingChecksum.getAlgorithm());
+                        logger.info("Task-"
+                                + task.getNodeId()
+                                + "-"
+                                + task.getPid()
+                                + " Try to retrieve a checksum from membernode that matches the checksum of existing systemMetadata");
+                        newChecksum = nodeCommunications.getMnRead().getChecksum(session,
+                                systemMetadata.getIdentifier(), existingChecksum.getAlgorithm());
                     }
                     if (newChecksum.getValue().contentEquals(existingChecksum.getValue())) {
                         // how do we determine what is unique about this and whether it should be processed?
-                        logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Update sysMeta because checksum is same");
+                        logger.info("Task-" + task.getNodeId() + "-" + task.getPid()
+                                + " Update sysMeta because checksum is same");
                         updateSystemMetadata(systemMetadata);
                     } else {
-                        logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Update sysMeta Not Unique! Checksum is different");
+                        logger.info("Task-" + task.getNodeId() + "-" + task.getPid()
+                                + " Update sysMeta Not Unique! Checksum is different");
 
-                        IdentifierNotUnique notUnique = new IdentifierNotUnique("-1", "Checksum does not match existing object with same pid.");
-                        submitSynchronizationFailed(systemMetadata.getIdentifier().getValue(), notUnique);
+                        IdentifierNotUnique notUnique = new IdentifierNotUnique("-1",
+                                "Checksum does not match existing object with same pid.");
+                        submitSynchronizationFailed(systemMetadata.getIdentifier().getValue(),
+                                notUnique);
                     }
                 } else {
                     if (cnSystemMetadata == null) {
-                        logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + " cn's systemMetadata is null when get called from Hazelcast " + hzSystemMetaMapString + " Map");
+                        logger.error("Task-" + task.getNodeId() + "-" + task.getPid()
+                                + " cn's systemMetadata is null when get called from Hazelcast "
+                                + hzSystemMetaMapString + " Map");
                     } else {
-                        logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + " cn's systemMetadata's checksum is null when get called from Hazelcast " + hzSystemMetaMapString + " Map");
+                        logger.error("Task-"
+                                + task.getNodeId()
+                                + "-"
+                                + task.getPid()
+                                + " cn's systemMetadata's checksum is null when get called from Hazelcast "
+                                + hzSystemMetaMapString + " Map");
                     }
                 }
             }
         } catch (VersionMismatch ex) {
-            logger.warn("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + ex.serialize(ex.FMT_XML));
+            logger.warn("Task-" + task.getNodeId() + "-" + task.getPid() + "\n"
+                    + ex.serialize(ex.FMT_XML));
             throw ex;
         } catch (InvalidSystemMetadata ex) {
-            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + ex.serialize(ex.FMT_XML));
+            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n"
+                    + ex.serialize(ex.FMT_XML));
             submitSynchronizationFailed(systemMetadata.getIdentifier().getValue(), ex);
         } catch (InvalidToken ex) {
-            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + ex.serialize(ex.FMT_XML));
+            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n"
+                    + ex.serialize(ex.FMT_XML));
             submitSynchronizationFailed(systemMetadata.getIdentifier().getValue(), ex);
         } catch (NotFound ex) {
-            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + ex.serialize(ex.FMT_XML));
+            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n"
+                    + ex.serialize(ex.FMT_XML));
             submitSynchronizationFailed(systemMetadata.getIdentifier().getValue(), ex);
         } catch (NotAuthorized ex) {
-            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + ex.serialize(ex.FMT_XML));
+            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n"
+                    + ex.serialize(ex.FMT_XML));
             submitSynchronizationFailed(systemMetadata.getIdentifier().getValue(), ex);
         } catch (InvalidRequest ex) {
-            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + ex.serialize(ex.FMT_XML));
+            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n"
+                    + ex.serialize(ex.FMT_XML));
             submitSynchronizationFailed(systemMetadata.getIdentifier().getValue(), ex);
         } catch (ServiceFailure ex) {
-            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + ex.serialize(ex.FMT_XML));
+            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n"
+                    + ex.serialize(ex.FMT_XML));
             submitSynchronizationFailed(systemMetadata.getIdentifier().getValue(), ex);
         } catch (InsufficientResources ex) {
-            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + ex.serialize(ex.FMT_XML));
+            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n"
+                    + ex.serialize(ex.FMT_XML));
             submitSynchronizationFailed(systemMetadata.getIdentifier().getValue(), ex);
         } catch (NotImplemented ex) {
-            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + ex.serialize(ex.FMT_XML));
+            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n"
+                    + ex.serialize(ex.FMT_XML));
             submitSynchronizationFailed(systemMetadata.getIdentifier().getValue(), ex);
         } catch (UnsupportedType ex) {
-            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + ex.serialize(ex.FMT_XML));
+            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n"
+                    + ex.serialize(ex.FMT_XML));
             submitSynchronizationFailed(systemMetadata.getIdentifier().getValue(), ex);
         } catch (IdentifierNotUnique ex) {
-            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + ex.serialize(ex.FMT_XML));
+            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n"
+                    + ex.serialize(ex.FMT_XML));
             submitSynchronizationFailed(systemMetadata.getIdentifier().getValue(), ex);
         } catch (Exception ex) {
             ex.printStackTrace();
@@ -544,6 +635,10 @@ public class TransferObjectTask implements Callable<Void> {
         systemMetadata.setDateSysMetadataModified(new Date());
         ObjectFormat objectFormat = nodeCommunications.getCnCore().getFormat(
                 systemMetadata.getFormatId());
+
+        validateSystemMetadata(systemMetadata);
+        validateChecksum(systemMetadata);
+
         if ((objectFormat != null) && !objectFormat.getFormatType().equalsIgnoreCase("DATA")) {
             InputStream sciMetaStream = null;
             // get the scimeta object and then feed it to metacat
@@ -618,6 +713,49 @@ public class TransferObjectTask implements Callable<Void> {
         }
     }
 
+    private void validateChecksum(SystemMetadata systemMetadata) throws InvalidSystemMetadata {
+        if (systemMetadata.getSize().compareTo(CHECKSUM_VERIFICATION_SIZE_BYPASS_THRESHOLD) < 0) {
+            Exception checksumException = null;
+            Checksum expectedChecksum = systemMetadata.getChecksum();
+            Checksum actualChecksum = null;
+            try {
+                actualChecksum = nodeCommunications.getMnRead()
+                        .getChecksum(systemMetadata.getIdentifier(),
+                                systemMetadata.getChecksum().getAlgorithm());
+            } catch (InvalidRequest e) {
+                checksumException = e;
+            } catch (InvalidToken e) {
+                checksumException = e;
+            } catch (NotAuthorized e) {
+                checksumException = e;
+            } catch (NotImplemented e) {
+                checksumException = e;
+            } catch (ServiceFailure e) {
+                checksumException = e;
+            } catch (NotFound e) {
+                checksumException = e;
+            }
+            if (!ChecksumUtil.areChecksumsEqual(expectedChecksum, actualChecksum)
+                    || checksumException != null) {
+                String pid = "null";
+                if (systemMetadata != null && systemMetadata.getIdentifier() != null
+                        && systemMetadata.getIdentifier().getValue() != null) {
+                    pid = systemMetadata.getIdentifier().getValue();
+                }
+                String errorMessage = "The checksum for pid: "
+                        + pid
+                        + " does not match the actual checksum supplied by the member node.  Actual checksum: "
+                        + actualChecksum + ". System metadata checksum: " + expectedChecksum;
+                InvalidSystemMetadata be = new InvalidSystemMetadata("000", errorMessage);
+                if (checksumException != null) {
+                    be.initCause(checksumException);
+                }
+                logger.error(errorMessage);
+                throw be;
+            }
+        }
+    }
+
     private boolean validateResource(byte[] resourceBytes) throws UnsupportedType {
         boolean valid = false;
         if (resourceBytes != null) {
@@ -653,8 +791,38 @@ public class TransferObjectTask implements Callable<Void> {
         return isResource;
     }
 
+    /**
+     * Throws InvalidSystemMetadata if the input sysmeta param is not schema valid.
+     * @param sysmeta
+     * @throws InvalidSystemMetadata
+     */
+    private void validateSystemMetadata(SystemMetadata sysmeta) throws InvalidSystemMetadata {
+        Exception caught = null;
+        try {
+            ByteArrayOutputStream os = new ByteArrayOutputStream();
+            TypeMarshaller.marshalTypeToOutputStream(sysmeta, os);
+            os.close();
+        } catch (JiBXException e) {
+            caught = e;
+        } catch (IOException e) {
+            caught = e;
+        }
+        if (caught != null) {
+            String pid = "null";
+            if (sysmeta != null && sysmeta.getIdentifier() != null
+                    && sysmeta.getIdentifier().getValue() != null) {
+                pid = sysmeta.getIdentifier().getValue();
+            }
+            String errorMessage = "The SystemMetadata for pid: " + pid + " is not schema valid";
+            InvalidSystemMetadata be = new InvalidSystemMetadata("000", errorMessage);
+            be.initCause(caught);
+            logger.error(errorMessage, be);
+            throw be;
+        }
+    }
+
     /*
-     * Object is already created. This opertation will only update systemmetadata if a portion of the systemmeta data
+     * Object is already created. This operation will only update systemmetadata if a portion of the systemmeta data
      * has changed that synchroniziation can update. Namely, The authoritative member node can update the obsoletedBy
      * field or if an existing replica is found, then the replica information is added to the systemMetadata.
      *
@@ -669,7 +837,9 @@ public class TransferObjectTask implements Callable<Void> {
      * @throwsVersionMismatch
      *
      */
-    private void updateSystemMetadata(SystemMetadata newSystemMetadata) throws InvalidSystemMetadata, NotFound, NotImplemented, NotAuthorized, ServiceFailure, InvalidRequest, InvalidToken, VersionMismatch {
+    private void updateSystemMetadata(SystemMetadata newSystemMetadata)
+            throws InvalidSystemMetadata, NotFound, NotImplemented, NotAuthorized, ServiceFailure,
+            InvalidRequest, InvalidToken, VersionMismatch {
         // Only update the systemMetadata fields that can be updated by a membernode
         //
         // obsoletedBy
@@ -679,46 +849,59 @@ public class TransferObjectTask implements Callable<Void> {
         Identifier pid = new Identifier();
         pid.setValue(newSystemMetadata.getIdentifier().getValue());
         SystemMetadata cnSystemMetadata = hzSystemMetaMap.get(pid);
-        if (cnSystemMetadata.getAuthoritativeMemberNode().getValue().contentEquals(task.getNodeId())) {
+        if (cnSystemMetadata.getAuthoritativeMemberNode().getValue()
+                .contentEquals(task.getNodeId())) {
             // this is an update from the original memberNode
 
-        	boolean validChange = false;
-        	if ((cnSystemMetadata.getObsoletedBy() == null) && (newSystemMetadata.getObsoletedBy() != null)) {
-                logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Update ObsoletedBy");
+            boolean validChange = false;
+            if ((cnSystemMetadata.getObsoletedBy() == null)
+                    && (newSystemMetadata.getObsoletedBy() != null)) {
+                logger.info("Task-" + task.getNodeId() + "-" + task.getPid()
+                        + " Update ObsoletedBy");
 
-                nodeCommunications.getCnCore().setObsoletedBy(session, pid, newSystemMetadata.getObsoletedBy(), cnSystemMetadata.getSerialVersion().longValue());
-//                auditReplicaSystemMetadata(pid);
+                nodeCommunications.getCnCore().setObsoletedBy(session, pid,
+                        newSystemMetadata.getObsoletedBy(),
+                        cnSystemMetadata.getSerialVersion().longValue());
+                //                auditReplicaSystemMetadata(pid);
                 // serial version will be updated at this point, so get the new version
-                logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Updated ObsoletedBy");
+                logger.info("Task-" + task.getNodeId() + "-" + task.getPid()
+                        + " Updated ObsoletedBy");
                 validChange = true;
             }
-        	if (((newSystemMetadata.getArchived() != null) && newSystemMetadata.getArchived())
+            if (((newSystemMetadata.getArchived() != null) && newSystemMetadata.getArchived())
                     && ((cnSystemMetadata.getArchived() == null) || !cnSystemMetadata.getArchived())) {
                 logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Update Archived");
 
                 nodeCommunications.getCnCore().archive(session, pid);
-//                auditReplicaSystemMetadata(pid);
+                //                auditReplicaSystemMetadata(pid);
                 // serial version will be updated at this point, so get the new version
                 logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Updated Archived");
                 validChange = true;
-        	} 
-        	if (validChange) {
-        		auditReplicaSystemMetadata(pid);
-        	
-        	} else {
-        		// TODO: refactor to assume less about how we got here and whether or not to throw an exception
-        	    // 
-        		// a simple reharvest may lead to getting to this point, so check
-        		// the sysmeta modified date before throwing an exception
-        		if (newSystemMetadata.getDateSysMetadataModified().after(cnSystemMetadata.getDateSysMetadataModified())) {
-        			// something has changed, and we should probably investigate,
-        			// but for now just assume that an out-of-bounds change was attempted.
-        			InvalidRequest invalidRequest = new InvalidRequest("567123", "Synchronization unable to process the update request. Only archived and obsoletedBy may be updated");
-        			logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + invalidRequest.serialize(invalidRequest.FMT_XML));
-        			submitSynchronizationFailed(pid.getValue(), invalidRequest);
-        			logger.warn(task.getNodeId() + "-" + task.getPid() + " Ignoring update from MN. Only archived and obsoletedBy may be updated");
-        		}
-        	}
+            }
+            if (validChange) {
+                auditReplicaSystemMetadata(pid);
+
+            } else {
+                // TODO: refactor to assume less about how we got here and whether or not to throw an exception
+                // 
+                // a simple reharvest may lead to getting to this point, so check
+                // the sysmeta modified date before throwing an exception
+                if (newSystemMetadata.getDateSysMetadataModified().after(
+                        cnSystemMetadata.getDateSysMetadataModified())) {
+                    // something has changed, and we should probably investigate,
+                    // but for now just assume that an out-of-bounds change was attempted.
+                    InvalidRequest invalidRequest = new InvalidRequest(
+                            "567123",
+                            "Synchronization unable to process the update request. Only archived and obsoletedBy may be updated");
+                    logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n"
+                            + invalidRequest.serialize(invalidRequest.FMT_XML));
+                    submitSynchronizationFailed(pid.getValue(), invalidRequest);
+                    logger.warn(task.getNodeId()
+                            + "-"
+                            + task.getPid()
+                            + " Ignoring update from MN. Only archived and obsoletedBy may be updated");
+                }
+            }
         } else {
             boolean performUpdate = true;
             // this may be an unrecorded replica
@@ -740,7 +923,8 @@ public class TransferObjectTask implements Callable<Void> {
                 mnReplica.setReplicationStatus(ReplicationStatus.COMPLETED);
                 mnReplica.setReplicaVerified(new Date());
 
-                nodeCommunications.getCnReplication().updateReplicationMetadata(session, pid, mnReplica, cnSystemMetadata.getSerialVersion().longValue());
+                nodeCommunications.getCnReplication().updateReplicationMetadata(session, pid,
+                        mnReplica, cnSystemMetadata.getSerialVersion().longValue());
 
                 auditReplicaSystemMetadata(pid);
                 logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Updated Replica");
@@ -748,10 +932,14 @@ public class TransferObjectTask implements Callable<Void> {
 
                 // attempt to determine what the MN was updating and report back with
                 // synchronizationFailed
-                InvalidRequest invalidRequest = new InvalidRequest("567123", "Not Authorized Node to perform Updates. Synchronization unable to process the update request. Only archived and obsoletedBy may be updated from Authorized Node");
-                logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + invalidRequest.serialize(invalidRequest.FMT_XML));
+                InvalidRequest invalidRequest = new InvalidRequest(
+                        "567123",
+                        "Not Authorized Node to perform Updates. Synchronization unable to process the update request. Only archived and obsoletedBy may be updated from Authorized Node");
+                logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n"
+                        + invalidRequest.serialize(invalidRequest.FMT_XML));
                 submitSynchronizationFailed(pid.getValue(), invalidRequest);
-                logger.warn(task.getNodeId() + "-" + task.getPid() + " Ignoring update from Replica MN");
+                logger.warn(task.getNodeId() + "-" + task.getPid()
+                        + " Ignoring update from Replica MN");
             }
         }
         // perform audit of replicas to make certain they all are at the same serialVersion level, if no update ?
@@ -770,13 +958,15 @@ public class TransferObjectTask implements Callable<Void> {
      * @throws NotAuthorized
      *
      */
-    private void auditReplicaSystemMetadata(Identifier pid) throws InvalidToken, ServiceFailure, NotAuthorized, NotFound, InvalidRequest, NotImplemented {
+    private void auditReplicaSystemMetadata(Identifier pid) throws InvalidToken, ServiceFailure,
+            NotAuthorized, NotFound, InvalidRequest, NotImplemented {
         IMap<NodeReference, Node> hzNodes = hazelcast.getMap(hzNodesName);
         SystemMetadata cnSystemMetadata = hzSystemMetaMap.get(pid);
         if (cnSystemMetadata != null) {
             List<Replica> prevReplicaList = cnSystemMetadata.getReplicaList();
             Session session = null;
-            logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " auditReplicaSystemMetadata");
+            logger.info("Task-" + task.getNodeId() + "-" + task.getPid()
+                    + " auditReplicaSystemMetadata");
             for (Replica replica : prevReplicaList) {
                 Node node = hzNodes.get(replica.getReplicaMemberNode());
                 if (node.getType().equals(NodeType.MN)) {
@@ -792,19 +982,25 @@ public class TransferObjectTask implements Callable<Void> {
                         String mnUrl = node.getBaseURL();
 
                         MNode mnNode = new MNode(mnUrl);
-                        SystemMetadata mnSystemMetadata = mnNode.getSystemMetadata(session, cnSystemMetadata.getIdentifier());
+                        SystemMetadata mnSystemMetadata = mnNode.getSystemMetadata(session,
+                                cnSystemMetadata.getIdentifier());
 
-                        if (mnSystemMetadata.getSerialVersion() != cnSystemMetadata.getSerialVersion()) {
+                        if (mnSystemMetadata.getSerialVersion() != cnSystemMetadata
+                                .getSerialVersion()) {
 
-                            mnNode.systemMetadataChanged(session, cnSystemMetadata.getIdentifier(), cnSystemMetadata.getSerialVersion().longValue(), cnSystemMetadata.getDateSysMetadataModified());
+                            mnNode.systemMetadataChanged(session, cnSystemMetadata.getIdentifier(),
+                                    cnSystemMetadata.getSerialVersion().longValue(),
+                                    cnSystemMetadata.getDateSysMetadataModified());
                         }
                     }
                 }
             }
         } else {
-            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + " is null when get called from Hazelcast " + hzSystemMetaMapString + " Map");
+            logger.error("Task-" + task.getNodeId() + "-" + task.getPid()
+                    + " is null when get called from Hazelcast " + hzSystemMetaMapString + " Map");
         }
     }
+
     /*
      * Inform Member Nodes that synchronization task failed
      *
