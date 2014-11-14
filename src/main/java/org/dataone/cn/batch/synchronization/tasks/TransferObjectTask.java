@@ -63,6 +63,8 @@ import org.dataone.service.types.v1.Session;
 import org.dataone.service.types.v1.SystemMetadata;
 import org.dataone.service.types.v1.util.ChecksumUtil;
 import org.dataone.service.util.TypeMarshaller;
+import org.dataone.cn.hazelcast.HazelcastInstanceFactory;
+import org.dataone.service.cn.impl.v1.ReserveIdentifierService;
 import org.dspace.foresite.OREException;
 import org.dspace.foresite.OREParserException;
 import org.jibx.runtime.JiBXException;
