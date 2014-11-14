@@ -13,6 +13,7 @@
         <quartz.version>2.1.6</quartz.version>
         <hazelcast.version>2.4.1</hazelcast.version>
         <d1_libclient_version>2.0.0-SNAPSHOT</d1_libclient_version>
+        <d1_cn_common_version>2.0.0-SNAPSHOT</d1_cn_common_version>
         <d1_cn_noderegistry_version>2.0.0-SNAPSHOT</d1_cn_noderegistry_version>
         <d1_identity_manager_version>2.0.0-SNAPSHOT</d1_identity_manager_version>
     </properties>
@@ -187,6 +188,12 @@
             <version>${d1_identity_manager_version}</version>
             <type>jar</type>
         </dependency>
+		<dependency>
+			<groupId>org.dataone</groupId>
+			<artifactId>d1_cn_common</artifactId>
+			<version>${d1_cn_common_version}</version>
+			<type>jar</type>
+		</dependency>
     </dependencies>
   <licenses>
     <license>
