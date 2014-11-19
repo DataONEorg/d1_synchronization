@@ -36,8 +36,10 @@ import org.apache.log4j.Logger;
 import org.dataone.client.MNode;
 import org.dataone.cn.batch.synchronization.type.NodeComm;
 import org.dataone.cn.batch.synchronization.type.SyncObject;
+import org.dataone.cn.hazelcast.HazelcastInstanceFactory;
 import org.dataone.configuration.Settings;
 import org.dataone.ore.ResourceMapFactory;
+import org.dataone.service.cn.impl.v1.ReserveIdentifierService;
 import org.dataone.service.exceptions.BaseException;
 import org.dataone.service.exceptions.IdentifierNotUnique;
 import org.dataone.service.exceptions.InsufficientResources;
@@ -63,8 +65,6 @@ import org.dataone.service.types.v1.Session;
 import org.dataone.service.types.v1.SystemMetadata;
 import org.dataone.service.types.v1.util.ChecksumUtil;
 import org.dataone.service.util.TypeMarshaller;
-import org.dataone.cn.hazelcast.HazelcastInstanceFactory;
-import org.dataone.service.cn.impl.v1.ReserveIdentifierService;
 import org.dspace.foresite.OREException;
 import org.dspace.foresite.OREParserException;
 import org.jibx.runtime.JiBXException;
@@ -744,10 +744,11 @@ public class TransferObjectTask implements Callable<Void> {
                         && systemMetadata.getIdentifier().getValue() != null) {
                     pid = systemMetadata.getIdentifier().getValue();
                 }
-                String errorMessage = "The checksum for pid: "
-                        + pid
-                        + " does not match the actual checksum supplied by the member node.  Actual checksum: "
-                        + actualChecksum + ". System metadata checksum: " + expectedChecksum;
+                String errorMessage = "The checksum for pid: " + pid
+                        + " does not match the actual checksum supplied by the member node: "
+                        + systemMetadata.getOriginMemberNode().getValue() + ".  Actual checksum: "
+                        + actualChecksum.getValue() + ". System metadata checksum: "
+                        + expectedChecksum.getValue();
                 InvalidSystemMetadata be = new InvalidSystemMetadata("000", errorMessage);
                 if (checksumException != null) {
                     be.initCause(checksumException);
