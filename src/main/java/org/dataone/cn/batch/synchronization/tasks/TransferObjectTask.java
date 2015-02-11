@@ -710,6 +710,10 @@ public class TransferObjectTask implements Callable<Void> {
                 }
             } while (needSciMetadata);
 
+            // while good intentioned, this may be too restrictive for "RESOURCE" formats
+            // see: https://redmine.dataone.org/issues/6848
+            // commenting out for now. BRL 20150211
+            /*
             if (isResource(objectFormat)) {
                 byte[] resourceBytes = null;
                 try {
@@ -725,6 +729,7 @@ public class TransferObjectTask implements Callable<Void> {
                     validateResource(resourceBytes);
                 }
             }
+            */
 
             logger.info("Task-" + task.getNodeId() + "-" + task.getPid() + " Creating Object");
             d1Identifier = nodeCommunications.getCnCore().create(null, d1Identifier, sciMetaStream,
