@@ -151,7 +151,7 @@ public class NodeCommSyncObjectFactory implements NodeCommFactory {
         ReserveIdentifierService reserveIdentifierService = new ReserveIdentifierService();
         
         // figure out what client impl to use for this node, default to v1
-        Object mNode = D1Client.getMN(mnNodeId);
+        Object mNode = org.dataone.client.v1.itk.D1Client.getMN(mnNodeId);
         NodeRegistryService nodeRegistryService = new NodeRegistryService();
         Node node = null;
         try {

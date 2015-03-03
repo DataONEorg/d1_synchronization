@@ -24,7 +24,6 @@ import java.util.concurrent.ConcurrentMap;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.dataone.client.auth.CertificateManager;
-import org.dataone.client.v1.itk.D1Client;
 import org.dataone.cn.batch.exceptions.NodeCommUnavailable;
 import org.dataone.cn.batch.synchronization.type.NodeComm;
 import org.dataone.cn.hazelcast.HazelcastClientInstance;
@@ -86,7 +85,7 @@ public class NodeCommObjectListHarvestFactory implements NodeCommFactory {
             }
         
             // figure out what client impl to use for this node, default to v1
-            Object mNode = D1Client.getMN(mnNodeId);
+            Object mNode = org.dataone.client.v1.itk.D1Client.getMN(mnNodeId);
             NodeRegistryService nodeRegistryService = new NodeRegistryService();
             Node node = null;
             try {
