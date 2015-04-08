@@ -17,44 +17,46 @@
  */
 package org.dataone.cn.batch.synchronization;
 
-import com.hazelcast.partition.Partition;
-import com.hazelcast.partition.PartitionService;
-import com.hazelcast.core.Hazelcast;
-import java.util.List;
-import java.util.ArrayList;
-import com.hazelcast.partition.MigrationEvent;
-import com.hazelcast.partition.MigrationListener;
-import com.hazelcast.core.Member;
-import org.dataone.service.types.v1.NodeReference;
-import com.hazelcast.core.EntryEvent;
-import com.hazelcast.core.EntryListener;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-import org.dataone.service.types.v1.NodeType;
-import org.dataone.service.types.v1.NodeState;
-import org.dataone.service.types.v1.Node;
-import org.quartz.impl.StdSchedulerFactory;
+import static org.quartz.CronScheduleBuilder.cronSchedule;
+import static org.quartz.JobBuilder.newJob;
+import static org.quartz.TriggerBuilder.newTrigger;
+
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Properties;
-import org.apache.commons.logging.LogFactory;
-import org.apache.commons.logging.Log;
-import com.hazelcast.core.IMap;
-import org.quartz.JobDetail;
-import org.dataone.cn.batch.synchronization.jobs.MemberNodeHarvestJob;
-import com.hazelcast.core.HazelcastInstance;
-import java.text.ParseException;
 import java.util.Set;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.dataone.cn.batch.synchronization.jobs.MemberNodeHarvestJob;
 import org.dataone.cn.hazelcast.HazelcastLdapStore;
 import org.dataone.configuration.Settings;
-import org.quartz.*;
+import org.dataone.service.types.v1.Node;
+import org.dataone.service.types.v1.NodeReference;
+import org.dataone.service.types.v1.NodeState;
+import org.dataone.service.types.v1.NodeType;
+import org.quartz.JobDetail;
+import org.quartz.JobKey;
+import org.quartz.Scheduler;
+import org.quartz.SchedulerException;
+import org.quartz.Trigger;
+import org.quartz.TriggerKey;
+import org.quartz.impl.StdSchedulerFactory;
 import org.quartz.impl.matchers.GroupMatcher;
 import org.springframework.beans.BeansException;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
-import static org.quartz.TriggerBuilder.*;
-import static org.quartz.CronScheduleBuilder.*;
 
-import static org.quartz.JobBuilder.*;
+import com.hazelcast.core.EntryEvent;
+import com.hazelcast.core.EntryListener;
+import com.hazelcast.core.HazelcastInstance;
+import com.hazelcast.core.IMap;
+import com.hazelcast.core.Member;
+import com.hazelcast.partition.MigrationEvent;
+import com.hazelcast.partition.MigrationListener;
+import com.hazelcast.partition.Partition;
+import com.hazelcast.partition.PartitionService;
 
 /**
  * this bean must be managed by Spring upon startup of spring it will execute via init method

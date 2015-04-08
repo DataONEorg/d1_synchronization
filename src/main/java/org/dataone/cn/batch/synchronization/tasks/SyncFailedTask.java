@@ -64,14 +64,20 @@ public class SyncFailedTask implements Callable<String> {
         //
         // if this is being called it is because another connection timed out
         //
-        ServiceFailure serviceFailure = new ServiceFailure("-1", "Connection failure. Connection timed out on service call.");
+        ServiceFailure serviceFailure = new ServiceFailure(
+                "-1", 
+                "Connection failure. Connection timed out on service call."
+                );
         submitSynchronizationFailed(task.getPid(), serviceFailure);
         return "done";
     }
 
     public void submitSynchronizationFailed(String pid, BaseException exception) {
         String nodeId = Settings.getConfiguration().getString("cn.nodeId");
-        SynchronizationFailed syncFailed = new SynchronizationFailed("6001", "Synchronization task of [PID::]" + pid + "[::PID] failed. " + exception.getDescription());
+        SynchronizationFailed syncFailed = new SynchronizationFailed(
+                "6001", 
+                "Synchronization task of [PID::]" + pid + "[::PID] failed. " + exception.getDescription()
+                );
         syncFailed.setPid(pid);
         syncFailed.setNodeId(nodeId);
         try {
@@ -85,15 +91,15 @@ public class SyncFailedTask implements Callable<String> {
             }
             
         } catch (InvalidToken ex) {
-            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + " " + ex.serialize(ex.FMT_XML));
+            logger.error(task.taskLabel() + " " + ex.serialize(ex.FMT_XML));
         } catch (NotAuthorized ex) {
-            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + " " + ex.serialize(ex.FMT_XML));
+            logger.error(task.taskLabel() + " " + ex.serialize(ex.FMT_XML));
         } catch (NotImplemented ex) {
-            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + " " + ex.serialize(ex.FMT_XML));
+            logger.error(task.taskLabel() + " " + ex.serialize(ex.FMT_XML));
         } catch (ServiceFailure ex) {
-            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + " " + ex.serialize(ex.FMT_XML));
+            logger.error(task.taskLabel() + " " + ex.serialize(ex.FMT_XML));
         } catch (Exception ex) {
-            logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + " " + ex.getMessage());
+            logger.error(task.taskLabel() + " " + ex.getMessage());
         }
     }
 }

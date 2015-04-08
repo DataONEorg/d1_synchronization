@@ -62,11 +62,12 @@ public class MemberNodeHarvestJob implements Job {
         boolean nodeLocked = false;
         IMap<NodeReference, Node> hzNodes = null;
         String synchronizationExecutorName = Settings.getConfiguration().getString("dataone.hazelcast.synchronizationExecutorService");
+        String mnIdentifier = null;
         try {
             boolean activateJob = Boolean.parseBoolean(Settings.getConfiguration().getString("Synchronization.active"));
             if (activateJob) {
-                String mnIdentifier = jobContext.getMergedJobDataMap().getString("mnIdentifier");
-                logger.info(mnIdentifier + "- Execute Service ObjectListHarvestTask Start");
+                mnIdentifier = jobContext.getMergedJobDataMap().getString("mnIdentifier");
+                logger.info(mnIdentifier + " - Execute Service ObjectListHarvestTask Start");
                 HazelcastInstance hazelcast = HazelcastInstanceFactory.getProcessingInstance();
 
                 hzNodes = hazelcast.getMap("hzNodes");
@@ -86,7 +87,8 @@ public class MemberNodeHarvestJob implements Job {
                     try {
                         lastProcessingCompletedDate = (Date) future.get();
                     } catch (ExecutionDisabledException ex) {
-                        logger.error("ExecutionDisabledException: " + ex.getMessage() + "\n\t\tExecutionDisabledException: Will fire Job again\n");
+                        logger.error("ExecutionDisabledException: " + ex.getMessage() 
+                                + "\n\t\tExecutionDisabledException: Will fire Job again\n");
                         jex = new JobExecutionException();
                         jex.setRefireImmediately(true);
                         Thread.sleep(5000L);
@@ -94,7 +96,8 @@ public class MemberNodeHarvestJob implements Job {
                         logger.error("InterruptedException: " + ex.getMessage());
                     } catch (ExecutionException ex) {
                         if (ex.getCause() instanceof ExecutionDisabledException) {
-                            logger.error("ExecutionDisabledException: " + ex.getMessage() + "\n\tExecutionDisabledException: Will fire Job again\n");
+                            logger.error("ExecutionDisabledException: " + ex.getMessage() 
+                                    + "\n\tExecutionDisabledException: Will fire Job again\n");
                             jex = new JobExecutionException();
                             jex.setStackTrace(ex.getStackTrace());
                             jex.setRefireImmediately(true);
@@ -108,15 +111,16 @@ public class MemberNodeHarvestJob implements Job {
                     // if the lastProcessingCompletedDate has changed then it should be persisted, but where?
                     // Does not need to be stored, maybe just printed?
                     if (lastProcessingCompletedDate == null) {
-                        logger.info(mnIdentifier + "- Execute Service ObjectListHarvestTask did not finish.");
+                        logger.info(mnIdentifier + " - Execute Service ObjectListHarvestTask did not finish.");
                     } else {
-                        logger.info(mnIdentifier + "- Execute Service ObjectListHarvestTask End at " + format.format(lastProcessingCompletedDate));
+                        logger.info(mnIdentifier + " - Execute Service ObjectListHarvestTask End at " 
+                                + format.format(lastProcessingCompletedDate));
                     }
                 }
             }
         } catch (Exception ex) {
             ex.printStackTrace();
-            logger.error(jobContext.getJobDetail().getKey().getName() + " died: " + ex.getMessage());
+            logger.error(mnIdentifier + " - " + jobContext.getJobDetail().getKey().getName() + " died: " + ex.getMessage());
             // log this message, someone else has the lock (and they probably shouldn't)
             jex = new JobExecutionException();
             jex.unscheduleFiringTrigger();

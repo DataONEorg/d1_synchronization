@@ -127,7 +127,9 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
         // make certain it is still after the lastModified date
         if (startHarvestDate.before(now)) {
             // if not then do not run (we should be running this less than every ten seconds for a membernode
-            logger.debug(d1NodeReference.getValue() + "- starting retrieval " + d1Node.getBaseURL() + " with startDate of " + DateTimeMarshaller.serializeDateToUTC(startHarvestDate) + " and endDate of " + DateTimeMarshaller.serializeDateToUTC(now));
+            logger.debug(d1NodeReference.getValue() + "- starting retrieval " + d1Node.getBaseURL() 
+                    + " with startDate of " + DateTimeMarshaller.serializeDateToUTC(startHarvestDate) 
+                    + " and endDate of " + DateTimeMarshaller.serializeDateToUTC(now));
             do {
                 activateJob = Boolean.parseBoolean(Settings.getConfiguration().getString("Synchronization.active"));
                 if (!activateJob) {
@@ -159,8 +161,8 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
                             ExecutionDisabledException ex = new ExecutionDisabledException(d1NodeReference.getValue() + "- Disabled");
                             throw ex;
                         }
-                         logger.debug("Sleeping for 5 secs. hzSyncObjectQueue has " + hzSyncObjectQueue.size() + " # of objects.");
-                         Thread.sleep(5000L);
+                        logger.debug("Sleeping for 5 secs. hzSyncObjectQueue has " + hzSyncObjectQueue.size() + " # of objects.");
+                        Thread.sleep(5000L);
 
                         ++loopCount;
                     }
@@ -185,7 +187,7 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
                         if (!objectInfo.getDateSysMetadataModified().after(now))
                                 {
                                 hzSyncObjectQueue.put(syncObject);
-                                logger.debug("placed on hzSyncObjectQueue- " +syncObject.getNodeId() + ":"+ syncObject.getPid());
+                                logger.debug("placed on hzSyncObjectQueue- " + syncObject.taskLabel());
                                 }
                     }
                 } else {

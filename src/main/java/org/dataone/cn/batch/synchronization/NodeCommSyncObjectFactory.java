@@ -87,52 +87,52 @@ public class NodeCommSyncObjectFactory implements NodeCommFactory {
     @Override
     public NodeComm getNodeComm(NodeReference mnNodeId, String hzConfigLocation) throws ServiceFailure, NodeCommUnavailable {
 
-                    NodeComm nodeCommunications = null;
+        NodeComm nodeCommunications = null;
 
-                    // grab a membernode client off of the stack of initialized clients
-                    if (initializedMemberNodes.containsKey(mnNodeId)) {
-                        List<NodeComm> nodeCommList = initializedMemberNodes.get(mnNodeId);
-                        // find a node comm that is not currently in use
-                        for (NodeComm nodeComm : nodeCommList) {
-                            if (nodeComm.getState().equals(NodeCommState.AVAILABLE)) {
-                                nodeCommunications = nodeComm;
-                                nodeCommunications.setState(NodeCommState.RUNNING);
-                                nodeCommunications.setRunningStartDate(new Date());
-                                break;
-                            }
-                        }
-                        if (nodeCommunications == null) {
-                            // no node Communications is available, see if we can create a new one
-                            if (nodeCommList.size() <= maxNumberOfClientsPerMemberNode) {
-                                    // create and add a new one
-                                    nodeCommunications = createNodeComm(mnNodeId, hzConfigLocation);
+        // grab a membernode client off of the stack of initialized clients
+        if (initializedMemberNodes.containsKey(mnNodeId)) {
+            List<NodeComm> nodeCommList = initializedMemberNodes.get(mnNodeId);
+            // find a node comm that is not currently in use
+            for (NodeComm nodeComm : nodeCommList) {
+                if (nodeComm.getState().equals(NodeCommState.AVAILABLE)) {
+                    nodeCommunications = nodeComm;
+                    nodeCommunications.setState(NodeCommState.RUNNING);
+                    nodeCommunications.setRunningStartDate(new Date());
+                    break;
+                }
+            }
+            if (nodeCommunications == null) {
+                // no node Communications is available, see if we can create a new one
+                if (nodeCommList.size() <= maxNumberOfClientsPerMemberNode) {
+                    // create and add a new one
+                    nodeCommunications = createNodeComm(mnNodeId, hzConfigLocation);
 
-                                    nodeCommunications.setState(NodeCommState.RUNNING);
-                                    nodeCommunications.setNumber(nodeCommList.size() + 1);
-                                    nodeCommunications.setRunningStartDate(new Date());
-                                    nodeCommList.add(nodeCommunications);
+                    nodeCommunications.setState(NodeCommState.RUNNING);
+                    nodeCommunications.setNumber(nodeCommList.size() + 1);
+                    nodeCommunications.setRunningStartDate(new Date());
+                    nodeCommList.add(nodeCommunications);
 
-                            } else {
-                                throw new NodeCommUnavailable("No Comm Nodes Available");
-                            }
-                        }
-                    } else {
-                        // The memberNode hash does not contain an array
-                        // that is assigned to this MemberNode
-                        // create it, get a node comm, and put it in the hash
-                            List<NodeComm> nodeCommList = new ArrayList<NodeComm>();
-                            nodeCommunications = createNodeComm(mnNodeId, hzConfigLocation);
-                            nodeCommunications.setState(NodeCommState.RUNNING);
-                            nodeCommunications.setNumber(nodeCommList.size() + 1);
-                            nodeCommunications.setRunningStartDate(new Date());
-                            nodeCommList.add(nodeCommunications);
-                            initializedMemberNodes.put(mnNodeId, nodeCommList);
+                } else {
+                    throw new NodeCommUnavailable("No Comm Nodes Available");
+                }
+            }
+        } else {
+            // The memberNode hash does not contain an array
+            // that is assigned to this MemberNode
+            // create it, get a node comm, and put it in the hash
+            List<NodeComm> nodeCommList = new ArrayList<NodeComm>();
+            nodeCommunications = createNodeComm(mnNodeId, hzConfigLocation);
+            nodeCommunications.setState(NodeCommState.RUNNING);
+            nodeCommunications.setNumber(nodeCommList.size() + 1);
+            nodeCommunications.setRunningStartDate(new Date());
+            nodeCommList.add(nodeCommunications);
+            initializedMemberNodes.put(mnNodeId, nodeCommList);
 
-                    }
-                    if (nodeCommunications == null) {
-                       throw new NodeCommUnavailable("No Comm Nodes Available");
-                    }
-                    return nodeCommunications;
+        }
+        if (nodeCommunications == null) {
+            throw new NodeCommUnavailable("No Comm Nodes Available");
+        }
+        return nodeCommunications;
     }
     
     private NodeComm createNodeComm(NodeReference mnNodeId, String hzConfigLocation) throws ServiceFailure {
@@ -143,9 +143,9 @@ public class NodeCommSyncObjectFactory implements NodeCommFactory {
 
         CNode cNode = null;
         try {
-        	cNode = D1Client.getCN();
+            cNode = D1Client.getCN();
         } catch(NotImplemented e) {
-        	throw new ServiceFailure("0000", e.getMessage());
+            throw new ServiceFailure("0000", e.getMessage());
         }
         
         ReserveIdentifierService reserveIdentifierService = new ReserveIdentifierService();
@@ -157,10 +157,10 @@ public class NodeCommSyncObjectFactory implements NodeCommFactory {
         try {
             node = nodeRegistryService.getNode(mnNodeId);
             for (Service service: node.getServices().getServiceList()) {
-            	if (service.getVersion().equals("v2")) {
-            		mNode = org.dataone.client.v2.itk.D1Client.getMN(mnNodeId);
-            		break;
-            	}
+                if (service.getVersion().equals("v2")) {
+                    mNode = org.dataone.client.v2.itk.D1Client.getMN(mnNodeId);
+                    break;
+                }
             }
         } catch (NotFound ex) {
             throw new ServiceFailure("0000", ex.getDescription());
