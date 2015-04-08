@@ -93,7 +93,7 @@ public class SyncObjectTaskManager implements Runnable {
                 } else {
                     // An InterruptedException occurred that was not
                     // a task cancellation, so cancel the task and
-                    // resubmitt
+                    // resubmit
                     futureTask.cancel(true);
                 }
             } else {
