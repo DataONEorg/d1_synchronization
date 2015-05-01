@@ -144,10 +144,9 @@ public class TransferObjectTask implements Callable<Void> {
             // this will be from the hazelcast client running against metacat
             logger.info(task.taskLabel()
                     + " Locking task of attempt " + task.getAttempt());
-            long timeToWait = 1;
 
             hzPidLock = hazelcast.getLock(lockPid);
-            isPidLocked = hzPidLock.tryLock(timeToWait, TimeUnit.SECONDS);
+            isPidLocked = hzPidLock.tryLock(1, TimeUnit.SECONDS); // both parameters define the wait time
             if (isPidLocked) {
                 logger.info(task.taskLabel() + " Processing task");
                 SystemMetadata systemMetadata = retrieveSystemMetadata();
@@ -162,11 +161,9 @@ public class TransferObjectTask implements Callable<Void> {
                                 "Placing back on hzSyncObjectQueue of attempt "
                                 + task.getAttempt());
                         if (task.getAttempt() == 1) {
-                            /*
-                             * Member node should be informed to update its systemMetadata. 
-                             * If the member node is unable
-                             * to update, this will be a nasty failure
-                             */
+                            // Member node should be informed to update its systemMetadata. 
+                            // If the member node is unable to update, 
+                            // this will be a nasty failure
                             Identifier pid = new Identifier();
                             pid.setValue(task.getPid());
                             auditReplicaSystemMetadata(pid);
@@ -176,6 +173,12 @@ public class TransferObjectTask implements Callable<Void> {
                             //sleep for 10 seconds before trying again in order
                             // to allow time for membernode to refresh
                             // for a maximum of 6Xs
+                            // TODO: pro-active sleeping and tying up a thread 
+                            // before re-queueing seems to waste CN time
+                            // recording when we returned the task to the queue
+                            // then sleeping the difference upon retrying might 
+                            // work, although accounting for different CN instance 
+                            // clocks might make this imprecise.
                             try {
                                 Thread.sleep(10000L);
                             } catch (InterruptedException iex) {
@@ -190,7 +193,7 @@ public class TransferObjectTask implements Callable<Void> {
 
                     }
                 } // else it was a failure and it should have been reported to MN so do nothing
-            } else {
+            } else { // could not lock the pid
                 try {
                     // there should be a max # of attempts from locking
                     if (task.getAttempt() < 100) {
@@ -203,7 +206,9 @@ public class TransferObjectTask implements Callable<Void> {
                          * allow a maximum number of attempts before permanent failure
                          */
                         task.setAttempt(task.getAttempt() + 1);
-                        // wait a second to see if replication completes its action and releases the lock
+                        // wait a second to give the CN (replication processing) a bit of time to complete
+                        // its action and release the lock before the next sync
+                        // attempt on this object.
                         try {
                             Thread.sleep(1000L);
                         } catch (InterruptedException iex) {
@@ -221,9 +226,6 @@ public class TransferObjectTask implements Callable<Void> {
                     logger.error(task.taskLabel()
                             + " Pid Locked! Unable to process pid " + task.getPid() 
                             + " from node " + task.getNodeId());
-                    ServiceFailure serviceFailure = new ServiceFailure("564001",
-                            "Checksum does not match existing object with same pid");
-
                 }
             }
         } catch (Exception ex) {
@@ -815,9 +817,15 @@ public class TransferObjectTask implements Callable<Void> {
     }
 
     /*
-     * Object is already created. This operation will only update systemmetadata if a portion of the systemmeta data
-     * has changed that synchroniziation can update. Namely, The authoritative member node can update the obsoletedBy
-     * field or if an existing replica is found, then the replica information is added to the systemMetadata.
+     * To be called if the Object is already created. This operation will update 
+     * system metadata on the CN if the source of the new SystemMetadata is from
+     * the Authoritative source and only allowable fields have changed OR if it's
+     * from a replicate node, it will register the node in the Replica section of
+     * the system metadata if the system metadata is the same and it is not already
+     * registered.
+     * <br/>
+     * (For v1) Allowable fields for the Authoritative Member Node to change are:
+     *  'obsoletedBy' and 'archived' (and of course 'dateSystemMetadataUpdated')
      *
      * @param SystemMetadata systemMetdata from the MN 
      * @throws InvalidRequest 
@@ -828,7 +836,6 @@ public class TransferObjectTask implements Callable<Void> {
      * @throws NotAuthorized
      * @throws InvalidSystemMetadata
      * @throwsVersionMismatch
-     *
      */
     private void updateSystemMetadata(SystemMetadata newSystemMetadata)
             throws InvalidSystemMetadata, NotFound, NotImplemented, NotAuthorized, ServiceFailure,
@@ -842,14 +849,19 @@ public class TransferObjectTask implements Callable<Void> {
         Identifier pid = new Identifier();
         pid.setValue(newSystemMetadata.getIdentifier().getValue());
         SystemMetadata cnSystemMetadata = hzSystemMetaMap.get(pid);
-        if (cnSystemMetadata.getAuthoritativeMemberNode().getValue()
-                .contentEquals(task.getNodeId())) {
-            // this is an update from the original memberNode
+        
+        if (task.getNodeId().contentEquals(
+                cnSystemMetadata.getAuthoritativeMemberNode().getValue())) {
 
-            boolean validChange = false;
+            // this is an update from the authoritative memberNode
+            // so look for fields with valid changes
+            boolean foundValidMNChange = false;
+            
+            // obsoletedBy can be updated to a value only if its value hasn't
+            // already been set.  Once set, it cannot change.
             if ((cnSystemMetadata.getObsoletedBy() == null)
                     && (newSystemMetadata.getObsoletedBy() != null)) {
-                logger.info(task.taskLabel() + " Update ObsoletedBy");
+                logger.info(task.taskLabel() + " Updating ObsoletedBy...");
 
                 nodeCommunications.getCnCore().setObsoletedBy(session, pid,
                         newSystemMetadata.getObsoletedBy(),
@@ -857,19 +869,23 @@ public class TransferObjectTask implements Callable<Void> {
                 //                auditReplicaSystemMetadata(pid);
                 // serial version will be updated at this point, so get the new version
                 logger.info(task.taskLabel() + " Updated ObsoletedBy");
-                validChange = true;
+                foundValidMNChange = true;
             }
+            
+            // (getArchived() returns a boolean)
+            // only process the update if the new sysmeta set it to true and the 
+            // existing value is null or false.  Cannot change the value from true
+            // to false.
             if (((newSystemMetadata.getArchived() != null) && newSystemMetadata.getArchived())
                     && ((cnSystemMetadata.getArchived() == null) || !cnSystemMetadata.getArchived())) {
-                logger.info(task.taskLabel() + " Update Archived");
-
+                logger.info(task.taskLabel() + " Updating Archived...");
                 nodeCommunications.getCnCore().archive(session, pid);
                 //                auditReplicaSystemMetadata(pid);
                 // serial version will be updated at this point, so get the new version
                 logger.info(task.taskLabel() + " Updated Archived");
-                validChange = true;
+                foundValidMNChange = true;
             }
-            if (validChange) {
+            if (foundValidMNChange) {
                 auditReplicaSystemMetadata(pid);
 
             } else {

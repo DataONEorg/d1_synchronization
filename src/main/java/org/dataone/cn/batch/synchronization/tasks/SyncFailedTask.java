@@ -72,24 +72,47 @@ public class SyncFailedTask implements Callable<String> {
         return "done";
     }
 
-    public void submitSynchronizationFailed(String pid, BaseException exception) {
+    /**
+     * Creates a SynchronizationFailed exception with a standardized message
+     * for submitting back to the MN.  If handed a non DataONE BaseException, it will
+     * transform the exception in a ServiceFailure, preserving the message in the
+     * description field.
+     * @param pid
+     * @param exception
+     * @return
+     */
+    public static SynchronizationFailed createSynchronizationFailed(String pid, Exception exception) {
         String nodeId = Settings.getConfiguration().getString("cn.nodeId");
+        BaseException be = null;
+        if (exception instanceof BaseException) {
+                be = (BaseException)be;
+        } else {
+            be = new ServiceFailure("-1", exception.getMessage());
+        }
         SynchronizationFailed syncFailed = new SynchronizationFailed(
                 "6001", 
-                "Synchronization task of [PID::]" + pid + "[::PID] failed. " + exception.getDescription()
+                "Synchronization task of [PID::]" + pid + "[::PID] failed. " + be.getDescription()
                 );
         syncFailed.setPid(pid);
         syncFailed.setNodeId(nodeId);
+        return syncFailed;
+    }
+
+
+    public void submitSynchronizationFailed(String pid, BaseException exception) {
+        SynchronizationFailed syncFailed = createSynchronizationFailed(pid, exception);
+        submitSynchronizationFailed(syncFailed);
+    }
+        
+    public void submitSynchronizationFailed(SynchronizationFailed syncFailed) {
         try {
-        	
-        	Object mnRead = nodeCommunications.getMnRead();
+            Object mnRead = nodeCommunications.getMnRead();
             if (mnRead instanceof MNRead) {
                 ((MNRead) mnRead).synchronizationFailed(session, syncFailed);;
             }
             if (mnRead instanceof org.dataone.service.mn.tier1.v1.MNRead) {
                ((org.dataone.service.mn.tier1.v1.MNRead) mnRead).synchronizationFailed(session, syncFailed);
             }
-            
         } catch (InvalidToken ex) {
             logger.error(task.taskLabel() + " " + ex.serialize(ex.FMT_XML));
         } catch (NotAuthorized ex) {

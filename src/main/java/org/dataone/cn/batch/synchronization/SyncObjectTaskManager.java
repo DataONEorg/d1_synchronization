@@ -32,7 +32,7 @@ import org.springframework.core.task.SimpleAsyncTaskExecutor;
  * evaluate the conditions by which it returned and determine
  * if the task may be executed again.
  *
- * TODO: If the SyncObjectTaskManager  dies, the entire synchronization process should
+ * TODO: If the SyncObjectTaskManager dies, the entire synchronization process should
  * be shutdown and a report sent to someone about its failure!
  * 
  * @author waltz
