@@ -56,7 +56,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
  * canceling tasks that are taking too long to complete.
  *
  * Instances of this class that are call()'ed run as a daemon thread by the 
- * SyncObjectExecutor, and the call() method uses an infinite loop that gracefully
+ * SyncObjectTaskManager, and the call() method uses an infinite loop that gracefully
  * exits upon exception.
  *
  * @author waltz
