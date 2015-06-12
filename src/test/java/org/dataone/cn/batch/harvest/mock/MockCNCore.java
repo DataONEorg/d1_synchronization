@@ -216,4 +216,23 @@ public class MockCNCore implements CNCore {
 	}
 
 
+	@Override
+	public ObjectFormatIdentifier addFormat(Session session,
+			ObjectFormatIdentifier formatid, ObjectFormat format)
+			throws ServiceFailure, NotFound, NotImplemented, InvalidRequest,
+			NotAuthorized, InvalidToken {
+        throw new UnsupportedOperationException("Not supported yet.");
+
+	}
+
+
+	@Override
+	public boolean synchronize(Session session, Identifier pid)
+			throws NotImplemented, NotAuthorized, ServiceFailure,
+			InvalidRequest, InvalidSystemMetadata, InvalidToken {
+        throw new UnsupportedOperationException("Not supported yet.");
+
+	}
+
+
 }
