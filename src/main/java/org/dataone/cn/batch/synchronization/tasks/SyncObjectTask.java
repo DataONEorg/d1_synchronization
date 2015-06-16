@@ -37,7 +37,7 @@ import org.dataone.cn.batch.synchronization.NodeCommFactory;
 import org.dataone.cn.batch.synchronization.NodeCommSyncObjectFactory;
 import org.dataone.cn.batch.synchronization.type.NodeComm;
 import org.dataone.cn.batch.synchronization.type.NodeCommState;
-import org.dataone.cn.batch.synchronization.type.SyncObject;
+import org.dataone.cn.synchronization.types.SyncObject;
 import org.dataone.configuration.Settings;
 import org.dataone.service.exceptions.ServiceFailure;
 import org.dataone.service.types.v2.Node;
