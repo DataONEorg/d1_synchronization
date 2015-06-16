@@ -25,7 +25,7 @@ package org.dataone.cn.batch.synchronization.tasks;
 import java.util.concurrent.Callable;
 import org.apache.log4j.Logger;
 import org.dataone.cn.batch.synchronization.type.NodeComm;
-import org.dataone.cn.batch.synchronization.type.SyncObject;
+import org.dataone.cn.synchronization.types.SyncObject;
 import org.dataone.configuration.Settings;
 import org.dataone.service.exceptions.BaseException;
 import org.dataone.service.exceptions.InvalidToken;
