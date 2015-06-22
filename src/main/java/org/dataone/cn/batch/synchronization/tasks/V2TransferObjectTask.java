@@ -423,7 +423,7 @@ public class V2TransferObjectTask implements Callable<Void> {
                 systemMetadata.addReplica(cnReplica);
                 logger.debug(task.taskLabel()
                         + " Added CN as replica because formatType " + objectFormat.getFormatType()
-                        + " is sciMetadata");
+                        + " is not DATA");
             }
             // the origin membernode may be different from the node
             // being harvested.  
@@ -511,7 +511,7 @@ public class V2TransferObjectTask implements Callable<Void> {
 
 
     /**
-     * Create the object if a resource or sci meta object. Register systemmetadata 
+     * Create the object if a resource or sci meta object. Only register the systemmetadata 
      * if a sci data object.
      *
      *
@@ -546,53 +546,51 @@ public class V2TransferObjectTask implements Callable<Void> {
         validateChecksum(systemMetadata);
 
         if ((objectFormat != null) && !objectFormat.getFormatType().equalsIgnoreCase("DATA")) {
-            
-            // XXX this input stream gets used as parameter to the create call.
+            // this input stream gets used as parameter to the create call.
             InputStream sciMetaStream = null;
-            
-            // get the scimeta object and then feed it to metacat
-            int tryAgain = 0;
-            boolean needSciMetadata = true;
-            do {
-                try {
-                    logger.debug(task.taskLabel() + " getting ScienceMetadata ");
-                    Object mnRead = nodeCommunications.getMnRead();
-                    if (mnRead instanceof MNRead) {
-                        sciMetaStream = ((MNRead) mnRead).get(null, systemMetadata.getIdentifier());
-                        needSciMetadata = false;
-                    } else if (mnRead instanceof org.dataone.service.mn.tier1.v1.MNRead) {
-                        sciMetaStream = ((org.dataone.service.mn.tier1.v1.MNRead) mnRead).get(null,
-                                systemMetadata.getIdentifier());
-                        needSciMetadata = false;
-                    }
-                } catch (NotAuthorized ex) {
-                    if (tryAgain < 2) {
-                        ++tryAgain;
-                        logger.error(task.taskLabel() + "\n" + ex.serialize(BaseException.FMT_XML));
-                        interruptableSleep(5000L);
-                    } else {
-                        // only way to get out of loop if NotAuthorized keeps getting thrown
-                        throw ex;
-                    }
-                } catch (ServiceFailure ex) {
-                    if (tryAgain < 6) {
-                        ++tryAgain;
-                        logger.error(task.taskLabel() + "\n" + ex.serialize(BaseException.FMT_XML));
-                        interruptableSleep(5000L);
-                    } else {
-                        // only way to get out of loop if NotAuthorized keeps getting thrown
-                        throw ex;
-                    }
-                }
-            } while (needSciMetadata);
-
-            // while good intentioned, this may be too restrictive for "RESOURCE" formats
-            // see: https://redmine.dataone.org/issues/6848
-            // commenting out for now. BRL 20150211
-            /*
-             validateResourceMap(objectFormat, sciMetaStream);
-             */
             try {
+                // get the scimeta object and then feed it to metacat
+                int tryAgain = 0;
+                boolean needSciMetadata = true;
+                do {
+                    try {
+                        logger.debug(task.taskLabel() + " getting ScienceMetadata ");
+                        Object mnRead = nodeCommunications.getMnRead();
+                        if (mnRead instanceof MNRead) {
+                            sciMetaStream = ((MNRead) mnRead).get(null, systemMetadata.getIdentifier());
+                            needSciMetadata = false;
+                        } else if (mnRead instanceof org.dataone.service.mn.tier1.v1.MNRead) {
+                            sciMetaStream = ((org.dataone.service.mn.tier1.v1.MNRead) mnRead).get(null,
+                                    systemMetadata.getIdentifier());
+                            needSciMetadata = false;
+                        }
+                    } catch (NotAuthorized ex) {
+                        if (tryAgain < 2) {
+                            ++tryAgain;
+                            logger.error(task.taskLabel() + "\n" + ex.serialize(BaseException.FMT_XML));
+                            interruptableSleep(5000L);
+                        } else {
+                            // only way to get out of loop if NotAuthorized keeps getting thrown
+                            throw ex;
+                        }
+                    } catch (ServiceFailure ex) {
+                        if (tryAgain < 6) {
+                            ++tryAgain;
+                            logger.error(task.taskLabel() + "\n" + ex.serialize(BaseException.FMT_XML));
+                            interruptableSleep(5000L);
+                        } else {
+                            // only way to get out of loop if NotAuthorized keeps getting thrown
+                            throw ex;
+                        }
+                    }
+                } while (needSciMetadata);
+
+                // while good intentioned, this may be too restrictive for "RESOURCE" formats
+                // see: https://redmine.dataone.org/issues/6848
+                // commenting out for now. BRL 20150211
+                /*
+                   validateResourceMap(objectFormat, sciMetaStream);
+                 */
                 logger.info(task.taskLabel() + " Creating Object");
                 d1Identifier = nodeCommunications.getCnCore().create(null, d1Identifier, sciMetaStream,
                         systemMetadata);
@@ -837,13 +835,12 @@ public class V2TransferObjectTask implements Callable<Void> {
         
         SystemMetadataValidator validator = new SystemMetadataValidator(hzSystemMetadata);
         if (validator.hasValidUpdates(mnSystemMetadata)) {
-            // TODO: update the hzSystemMetadata map?
-            
-            // TODO: persist the new systemMetadata
-            
-            
-            notifyReplicaNodes(mnSystemMetadata.getIdentifier());
-            
+            Identifier pid = mnSystemMetadata.getIdentifier();
+            // persist the new systemMetadata
+            nodeCommunications.getCnCore().updateSystemMetadata(session, pid, mnSystemMetadata);
+            // spread the word...
+            notifyReplicaNodes(pid);
+            logger.info(task.taskLabel() + " Update with new SystemMetadata");
         } else {
             logger.info(task.taskLabel() + " No changes to update.");
         }
