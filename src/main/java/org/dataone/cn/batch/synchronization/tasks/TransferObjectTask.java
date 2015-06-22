@@ -625,53 +625,56 @@ public class TransferObjectTask implements Callable<Void> {
         if ((objectFormat != null) && !objectFormat.getFormatType().equalsIgnoreCase("DATA")) {
             InputStream sciMetaStream = null;
             // get the scimeta object and then feed it to metacat
-            int tryAgain = 0;
-            boolean needSciMetadata = true;
-            do {
-                try {
-                    logger.debug(task.taskLabel() + " getting ScienceMetadata ");
-                    Object mnRead = nodeCommunications.getMnRead();
-                    if (mnRead instanceof MNRead) {
-                        sciMetaStream = ((MNRead) mnRead).get(null, systemMetadata.getIdentifier());
-                        needSciMetadata = false;
-                    } else if (mnRead instanceof org.dataone.service.mn.tier1.v1.MNRead) {
-                        sciMetaStream = ((org.dataone.service.mn.tier1.v1.MNRead) mnRead).get(null,
-                                systemMetadata.getIdentifier());
-                        needSciMetadata = false;
-                    }
-                } catch (NotAuthorized ex) {
-                    if (tryAgain < 2) {
-                        ++tryAgain;
-                        logger.error(task.taskLabel() + "\n" + ex.serialize(BaseException.FMT_XML));
-                        try {
-                            Thread.sleep(5000L);
-                        } catch (InterruptedException ex1) {
-                            logger.warn(task.taskLabel() + "\n" + ex);
-                        }
-                    } else {
-                        // only way to get out of loop if NotAuthorized keeps getting thrown
-                        throw ex;
-                    }
-                } catch (ServiceFailure ex) {
-                    if (tryAgain < 6) {
-                        ++tryAgain;
-                        logger.error(task.taskLabel() + "\n" + ex.serialize(BaseException.FMT_XML));
-                        try {
-                            Thread.sleep(5000L);
-                        } catch (InterruptedException ex1) {
-                            logger.warn(task.taskLabel() + "\n" + ex);
-                        }
-                    } else {
-                        // only way to get out of loop if NotAuthorized keeps getting thrown
-                        throw ex;
-                    }
-                }
-            } while (needSciMetadata);
+            
+            try {
+                int tryAgain = 0;
 
-            // while good intentioned, this may be too restrictive for "RESOURCE" formats
-            // see: https://redmine.dataone.org/issues/6848
-            // commenting out for now. BRL 20150211
-            /*
+                boolean needSciMetadata = true;
+                do {
+                    try {
+                        logger.debug(task.taskLabel() + " getting ScienceMetadata ");
+                        Object mnRead = nodeCommunications.getMnRead();
+                        if (mnRead instanceof MNRead) {
+                            sciMetaStream = ((MNRead) mnRead).get(null, systemMetadata.getIdentifier());
+                            needSciMetadata = false;
+                        } else if (mnRead instanceof org.dataone.service.mn.tier1.v1.MNRead) {
+                            sciMetaStream = ((org.dataone.service.mn.tier1.v1.MNRead) mnRead).get(null,
+                                    systemMetadata.getIdentifier());
+                            needSciMetadata = false;
+                        }
+                    } catch (NotAuthorized ex) {
+                        if (tryAgain < 2) {
+                            ++tryAgain;
+                            logger.error(task.taskLabel() + "\n" + ex.serialize(BaseException.FMT_XML));
+                            try {
+                                Thread.sleep(5000L);
+                            } catch (InterruptedException ex1) {
+                                logger.warn(task.taskLabel() + "\n" + ex);
+                            }
+                        } else {
+                            // only way to get out of loop if NotAuthorized keeps getting thrown
+                            throw ex;
+                        }
+                    } catch (ServiceFailure ex) {
+                        if (tryAgain < 6) {
+                            ++tryAgain;
+                            logger.error(task.taskLabel() + "\n" + ex.serialize(BaseException.FMT_XML));
+                            try {
+                                Thread.sleep(5000L);
+                            } catch (InterruptedException ex1) {
+                                logger.warn(task.taskLabel() + "\n" + ex);
+                            }
+                        } else {
+                            // only way to get out of loop if NotAuthorized keeps getting thrown
+                            throw ex;
+                        }
+                    }
+                } while (needSciMetadata);
+
+                // while good intentioned, this may be too restrictive for "RESOURCE" formats
+                // see: https://redmine.dataone.org/issues/6848
+                // commenting out for now. BRL 20150211
+                /*
             if (isResource(objectFormat)) {
                 byte[] resourceBytes = null;
                 try {
@@ -687,12 +690,15 @@ public class TransferObjectTask implements Callable<Void> {
                     validateResource(resourceBytes);
                 }
             }
-            */
+                 */
 
-            logger.info(task.taskLabel() + " Creating Object");
-            d1Identifier = nodeCommunications.getCnCore().create(null, d1Identifier, sciMetaStream,
-                    systemMetadata);
-            logger.info(task.taskLabel() + " Created Object");
+                logger.info(task.taskLabel() + " Creating Object");
+                d1Identifier = nodeCommunications.getCnCore().create(null, d1Identifier, sciMetaStream,
+                        systemMetadata);
+                logger.info(task.taskLabel() + " Created Object");
+            } finally {
+                IOUtils.closeQuietly(sciMetaStream);
+            }
         } else {
             logger.info(task.taskLabel() + " Registering SystemMetadata");
             nodeCommunications.getCnCore().registerSystemMetadata(null, d1Identifier,
