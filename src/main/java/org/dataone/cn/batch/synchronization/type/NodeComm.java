@@ -37,6 +37,7 @@ import org.dataone.service.cn.v2.CNReplication;
 public class NodeComm {
 
     private Object mnRead;
+    private Object cnRead;
     private CNCore cnCore;
     private CNReplication cnReplication;
     private HazelcastInstance hzClient;
@@ -49,15 +50,18 @@ public class NodeComm {
     private NodeCommState state;
     // help to determine if thread is blocking, used as timeout
     private Date runningStartDate;
-    public NodeComm(Object mnRead,  NodeRegistryService nodeRegistryService, HazelcastInstance hzClient) {
+    
+    public NodeComm(Object mnRead, NodeRegistryService nodeRegistryService, HazelcastInstance hzClient) {
         this.mnRead = mnRead;
         this.reserveIdentifierService = null;
         this.nodeRegistryService = nodeRegistryService;
         this.hzClient = hzClient;
+        this.cnRead = null;
     }
 
-    public NodeComm(Object mnRead, CNCore cnCore, CNReplication cnReplication, ReserveIdentifierService reserveIdentifierService, HazelcastInstance hzClient) {
+    public NodeComm(Object mnRead, Object cnRead, CNCore cnCore, CNReplication cnReplication, ReserveIdentifierService reserveIdentifierService, HazelcastInstance hzClient) {
         this.mnRead = mnRead;
+        this.cnRead = cnRead;
         this.cnCore = cnCore;
         this.cnReplication = cnReplication;
         this.reserveIdentifierService = reserveIdentifierService;
@@ -70,6 +74,14 @@ public class NodeComm {
 
     public void setMnRead(Object mnRead) {
         this.mnRead = mnRead;
+    }
+    
+    public Object getCnRead() {
+        return cnRead;
+    }
+
+    public void setCnRead(Object cnRead) {
+        this.cnRead = cnRead;
     }
 
     public NodeCommState getState() {

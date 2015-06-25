@@ -8,11 +8,11 @@ package org.dataone.cn.batch.exceptions;
  * @author rnahf
  *
  */
-public class InternalSyncFailure extends Exception {
-    public InternalSyncFailure(String message) {
+public class UnrecoverableException extends Exception {
+    public UnrecoverableException(String message) {
         super(message);
     }
-    public InternalSyncFailure(String message, Throwable t) {
+    public UnrecoverableException(String message, Throwable t) {
         super(message,t);
     }
 }
