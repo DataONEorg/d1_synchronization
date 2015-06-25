@@ -166,7 +166,7 @@ public class NodeCommSyncObjectFactory implements NodeCommFactory {
             throw new ServiceFailure("0000", ex.getDescription());
         }
         
-        NodeComm nodeComm = new NodeComm(mNode, cNode, cNode, reserveIdentifierService, hzclient);
+        NodeComm nodeComm = new NodeComm(mNode, cNode, cNode, cNode, reserveIdentifierService, hzclient);
         return nodeComm;
     }
 }

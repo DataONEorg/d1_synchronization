@@ -10,13 +10,15 @@ import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.ObjectUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.Logger;
-import org.dataone.client.D1Node;
-import org.dataone.cn.batch.exceptions.InternalSyncFailure;
 import org.dataone.cn.batch.synchronization.D1TypeUtils;
 import org.dataone.service.exceptions.BaseException;
 import org.dataone.service.exceptions.IdentifierNotUnique;
 import org.dataone.service.exceptions.InvalidRequest;
 import org.dataone.service.exceptions.InvalidSystemMetadata;
+import org.dataone.service.exceptions.InvalidToken;
+import org.dataone.service.exceptions.NotAuthorized;
+import org.dataone.service.exceptions.NotFound;
+import org.dataone.service.exceptions.NotImplemented;
 import org.dataone.service.exceptions.ServiceFailure;
 import org.dataone.service.mn.tier1.v2.MNRead;
 import org.dataone.service.types.v1.Checksum;
@@ -90,12 +92,17 @@ public class SystemMetadataValidator {
      * 
      * @param newSysMeta
      * @param authoritativeNodeReadImpl
-     * @throws BaseException - thrown if communication error trying to call MN to calculate the checksum
-     * @throws InternalSyncFailure - thrown if there is an internal problem validating
+     * @throws IdentifierNotUnique - if the newSysMeta's identifier doesn't match
+     * @throws ServiceFailure - if the reference sysMeta's checksum is null
+     * @throws NotFound - if authMNImpl is used and the pid was not found
+     * @throws NotImplemented - if the getChecksum method was not available
+     * @throws NotAuthorized  - if the client couldn't access getChecksum
+     * @throws InvalidToken  - if the client couldn't access getChecksum
+     * @throws InvalidRequest - if the checksum algorithm requested wasn't availabe.
      */
-    public void validateEssentialProperties(SystemMetadata newSysMeta, Object authoritativeNodeReadImpl)
-    throws BaseException, InternalSyncFailure
-    {
+    public void validateEssentialProperties(SystemMetadata newSysMeta, Object authoritativeNodeReadImpl) 
+            throws IdentifierNotUnique, ServiceFailure, InvalidRequest, InvalidToken, NotAuthorized, NotImplemented, NotFound {
+        
         if (!referenceSysMeta.getIdentifier().equals(newSysMeta.getIdentifier()))
             throw new IdentifierNotUnique("-1","Identifier does not match the reference SystemMetadata's!");
         
@@ -123,8 +130,9 @@ public class SystemMetadataValidator {
                 newChecksum = ((org.dataone.service.mn.tier1.v1.MNRead) authoritativeNodeReadImpl)
                         .getChecksum(null, newSysMeta.getIdentifier(), cnCsAlgorithm);
             } else {
-                throw new InternalSyncFailure("Could not contact the authoritative Member Node to" +
-                        " calculate the required checksum.");
+                throw new NotImplemented("0000", "Do not support authoritativeNodeReadImpl Object type (" +
+                        authoritativeNodeReadImpl.getClass().getCanonicalName() + "), so could" +
+                        		"not compare checksums (needed the MN to recalculate).");
             }
         }
         
@@ -247,15 +255,20 @@ public class SystemMetadataValidator {
         if (!ObjectUtils.equals(cnSysMeta.getOriginMemberNode(), newSysMeta.getOriginMemberNode())) {
             illegalChangeFields.add("originMemberNode");
         }
+        
         // seriesId:   can only go from null => a value
+        // XXX should there be any other validation that the series ID doesn't 
+        // conflict with existing identifiers (pids?), and that there isn't a 
+        // reservation on it? 
         if (!D1TypeUtils.equals(cnSysMeta.getSeriesId(), newSysMeta.getSeriesId())) {
             if (cnSysMeta.getSeriesId() == null) {
                 changes++;
             } else {
-                illegalChangeFields.add("obsoletedBy");
+                illegalChangeFields.add("seriesId");
             }
         }
-
+        
+        
         if (illegalChangeFields.size() > 0) {
             throw new InvalidRequest("-1", "Illegal changes attempted to the fields: "
                     + StringUtils.join(illegalChangeFields, ", "));
@@ -275,6 +288,10 @@ public class SystemMetadataValidator {
             return true;
         }
 
+        // TODO: detector for 'filename'
+        
+        // TODO: detector for 'mediaType'
+        
         // use XOR to find cases where one is null and the other is not
         if ((newSysMeta.getAccessPolicy() == null) ^ (cnSysMeta.getAccessPolicy() == null)) {
             return true;

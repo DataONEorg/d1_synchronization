@@ -24,17 +24,21 @@ import java.io.UnsupportedEncodingException;
 import java.math.BigInteger;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.Logger;
 import org.dataone.client.v1.types.D1TypeBuilder;
-import org.dataone.cn.batch.exceptions.InternalSyncFailure;
 import org.dataone.cn.batch.exceptions.NodeCommUnavailable;
+import org.dataone.cn.batch.exceptions.RetryableException;
+import org.dataone.cn.batch.exceptions.UnrecoverableException;
 import org.dataone.cn.batch.synchronization.D1TypeUtils;
 import org.dataone.cn.batch.synchronization.NodeCommSyncObjectFactory;
 import org.dataone.cn.batch.synchronization.type.NodeComm;
@@ -44,6 +48,7 @@ import org.dataone.cn.synchronization.types.SyncObject;
 import org.dataone.configuration.Settings;
 import org.dataone.ore.ResourceMapFactory;
 import org.dataone.service.cn.impl.v2.ReserveIdentifierService;
+import org.dataone.service.cn.v2.CNRead;
 import org.dataone.service.exceptions.BaseException;
 import org.dataone.service.exceptions.IdentifierNotUnique;
 import org.dataone.service.exceptions.InsufficientResources;
@@ -62,10 +67,13 @@ import org.dataone.service.types.v1.Checksum;
 import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.NodeReference;
 import org.dataone.service.types.v1.NodeType;
+import org.dataone.service.types.v1.Permission;
 import org.dataone.service.types.v1.Replica;
 import org.dataone.service.types.v1.ReplicationStatus;
 import org.dataone.service.types.v1.Service;
 import org.dataone.service.types.v1.Session;
+import org.dataone.service.types.v1.Subject;
+import org.dataone.service.types.v1.util.AuthUtils;
 import org.dataone.service.types.v1.util.ChecksumUtil;
 import org.dataone.service.types.v2.Node;
 import org.dataone.service.types.v2.ObjectFormat;
@@ -346,6 +354,7 @@ public class V2TransferObjectTask implements Callable<Void> {
      */
     private void processTask(SystemMetadata mnSystemMetadata) throws VersionMismatch, SynchronizationFailed {
         try {
+            validateSeriesId(mnSystemMetadata);
             if (alreadyExists(mnSystemMetadata)) {
                 processUpdates(mnSystemMetadata);
             } else {
@@ -466,6 +475,58 @@ public class V2TransferObjectTask implements Callable<Void> {
 
         }
         return systemMetadata;
+    }
+
+    /**
+     * For any sync task, (update or newObject) the submitter needs to have control
+     * over the seriesId, so it makes sense to filter out seriesId problems first.
+     * @param sysMeta
+     * @throws NotAuthorized 
+     * @throws UnrecoverableException 
+     * @throws RetryableException 
+     */
+    private void validateSeriesId(SystemMetadata sysMeta) throws NotAuthorized, UnrecoverableException, RetryableException {
+
+        Identifier sid = sysMeta.getSeriesId();
+
+        if (sid == null || StringUtils.isBlank(sid.getValue()))
+            return;
+
+        try {
+            Session verifySubmitter = new Session();
+            verifySubmitter.setSubject(sysMeta.getSubmitter());
+            if (!reserveIdentifierService.hasReservation(verifySubmitter, sysMeta.getSubmitter(), sysMeta.getIdentifier())) {
+                throw new NotAuthorized("0000","someone else (other than submitter) holds the reservation on the seriesId!");
+            }
+            logger.info(task.taskLabel() + " SeriesId is reserved by sysmeta.submitter");
+            return;  // ok
+        } catch (NotFound ex) {
+            // assume if reserveIdentifierService has thrown NotFound exception SystemMetadata does not exist
+            logger.info(task.taskLabel() + " SeriesId doesn't exist as reservation or object on the CN...");
+            return; // ok
+        } catch (IdentifierNotUnique ex) {
+            logger.info(task.taskLabel() + " SeriesId is in use....");
+            try {
+                SystemMetadata sidSysMeta = ((CNRead)nodeCommunications.getCnRead()).getSystemMetadata(null, sid);
+                if (!AuthUtils.isAuthorized(
+                        Collections.singletonList(sysMeta.getSubmitter()),
+                        Permission.CHANGE_PERMISSION, 
+                        sidSysMeta))
+                    throw new NotAuthorized("0000","Submitter does not have CHANGE rights on the SeriesId as determined by" +
+                            " the current head of the Sid collection, whose pid is: " +
+                            sidSysMeta.getIdentifier().getValue());
+            } catch (InvalidToken|NotImplemented e) {
+                String message = " couldn't connect to the CN /meta endpoint to check seriesId!! Reason: " + e.toString();
+                logger.error(task.taskLabel() + message);
+                e.printStackTrace();
+                throw new UnrecoverableException(message, e);
+            } catch (ServiceFailure e) {
+                throw new RetryableException("Temporary problem connecting to CN /meta endpoint to check seriesId.", e);
+            } catch (NotFound e) {
+                logger.info(task.taskLabel() + " SeriesId doesn't exist for any object on the CN...");
+                return; //ok
+            }
+        }
     }
 
     
@@ -754,44 +815,70 @@ public class V2TransferObjectTask implements Callable<Void> {
      * the authoritative Member Node.
      *
      * @param SystemMetadata systemMetdata from the MN 
+     * @throws UnrecoverableException 
+     * @throws SynchronizationFailed 
      * @throws InternalSyncFailure 
      * @throws BaseException 
      */
-    //  XXX reviewed 6/20
-    private void processUpdates(SystemMetadata newSystemMetadata) throws BaseException, InternalSyncFailure {
+    // TODO: Check that we are not updating V2 sysmeta with V1
+    private void processUpdates(SystemMetadata newSystemMetadata) throws RetryableException, UnrecoverableException, SynchronizationFailed {
         //XXX is cloning the identifier necessary?
         Identifier pid = D1TypeBuilder.cloneIdentifier(newSystemMetadata.getIdentifier());
         
         logger.info(task.taskLabel() + " Processing as an Update");
         logger.info(task.taskLabel() + " Getting sysMeta from HazelCast map");
         SystemMetadata hzSystemMetadata = hzSystemMetaMap.get(pid);
+        try {
+            SystemMetadataValidator validator = new SystemMetadataValidator(hzSystemMetadata);
+            validator.validateEssentialProperties(newSystemMetadata,nodeCommunications.getMnRead());
 
-        SystemMetadataValidator validator = new SystemMetadataValidator(hzSystemMetadata);
-        validator.validateEssentialProperties(newSystemMetadata,nodeCommunications.getMnRead());
-        
-        // if here, we know that the new system metadata is referring to the same
-        // object, and we can consider updating other values.
-        
-        if (task.getNodeId().contentEquals(
-                hzSystemMetadata.getAuthoritativeMemberNode().getValue())) 
-        {
-            processAuthoritativeUpdate(newSystemMetadata, hzSystemMetadata);
-        } else {
-            processPossibleNewReplica(newSystemMetadata, hzSystemMetadata);
-        }
+            // if here, we know that the new system metadata is referring to the same
+            // object, and we can consider updating other values.
+
+            if (task.getNodeId().contentEquals(
+                    hzSystemMetadata.getAuthoritativeMemberNode().getValue())) 
+            {
+                processAuthoritativeUpdate(newSystemMetadata, hzSystemMetadata);
+            } else {
+                processPossibleNewReplica(newSystemMetadata, hzSystemMetadata);
+            }
+        } catch (InvalidSystemMetadata e) {
+            throw new UnrecoverableException("In processUpdates, bad SystemMetadata from the HzMap", e);
+        } catch (IdentifierNotUnique e) {
+            // syncFailure
+        } catch (ServiceFailure e) {
+            //retryable
+        } catch (InvalidRequest e) {
+            // unrecoverable
+        } catch (InvalidToken e) {
+            // unrecoverable
+        } catch (NotAuthorized e) {
+            // unrecoverable
+        } catch (NotImplemented e) {
+            // unrecoverable
+        } catch (NotFound e) {
+            // unrecoverable ?
+        } finally{}
     }
     
-    //  XXX reviewed 6/20
     /**
      * checks to see if this systemMetadata is from an existing replica or is 
      * an unknown source that should be registered as a replica.
      * 
      * @param newSystemMetadata
      * @param hzSystemMetadata
-     * @throws BaseException
+     * @throws VersionMismatch 
+     * @throws InvalidToken 
+     * @throws InvalidRequest 
+     * @throws NotFound 
+     * @throws ServiceFailure 
+     * @throws NotAuthorized 
+     * @throws NotImplemented 
+
      */
     private void processPossibleNewReplica(SystemMetadata newSystemMetadata, SystemMetadata hzSystemMetadata) 
-    throws BaseException {
+    throws RetryableException, UnrecoverableException, SynchronizationFailed 
+    {
         
         for (Replica replica : hzSystemMetadata.getReplicaList()) {
             if (task.getNodeId().equals(replica.getReplicaMemberNode().getValue())) {
@@ -809,11 +896,20 @@ public class V2TransferObjectTask implements Callable<Void> {
         logger.info(task.taskLabel() + " Non-authoritative source, adding the" +
                 " node as a replica");
 
-        // TODO add the replica to the hzsysmetamap ?
-        // TODO make sure the new systemMetadata is persisted ?
-        
-        nodeCommunications.getCnReplication().updateReplicationMetadata(session, newSystemMetadata.getIdentifier(),
-                mnReplica, hzSystemMetadata.getSerialVersion().longValue());
+        try {
+            nodeCommunications.getCnReplication().updateReplicationMetadata(session, newSystemMetadata.getIdentifier(),
+                    mnReplica, hzSystemMetadata.getSerialVersion().longValue());
+        } catch (NotImplemented | NotAuthorized | InvalidRequest | InvalidToken e) {
+            throw  SyncFailedTask.createSynchronizationFailed(task.getPid(), e);
+        } catch (ServiceFailure e) {
+            // TODO: review message
+            throw new RetryableException("from processPossibleNewReplica: ", e);
+        } catch (NotFound e) {
+            // TODO: maybe push to back of queue to catch the replica
+            throw new RetryableException("from processPossibleNewReplica: ", e);
+        } catch (VersionMismatch e) {
+            throw new RetryableException("from processPossibleNewReplica: ", e);
+        }
     }
 
     /**

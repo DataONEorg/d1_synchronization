@@ -5,8 +5,6 @@ import java.io.IOException;
 import java.util.Arrays;
 
 import org.apache.commons.io.IOUtils;
-import org.dataone.cn.batch.exceptions.InternalSyncFailure;
-import org.dataone.service.exceptions.ServiceFailure;
 import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.NodeReference;
 import org.dataone.service.types.v1.ObjectFormatIdentifier;
