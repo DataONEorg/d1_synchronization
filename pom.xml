@@ -1,11 +1,11 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
-	<modelVersion>4.0.0</modelVersion>
-	<groupId>org.dataone</groupId>
-	<artifactId>d1_synchronization</artifactId>
-	<packaging>jar</packaging>
-	<name>DataONE_Synchronization</name>
-	<version>2.0.0-SNAPSHOT</version>
-	<description>Cn Member Node Synchronization</description>
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>org.dataone</groupId>
+  <artifactId>d1_synchronization</artifactId>
+  <packaging>jar</packaging>
+  <name>DataONE_Synchronization</name>
+  <version>2.0.0-SNAPSHOT</version>
+  <description>Cn Member Node Synchronization</description>
         <url>http://dataone.org</url>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -58,22 +58,22 @@
                 </configuration>
             </plugin>
         </plugins>
-		<resources>
-	      <resource>
-	        <directory>src/main/resources</directory>
-	        <filtering>true</filtering>
-	        <includes>
-	          <include>buildInfo/buildInfo.properties</include>
-	        </includes>
-	      </resource>
-	      <resource>
-	        <directory>src/main/resources</directory>
-	        <filtering>false</filtering>
-	        <includes>
-	          <include>**/*.*</include>
-	        </includes>
-	      </resource>
-		</resources>
+    <resources>
+        <resource>
+          <directory>src/main/resources</directory>
+          <filtering>true</filtering>
+          <includes>
+            <include>buildInfo/buildInfo.properties</include>
+          </includes>
+        </resource>
+        <resource>
+          <directory>src/main/resources</directory>
+          <filtering>false</filtering>
+          <includes>
+            <include>**/*.*</include>
+          </includes>
+        </resource>
+    </resources>
     </build>
     <repositories>
         <repository>
@@ -178,6 +178,13 @@
         </dependency>
         <dependency>
             <groupId>org.dataone</groupId>
+            <artifactId>d1_libclient_java</artifactId>
+            <version>${d1_libclient_version}</version>
+            <type>test-jar</type>
+<!--             <scope>test</scope> -->
+        </dependency>
+        <dependency>
+            <groupId>org.dataone</groupId>
             <artifactId>d1_cn_noderegistry</artifactId>
             <version>${d1_cn_noderegistry_version}</version>
             <type>jar</type>
@@ -188,12 +195,12 @@
             <version>${d1_identity_manager_version}</version>
             <type>jar</type>
         </dependency>
-		<dependency>
-			<groupId>org.dataone</groupId>
-			<artifactId>d1_cn_common</artifactId>
-			<version>${d1_cn_common_version}</version>
-			<type>jar</type>
-		</dependency>
+    <dependency>
+      <groupId>org.dataone</groupId>
+      <artifactId>d1_cn_common</artifactId>
+      <version>${d1_cn_common_version}</version>
+      <type>jar</type>
+    </dependency>
     </dependencies>
   <licenses>
     <license>
