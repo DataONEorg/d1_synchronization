@@ -1,6 +1,6 @@
 /**
  * This work was created by participants in the DataONE project, and is
- * jointly copyrighted by participating institutions in DataONE. For 
+ * jointly copyrighted by participating institutions in DataONE. For
  * more information on DataONE, see our web site at http://dataone.org.
  *
  *   Copyright ${year}
@@ -14,9 +14,9 @@
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and 
+ * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  * $Id$
  */
 
@@ -45,14 +45,14 @@ import org.dataone.service.types.v1.Service;
 import org.dataone.service.types.v2.Node;
 
 /**
- * Creates/maintains a CommNode (node communications) pool for use by the TransferObjectTask
- * A CommNode is memberNode specific
- * 
+ * Creates/maintains a NodeComm (node communications) pool for use by the TransferObjectTask
+ * A NodeComm is memberNode specific
+ *
  * Sets up instances that should be reused by the TransferObjectTask
  * Assume that most of the instances are not thread-safe, in other words
  * the instances created by this factory will be re-used by threads, but no two concurrent threads
  * should access the same instances (with the exception of hazelcast client instance)
- * 
+ *
  * @author waltz
  */
 public class NodeCommSyncObjectFactory implements NodeCommFactory {
@@ -71,7 +71,7 @@ public class NodeCommSyncObjectFactory implements NodeCommFactory {
     private static Map<NodeReference, List<NodeComm>> initializedMemberNodes = new HashMap<NodeReference, List<NodeComm>>();
     private static NodeCommFactory nodeCommFactory = null;
     private NodeCommSyncObjectFactory() {
-        
+
     }
     public static NodeCommFactory getInstance () {
         if (nodeCommFactory == null) {
@@ -134,7 +134,7 @@ public class NodeCommSyncObjectFactory implements NodeCommFactory {
         }
         return nodeCommunications;
     }
-    
+
     private NodeComm createNodeComm(NodeReference mnNodeId, String hzConfigLocation) throws ServiceFailure {
         if (hzclient == null) {
             hzclient = HazelcastClientInstance.getHazelcastClient();
@@ -147,9 +147,9 @@ public class NodeCommSyncObjectFactory implements NodeCommFactory {
         } catch(NotImplemented e) {
             throw new ServiceFailure("0000", e.getMessage());
         }
-        
+
         ReserveIdentifierService reserveIdentifierService = new ReserveIdentifierService();
-        
+
         // figure out what client impl to use for this node, default to v1
         Object mNode = org.dataone.client.v1.itk.D1Client.getMN(mnNodeId);
         NodeRegistryService nodeRegistryService = new NodeRegistryService();
@@ -165,7 +165,7 @@ public class NodeCommSyncObjectFactory implements NodeCommFactory {
         } catch (NotFound ex) {
             throw new ServiceFailure("0000", ex.getDescription());
         }
-        
+
         NodeComm nodeComm = new NodeComm(mNode, cNode, cNode, cNode, reserveIdentifierService, hzclient);
         return nodeComm;
     }

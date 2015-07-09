@@ -37,14 +37,14 @@ import org.dataone.service.types.v1.Service;
 
 
 /**
- * 
- * Creates a CommNode (node communications) pool for use by the ObjectListHarvestTask.
- * A CommNode object is memberNode specific
  *
- * Sets up instances that should be reused by the ObjectListHarvestTask 
- * Assume that most of the pooled instances (mNode/nodeRegistry) are not thread-safe, 
- * in other words the instances created by this factory will be re-used by threads, 
- * but no two concurrent threads should access the same instances 
+ * Creates a NodeComm (node communications) pool for use by the ObjectListHarvestTask.
+ * A NodeComm object is memberNode specific
+ *
+ * Sets up instances that should be reused by the ObjectListHarvestTask
+ * Assume that most of the pooled instances (mNode/nodeRegistry) are not thread-safe,
+ * in other words the instances created by this factory will be re-used by threads,
+ * but no two concurrent threads should access the same instances
  * (with the exception of hazelcast client instance)
  *
  * @author waltz
@@ -83,7 +83,7 @@ public class NodeCommObjectListHarvestFactory implements NodeCommFactory {
                 hzclient = HazelcastClientInstance.getHazelcastClient();
                 CertificateManager.getInstance().setCertificateLocation(clientCertificateLocation);
             }
-        
+
             // figure out what client impl to use for this node, default to v1
             Object mNode = org.dataone.client.v1.itk.D1Client.getMN(mnNodeId);
             NodeRegistryService nodeRegistryService = new NodeRegistryService();
@@ -91,15 +91,15 @@ public class NodeCommObjectListHarvestFactory implements NodeCommFactory {
             try {
                 node = nodeRegistryService.getNode(mnNodeId);
                 for (Service service: node.getServices().getServiceList()) {
-                	if (service.getVersion().equals("v2")) {
-                		mNode = org.dataone.client.v2.itk.D1Client.getMN(mnNodeId);
-                		break;
-                	}
+                    if (service.getVersion().equals("v2")) {
+                        mNode = org.dataone.client.v2.itk.D1Client.getMN(mnNodeId);
+                        break;
+                    }
                 }
             } catch (NotFound ex) {
                 throw new NodeCommUnavailable(ex.getDescription());
             }
-            
+
             NodeComm nodeComm = new NodeComm(mNode, nodeRegistryService, hzclient);
             initializedMemberNodes.putIfAbsent(mnNodeId, nodeComm);
             return nodeComm;
