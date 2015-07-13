@@ -31,17 +31,23 @@ import org.dataone.client.v2.CNode;
 import org.dataone.client.v2.itk.D1Client;
 import org.dataone.client.auth.CertificateManager;
 import org.dataone.cn.batch.exceptions.NodeCommUnavailable;
+import org.dataone.cn.batch.synchronization.type.IdentifierReservationQueryService;
 import org.dataone.cn.batch.synchronization.type.NodeComm;
 import org.dataone.cn.batch.synchronization.type.NodeCommState;
 import org.dataone.cn.hazelcast.HazelcastClientInstance;
 import org.dataone.configuration.Settings;
 import org.dataone.service.cn.impl.v2.NodeRegistryService;
 import org.dataone.service.cn.impl.v2.ReserveIdentifierService;
+import org.dataone.service.exceptions.IdentifierNotUnique;
+import org.dataone.service.exceptions.NotAuthorized;
 import org.dataone.service.exceptions.NotFound;
 import org.dataone.service.exceptions.NotImplemented;
 import org.dataone.service.exceptions.ServiceFailure;
+import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.NodeReference;
 import org.dataone.service.types.v1.Service;
+import org.dataone.service.types.v1.Session;
+import org.dataone.service.types.v1.Subject;
 import org.dataone.service.types.v2.Node;
 
 /**
@@ -127,10 +133,6 @@ public class NodeCommSyncObjectFactory implements NodeCommFactory {
             nodeCommunications.setRunningStartDate(new Date());
             nodeCommList.add(nodeCommunications);
             initializedMemberNodes.put(mnNodeId, nodeCommList);
-
-        }
-        if (nodeCommunications == null) {
-            throw new NodeCommUnavailable("No Comm Nodes Available");
         }
         return nodeCommunications;
     }
@@ -148,7 +150,19 @@ public class NodeCommSyncObjectFactory implements NodeCommFactory {
             throw new ServiceFailure("0000", e.getMessage());
         }
 
-        ReserveIdentifierService reserveIdentifierService = new ReserveIdentifierService();
+        IdentifierReservationQueryService reserveIdentifierService = 
+                new IdentifierReservationQueryService() {
+                    
+                    private ReserveIdentifierService serviceImpl =
+                            new ReserveIdentifierService();
+                    
+                    @Override
+                    public boolean hasReservation(Session session, Subject subject, Identifier pid) 
+                            throws NotAuthorized, NotFound, IdentifierNotUnique {
+                       
+                       return serviceImpl.hasReservation(session, subject, pid);
+                    }
+        };
 
         // figure out what client impl to use for this node, default to v1
         Object mNode = org.dataone.client.v1.itk.D1Client.getMN(mnNodeId);

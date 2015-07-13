@@ -35,6 +35,7 @@ import org.apache.commons.io.IOUtils;
 import org.apache.log4j.Logger;
 import org.dataone.cn.batch.exceptions.NodeCommUnavailable;
 import org.dataone.cn.batch.synchronization.NodeCommSyncObjectFactory;
+import org.dataone.cn.batch.synchronization.type.IdentifierReservationQueryService;
 import org.dataone.cn.batch.synchronization.type.NodeComm;
 import org.dataone.cn.hazelcast.HazelcastInstanceFactory;
 import org.dataone.cn.synchronization.types.SyncObject;
@@ -115,7 +116,7 @@ public class TransferObjectTask implements Callable<Void> {
             Settings.getConfiguration().getString("dataone.hazelcast.systemMetadata");
     
     IMap<Identifier, SystemMetadata> hzSystemMetaMap;
-    ReserveIdentifierService reserveIdentifierService;
+    IdentifierReservationQueryService reserveIdentifierService;
 
     public TransferObjectTask(NodeComm nodeCommunications, SyncObject task) {
         this.nodeCommunications = nodeCommunications;
@@ -481,7 +482,7 @@ public class TransferObjectTask implements Callable<Void> {
                 logger.info(task.taskLabel() + " Create from reservation");
             } catch (NotFound ex) {
                 doCreate = true;
-                // assume if reserveIdentifierService has thrown NotFound exception SystemMetadata does not exist
+                // assume if identifierReservationService has thrown NotFound exception SystemMetadata does not exist
                 logger.info(task.taskLabel() + " Create from Exception");
             } catch (IdentifierNotUnique ex) {
                 logger.info(task.taskLabel() + " Pid Exists. Must be an Update");

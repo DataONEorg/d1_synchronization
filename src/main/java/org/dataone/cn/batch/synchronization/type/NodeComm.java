@@ -41,7 +41,7 @@ public class NodeComm {
     private CNCore cnCore;
     private CNReplication cnReplication;
     private HazelcastInstance hzClient;
-    private ReserveIdentifierService reserveIdentifierService;
+    private IdentifierReservationQueryService reserveIdentifierService;
     private NodeRegistryService nodeRegistryService;
     // helpful for debugging
     private Integer number;
@@ -59,7 +59,7 @@ public class NodeComm {
         this.cnRead = null;
     }
 
-    public NodeComm(Object mnRead, Object cnRead, CNCore cnCore, CNReplication cnReplication, ReserveIdentifierService reserveIdentifierService, HazelcastInstance hzClient) {
+    public NodeComm(Object mnRead, Object cnRead, CNCore cnCore, CNReplication cnReplication, IdentifierReservationQueryService reserveIdentifierService, HazelcastInstance hzClient) {
         this.mnRead = mnRead;
         this.cnRead = cnRead;
         this.cnCore = cnCore;
@@ -133,11 +133,11 @@ public class NodeComm {
         this.cnReplication = cnReplication;
     }
 
-    public ReserveIdentifierService getReserveIdentifierService() {
+    public IdentifierReservationQueryService getReserveIdentifierService() {
         return reserveIdentifierService;
     }
 
-    public void setReserveIdentifierService(ReserveIdentifierService reserveIdentifierService) {
+    public void setReserveIdentifierService(IdentifierReservationQueryService reserveIdentifierService) {
         this.reserveIdentifierService = reserveIdentifierService;
     }
 
