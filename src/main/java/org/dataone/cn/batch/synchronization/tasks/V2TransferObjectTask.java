@@ -41,6 +41,7 @@ import org.dataone.cn.batch.exceptions.RetryableException;
 import org.dataone.cn.batch.exceptions.UnrecoverableException;
 import org.dataone.cn.batch.synchronization.D1TypeUtils;
 import org.dataone.cn.batch.synchronization.NodeCommSyncObjectFactory;
+import org.dataone.cn.batch.synchronization.type.IdentifierReservationQueryService;
 import org.dataone.cn.batch.synchronization.type.NodeComm;
 import org.dataone.cn.batch.synchronization.type.SystemMetadataValidator;
 import org.dataone.cn.hazelcast.HazelcastInstanceFactory;
@@ -130,13 +131,14 @@ public class V2TransferObjectTask implements Callable<Void> {
             Settings.getConfiguration().getString("dataone.hazelcast.systemMetadata");
     
     IMap<Identifier, SystemMetadata> hzSystemMetaMap;
-    ReserveIdentifierService reserveIdentifierService;
+    IdentifierReservationQueryService identifierReservationService;
 
     public V2TransferObjectTask(NodeComm nodeCommunications, SyncObject task) {
         this.nodeCommunications = nodeCommunications;
         this.task = task;
-        this.hzSystemMetaMap = nodeCommunications.getHzClient().getMap(hzSystemMetaMapString);
-        this.reserveIdentifierService = nodeCommunications.getReserveIdentifierService();
+        HazelcastInstance hzInst = nodeCommunications.getHzClient();
+        this.hzSystemMetaMap = hzInst.getMap(hzSystemMetaMapString);
+        this.identifierReservationService = nodeCommunications.getReserveIdentifierService();
     }
     
     /**
@@ -502,13 +504,13 @@ public class V2TransferObjectTask implements Callable<Void> {
         try {
             Session verifySubmitter = new Session();
             verifySubmitter.setSubject(sysMeta.getSubmitter());
-            if (!reserveIdentifierService.hasReservation(verifySubmitter, sysMeta.getSubmitter(), sysMeta.getIdentifier())) {
+            if (!identifierReservationService.hasReservation(verifySubmitter, sysMeta.getSubmitter(), sysMeta.getIdentifier())) {
                 throw new NotAuthorized("0000","someone else (other than submitter) holds the reservation on the seriesId!");
             }
             logger.info(task.taskLabel() + " SeriesId is reserved by sysmeta.submitter");
             return;  // ok
         } catch (NotFound ex) {
-            // assume if reserveIdentifierService has thrown NotFound exception SystemMetadata does not exist
+            // assume if identifierReservationService has thrown NotFound exception SystemMetadata does not exist
             logger.info(task.taskLabel() + " SeriesId doesn't exist as reservation or object on the CN...");
             return; // ok
         } catch (IdentifierNotUnique ex) {
@@ -559,13 +561,13 @@ public class V2TransferObjectTask implements Callable<Void> {
         try {
             Session verifySubmitter = new Session();
             verifySubmitter.setSubject(sysMeta.getSubmitter());
-            if (!reserveIdentifierService.hasReservation(verifySubmitter, sysMeta.getSubmitter(), sysMeta.getIdentifier())) {
+            if (!identifierReservationService.hasReservation(verifySubmitter, sysMeta.getSubmitter(), sysMeta.getIdentifier())) {
                 throw new NotAuthorized("0000","someone else (other than submitter) holds the reservation on the pid!");
             }
             logger.info(task.taskLabel() + " Pid is reserved by sysmeta.submitter");
             exists = false;
         } catch (NotFound ex) {
-            // assume if reserveIdentifierService has thrown NotFound exception SystemMetadata does not exist
+            // assume if identifierReservationService has thrown NotFound exception SystemMetadata does not exist
             logger.info(task.taskLabel() + " Pid doesn't exist as reservation or object.");
             exists = false;
         } catch (IdentifierNotUnique ex) {

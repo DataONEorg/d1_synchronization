@@ -2,13 +2,14 @@ package org.dataone.cn.batch.harvest.mock;
 
 import javax.naming.NamingException;
 
+import org.dataone.cn.batch.synchronization.type.IdentifierReservationQueryService;
 import org.dataone.service.cn.impl.v2.ReserveIdentifierService;
 import org.dataone.service.exceptions.*;
 import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.Session;
 import org.dataone.service.types.v1.Subject;
 
-public class MockReserveIdentifierService extends ReserveIdentifierService {
+public class MockReserveIdentifierService implements IdentifierReservationQueryService {
 
     private Identifier knownIdentifier;
     private boolean alreadyCreated;

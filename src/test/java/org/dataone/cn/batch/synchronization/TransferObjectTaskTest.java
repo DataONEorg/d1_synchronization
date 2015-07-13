@@ -13,6 +13,7 @@ import org.dataone.client.v2.impl.NodeListNodeLocator;
 import org.dataone.cn.batch.harvest.mock.MockReserveIdentifierService;
 import org.dataone.cn.batch.synchronization.tasks.TransferObjectTask;
 import org.dataone.cn.batch.synchronization.tasks.V2TransferObjectTask;
+import org.dataone.cn.batch.synchronization.type.IdentifierReservationQueryService;
 import org.dataone.cn.batch.synchronization.type.NodeComm;
 import org.dataone.cn.hazelcast.HazelcastInstanceFactory;
 import org.dataone.cn.synchronization.types.SyncObject;
@@ -95,12 +96,14 @@ public class TransferObjectTaskTest {
     }
 
 
-//    @Test
+    @Test
     public void testRequeue_cannot_lock() throws Exception {
 
         Identifier pidToSync = D1TypeBuilder.buildIdentifier("foooo");
         Subject sysMetaSubmitter = D1TypeBuilder.buildSubject("groucho");
-
+        
+//        hazelcast.
+        
         NodeComm nc = new NodeComm(
                 nodeLoc.getNode(authMN),
                 nodeLoc.getNode(theCN), (CNCore)nodeLoc.getNode(theCN), (CNReplication)nodeLoc.getNode(theCN),
@@ -113,7 +116,7 @@ public class TransferObjectTaskTest {
 
     }
 
-    private ReserveIdentifierService createMockReserveIdService(Identifier knownIdentifier, Subject reservationHolder, boolean alreadyCreated, boolean acceptSession) {
+    private IdentifierReservationQueryService createMockReserveIdService(Identifier knownIdentifier, Subject reservationHolder, boolean alreadyCreated, boolean acceptSession) {
         return new MockReserveIdentifierService( knownIdentifier,  reservationHolder,  alreadyCreated,  acceptSession);
     }
 
