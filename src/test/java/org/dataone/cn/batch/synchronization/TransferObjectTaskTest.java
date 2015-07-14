@@ -15,6 +15,7 @@ import org.dataone.cn.batch.synchronization.tasks.TransferObjectTask;
 import org.dataone.cn.batch.synchronization.tasks.V2TransferObjectTask;
 import org.dataone.cn.batch.synchronization.type.IdentifierReservationQueryService;
 import org.dataone.cn.batch.synchronization.type.NodeComm;
+import org.dataone.cn.hazelcast.HazelcastClientInstance;
 import org.dataone.cn.hazelcast.HazelcastInstanceFactory;
 import org.dataone.cn.synchronization.types.SyncObject;
 import org.dataone.configuration.Settings;
@@ -25,14 +26,33 @@ import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.NodeReference;
 import org.dataone.service.types.v1.Subject;
 import org.dataone.service.types.v2.NodeList;
+import org.dataone.service.types.v2.SystemMetadata;
+import org.junit.After;
+import org.junit.AfterClass;
+import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.Resource;
+import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
+import com.hazelcast.client.HazelcastClient;
+import com.hazelcast.config.ClasspathXmlConfig;
+import com.hazelcast.config.Config;
+import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
+import com.hazelcast.core.IMap;
 
+//@RunWith(SpringJUnit4ClassRunner.class)
+//context files are located from the root of the test's classpath
+//for example org/dataone/cn/index/test/
+//@ContextConfiguration(locations = { "test-context.xml" })
 public class TransferObjectTaskTest {
 
-    private HazelcastInstance hazelcast = HazelcastInstanceFactory.getProcessingInstance();
+    private static HazelcastInstance hzMember;
+    private HazelcastInstance hzClient;
 //    String cnIdentifier =
 //            Settings.getConfiguration().getString("cn.router.nodeId");
     String synchronizationObjectQueue =
@@ -50,13 +70,38 @@ public class TransferObjectTaskTest {
     static NodeReference replicaMN = D1TypeBuilder.buildNodeReference("urn:node:replicaMN");
     static NodeReference otherMN = D1TypeBuilder.buildNodeReference("urn:node:otherMN");
 
-    @Test
-    public void testTrue() {
+//    @Autowired
+//    private Resource systemMetadataResource;
 
+    @Before
+    public void setUp() throws Exception {
+
+
+
+
+    }
+
+    @AfterClass
+    public static void tearDown() throws Exception {
+        Hazelcast.shutdownAll();
     }
 
     @BeforeClass
     public static void setUpContext() throws ClientSideException {
+
+        Config hzConfig = new ClasspathXmlConfig("org/dataone/configuration/hazelcast.xml");
+
+        System.out.println("Hazelcast Group Config:\n" + hzConfig.getGroupConfig());
+        System.out.print("Hazelcast Maps: ");
+        for (String mapName : hzConfig.getMapConfigs().keySet()) {
+            System.out.print(mapName + " ");
+        }
+
+        System.out.println();
+        hzMember = Hazelcast.newHazelcastInstance(hzConfig);
+        System.out.println("Hazelcast member hzMember name: " + hzMember.getName());
+
+
         // need a set of nodes for the nodeComm
         // theCN
         Object theCNode =
@@ -101,14 +146,17 @@ public class TransferObjectTaskTest {
 
         Identifier pidToSync = D1TypeBuilder.buildIdentifier("foooo");
         Subject sysMetaSubmitter = D1TypeBuilder.buildSubject("groucho");
-        
-//        hazelcast.
-        
+
+        IMap<String,SystemMetadata> sysMetaMap = hzMember.getMap(hzSystemMetaMapString);
+        sysMetaMap.put("foooo",new SystemMetadata());
+        sysMetaMap.put("bar",new SystemMetadata());
+
+        hzClient = HazelcastClientInstance.getHazelcastClient();
         NodeComm nc = new NodeComm(
                 nodeLoc.getNode(authMN),
                 nodeLoc.getNode(theCN), (CNCore)nodeLoc.getNode(theCN), (CNReplication)nodeLoc.getNode(theCN),
                 this.createMockReserveIdService(pidToSync, sysMetaSubmitter, false, true),
-                hazelcast);
+                hzClient);
         SyncObject so = new SyncObject(authMN, pidToSync);
 
         V2TransferObjectTask task = new V2TransferObjectTask(nc, so);
