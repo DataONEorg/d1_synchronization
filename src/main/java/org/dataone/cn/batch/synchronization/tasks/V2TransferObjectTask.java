@@ -142,6 +142,25 @@ public class V2TransferObjectTask implements Callable<Void> {
     }
     
     /**
+     * A constructor that allows the caller to pass in the HazelcastProcessingInstance
+     * (a Member instance)
+     * 
+     * Not intended for use in production.
+     *  
+     * @param nodeCommunications
+     * @param task
+     * @param testHzProcessingInstance - a testHzProcessingInstance
+     */
+     V2TransferObjectTask(NodeComm nodeCommunications, SyncObject task, HazelcastInstance testHzProcessingInstance) {
+        this.nodeCommunications = nodeCommunications;
+        this.task = task;
+        HazelcastInstance hzInst = nodeCommunications.getHzClient();
+        this.hzSystemMetaMap = hzInst.getMap(hzSystemMetaMapString);
+        this.identifierReservationService = nodeCommunications.getReserveIdentifierService();
+        this.hazelcast = testHzProcessingInstance;
+    }
+    
+    /**
      * Attepts to process the item to be synchronized.  Retry logic is implemented
      * here such that the object is requeued if the thread couldn't get the lock on
      * the pid, or the V1 MN needs to refresh its systemMetadata due to end-user 

@@ -224,7 +224,23 @@
     </merge-policies>
   -->
 
-<queue name="hzSyncObjectQueue">
-</queue>
-
+    <queue name="hzSyncObjectQueue">
+        <max-size>0</max-size>
+        <backup-count>1</backup-count>
+        <async-backup-count>0</async-backup-count>
+        <empty-queue-ttl>-1</empty-queue-ttl>
+        <item-listeners>
+           <item-listener>
+              com.hazelcast.examples.ItemListener
+           </item-listener>
+        </item-listeners>
+    </queue>
+    <queue-store>
+        <class-name>com.hazelcast.QueueStoreImpl</class-name>
+        <properties>
+           <property name="binary">false</property>
+           <property name="memory-limit">10000</property>
+           <property name="bulk-load">500</property>
+        </properties>
+    </queue-store>
 </hazelcast>
