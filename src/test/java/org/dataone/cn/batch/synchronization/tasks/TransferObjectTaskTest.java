@@ -1,8 +1,9 @@
-package org.dataone.cn.batch.synchronization;
+package org.dataone.cn.batch.synchronization.tasks;
 
 import static org.junit.Assert.*;
 
 import java.net.URI;
+import java.util.Date;
 
 import org.dataone.client.D1Node;
 import org.dataone.client.D1NodeFactory;
@@ -22,9 +23,13 @@ import org.dataone.configuration.Settings;
 import org.dataone.service.cn.impl.v2.ReserveIdentifierService;
 import org.dataone.service.cn.v2.CNCore;
 import org.dataone.service.cn.v2.CNReplication;
+import org.dataone.service.types.v1.Event;
 import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.NodeReference;
+import org.dataone.service.types.v1.Session;
 import org.dataone.service.types.v1.Subject;
+import org.dataone.service.types.v2.Log;
+import org.dataone.service.types.v2.LogEntry;
 import org.dataone.service.types.v2.NodeList;
 import org.dataone.service.types.v2.SystemMetadata;
 import org.junit.After;
@@ -69,9 +74,11 @@ public class TransferObjectTaskTest {
     static NodeReference preRepMN = D1TypeBuilder.buildNodeReference("urn:node:preRepMN");
     static NodeReference replicaMN = D1TypeBuilder.buildNodeReference("urn:node:replicaMN");
     static NodeReference otherMN = D1TypeBuilder.buildNodeReference("urn:node:otherMN");
-
-//    @Autowired
-//    private Resource systemMetadataResource;
+    static Session cnClientSession;
+    {
+        cnClientSession = new Session();
+        cnClientSession.setSubject(D1TypeBuilder.buildSubject("cnClient"));
+    }
 
     @Before
     public void setUp() throws Exception {
@@ -113,22 +120,22 @@ public class TransferObjectTaskTest {
         // authMN
         org.dataone.client.v2.MNode authMNode =
                 D1NodeFactory.buildNode(org.dataone.client.v2.MNode.class, null,
-                URI.create("java:org.dataone.client.v2.impl.InMemoryMNode#Subject=authMnAdmin&Subject=authMnClient&NodeReference=theCN"));
+                URI.create("java:org.dataone.client.v2.impl.InMemoryMNode#Subject=authMnAdmin&Subject=cnClient&NodeReference=theCN"));
 
         // preRepMN
         org.dataone.client.v2.MNode preRepMNode =
                 D1NodeFactory.buildNode(org.dataone.client.v2.MNode.class, null,
-                URI.create("java:org.dataone.client.v2.impl.InMemoryMNode#Subject=preRepMnAdmin&Subject=preRepMnClient&NodeReference=urn:node:theCN"));
+                URI.create("java:org.dataone.client.v2.impl.InMemoryMNode#Subject=preRepMnAdmin&Subject=cnClient&NodeReference=urn:node:theCN"));
 
         // replicaMN
         org.dataone.client.v2.MNode replicaMNode =
                 D1NodeFactory.buildNode(org.dataone.client.v2.MNode.class, null,
-                URI.create("java:org.dataone.client.v2.impl.InMemoryMNode#Subject=replicaMnAdmin&Subject=replicaMnClient&NodeReference=urn:node:theCN"));
+                URI.create("java:org.dataone.client.v2.impl.InMemoryMNode#Subject=replicaMnAdmin&Subject=cnnClient&NodeReference=urn:node:theCN"));
 
         // otherMN
         org.dataone.client.v2.MNode otherMNode =
                 D1NodeFactory.buildNode(org.dataone.client.v2.MNode.class, null,
-                URI.create("java:org.dataone.client.v2.impl.InMemoryMNode#Subject=otherMnAdmin&Subject=otherMnClient&NodeReference=urn:node:theCN"));
+                URI.create("java:org.dataone.client.v2.impl.InMemoryMNode#Subject=otherMnAdmin&Subject=cnClient&NodeReference=urn:node:theCN"));
 
      // and put them into a NodeLocator
         nodeLoc = new NodeListNodeLocator(null, null);
@@ -142,16 +149,16 @@ public class TransferObjectTaskTest {
 
 
     @Test
-    public void testRequeue_cannot_lock() throws Exception {
+    public void testCantGetMNsSysMeta() throws Exception {
 
         Identifier pidToSync = D1TypeBuilder.buildIdentifier("foooo");
         Subject sysMetaSubmitter = D1TypeBuilder.buildSubject("groucho");
 
+        
         IMap<String,SystemMetadata> sysMetaMap = hzMember.getMap(hzSystemMetaMapString);
         sysMetaMap.put("foooo",new SystemMetadata());
-        sysMetaMap.put("bar",new SystemMetadata());
 
-        hzClient = HazelcastClientInstance.getHazelcastClient();
+        hzClient = hzMember;
         NodeComm nc = new NodeComm(
                 nodeLoc.getNode(authMN),
                 nodeLoc.getNode(theCN), (CNCore)nodeLoc.getNode(theCN), (CNReplication)nodeLoc.getNode(theCN),
@@ -159,9 +166,19 @@ public class TransferObjectTaskTest {
                 hzClient);
         SyncObject so = new SyncObject(authMN, pidToSync);
 
-        V2TransferObjectTask task = new V2TransferObjectTask(nc, so);
+        Date fromFilter = new Date();
+        V2TransferObjectTask task = new V2TransferObjectTask(nc, so, hzMember);
         task.call();
-
+        
+        Log events = ((org.dataone.client.v2.MNode)nodeLoc.getNode(authMN)).getLogRecords(cnClientSession, fromFilter, null, Event.SYNCHRONIZATION_FAILED.toString(), pidToSync.getValue(), null, null);
+        for (LogEntry le : events.getLogEntryList()) {
+            System.out.print("eventDate=" + le.getDateLogged());
+            System.out.print(" : type=" + le.getEvent());
+            System.out.print(" : id=" + le.getIdentifier().getValue());
+            System.out.println(" : nodeId=" + le.getNodeIdentifier().getValue()); 
+        }
+        assertEquals("Task should submit a Sync Failed when it can't retrieve the systemMetadata from the MN", 1, events.getLogEntryList().size());
+        
     }
 
     private IdentifierReservationQueryService createMockReserveIdService(Identifier knownIdentifier, Subject reservationHolder, boolean alreadyCreated, boolean acceptSession) {

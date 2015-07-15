@@ -85,7 +85,7 @@ public class SyncFailedTask implements Callable<String> {
         String nodeId = Settings.getConfiguration().getString("cn.nodeId");
         BaseException be = null;
         if (exception instanceof BaseException) {
-                be = (BaseException)be;
+                be = (BaseException)exception;
         } else {
             be = new ServiceFailure("-1", exception.getMessage());
         }
