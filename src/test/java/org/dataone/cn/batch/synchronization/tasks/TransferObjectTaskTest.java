@@ -183,10 +183,6 @@ public class TransferObjectTaskTest {
         // create it on the authMN
         ((org.dataone.client.v2.MNode)nodeLoc.getNode(authMN)).create(
                 submitterSession, pidToSync, o.getDataSource().getInputStream(), o.getSystemMetadata());
-
-//      IMap<String,SystemMetadata> sysMetaMap = hzMember.getMap(hzSystemMetaMapString);
-//      sysMetaMap.put(o.getIdentifier().getValue(),o.getSystemMetadata());
-
         
         // sync it
         hzClient = hzMember;
@@ -248,9 +244,6 @@ public class TransferObjectTaskTest {
         ((org.dataone.client.v2.MNode)nodeLoc.getNode(authMN)).create(
                 submitterSession, pidToSync, o.getDataSource().getInputStream(), o.getSystemMetadata());
 
-//      IMap<String,SystemMetadata> sysMetaMap = hzMember.getMap(hzSystemMetaMapString);
-//      sysMetaMap.put(o.getIdentifier().getValue(),o.getSystemMetadata());
-
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         TypeMarshaller.marshalTypeToOutputStream(o.getSystemMetadata(), baos);
         System.out.println(baos.toString("UTF-8"));
@@ -272,8 +265,6 @@ public class TransferObjectTaskTest {
         Log events = ((org.dataone.client.v2.MNode)nodeLoc.getNode(authMN)).getLogRecords(cnClientSession, fromFilter, null, Event.SYNCHRONIZATION_FAILED.toString(), pidToSync.getValue(), null, null);
         outputLogEntries(events);
         
-//        System.out.println(System.getProperty("java.version"));
-        
         assertEquals("Task should not generate a synchronizationFailed", 0, events.getLogEntryList().size());
 
         CNRead cnRead = (CNRead)nodeLoc.getNode(theCN);
@@ -293,22 +284,138 @@ public class TransferObjectTaskTest {
             IOUtils.closeQuietly(is);
         }
     }
+    
+    //TODO: note that if the submitter is not set by the MemberNode, the V2TranserObjectTask will
+    //percolate an NPE out of the alreadyExists helper method.
+    @Test
+    public void testSyncNewObject_v2MN_reserved_DATA_object() throws Exception {
 
-    public void buildSyncObject(String identifier, boolean onMN, boolean onCN, boolean hasReplicas) {
-        // create systemMetadata
+        // build the 'who'
+        Subject submitter = D1TypeBuilder.buildSubject("groucho");
+        Session submitterSession = new Session();
+        submitterSession.setSubject(submitter);
 
-        // add sysmeta to Hz map if required
+        // build the 'what'
+        Identifier pidToSync = D1TypeBuilder.buildIdentifier("foooo");
+        D1Object o = new D1Object(pidToSync, new ByteArrayDataSource("a,b,c,d".getBytes(),"text/csv"),
+                D1TypeBuilder.buildFormatIdentifier("text/csv"),
+                submitter,
+                D1TypeBuilder.buildNodeReference("urn:node:authMN"));
+        
+        // create it on the authMN
+        ((org.dataone.client.v2.MNode)nodeLoc.getNode(authMN)).create(
+                submitterSession, pidToSync, o.getDataSource().getInputStream(), o.getSystemMetadata());
+        
+        // sync it
+        hzClient = hzMember;
+        NodeComm nc = new NodeComm(
+                nodeLoc.getNode(authMN),
+                nodeLoc.getNode(theCN), (CNCore)nodeLoc.getNode(theCN), (CNReplication)nodeLoc.getNode(theCN),
+                this.createMockReserveIdService(pidToSync, submitter, false, true),
+                hzClient);
+        SyncObject so = new SyncObject(authMN, pidToSync);
 
-        // add sysmeta to CN if required
+        Date fromFilter = new Date();
+        V2TransferObjectTask task = new V2TransferObjectTask(nc, so, hzMember, cnClientSession);
+        task.call();
+        
+        Log events = ((org.dataone.client.v2.MNode)nodeLoc.getNode(authMN)).getLogRecords(cnClientSession, fromFilter, null, Event.SYNCHRONIZATION_FAILED.toString(), pidToSync.getValue(), null, null);
+        outputLogEntries(events);
+        
+        assertEquals("Task should not generate a synchronizationFailed", 0, events.getLogEntryList().size());
 
-        // add sysmeta to authMN
-
-        // add sysmeta to replicaMN
-
-        // add sysmeta to preReplicated MN
-
-
+        CNRead cnRead = (CNRead)nodeLoc.getNode(theCN);
+        
+        
+        try {
+            SystemMetadata sysmeta = cnRead.getSystemMetadata(cnClientSession, pidToSync);
+        } catch (NotFound e) {
+            fail("Should be able to retrieve sysmeta from CN after synchronization.");
+        }
+        
+        InputStream is = null;
+        try {
+            is = cnRead.get(cnClientSession, pidToSync);
+            fail("Should NOT be able to retrieve object bytes from the CN for DATA format.");
+        } catch (NotFound e) {
+            // that's good
+        } finally {
+            IOUtils.closeQuietly(is);
+        }
+        
+        
+        
     }
+    
+    @Test
+    public void testSyncNewObject_v2MN_reservedByOther_DATA_object() throws Exception {
+
+        // build the 'who'
+        Subject submitter = D1TypeBuilder.buildSubject("groucho");
+        Session submitterSession = new Session();
+        submitterSession.setSubject(submitter);
+
+        // build the 'what'
+        Identifier pidToSync = D1TypeBuilder.buildIdentifier("foooo");
+        D1Object o = new D1Object(pidToSync, new ByteArrayDataSource("a,b,c,d".getBytes(),"text/csv"),
+                D1TypeBuilder.buildFormatIdentifier("text/csv"),
+                submitter,
+                D1TypeBuilder.buildNodeReference("urn:node:authMN"));
+        
+        // create it on the authMN
+        ((org.dataone.client.v2.MNode)nodeLoc.getNode(authMN)).create(
+                submitterSession, pidToSync, o.getDataSource().getInputStream(), o.getSystemMetadata());
+        
+        // sync it
+        hzClient = hzMember;
+        NodeComm nc = new NodeComm(
+                nodeLoc.getNode(authMN),
+                nodeLoc.getNode(theCN), (CNCore)nodeLoc.getNode(theCN), (CNReplication)nodeLoc.getNode(theCN),
+                this.createMockReserveIdService(pidToSync, D1TypeBuilder.buildSubject("zeppo"), false, true),
+                hzClient);
+        SyncObject so = new SyncObject(authMN, pidToSync);
+
+        Date fromFilter = new Date();
+        V2TransferObjectTask task = new V2TransferObjectTask(nc, so, hzMember, cnClientSession);
+        task.call();
+        
+        Log events = ((org.dataone.client.v2.MNode)nodeLoc.getNode(authMN)).getLogRecords(cnClientSession, fromFilter, null, Event.SYNCHRONIZATION_FAILED.toString(), pidToSync.getValue(), null, null);
+        outputLogEntries(events);
+        
+        assertEquals("Task should generate a synchronizationFailed", 1, events.getLogEntryList().size());
+
+        CNRead cnRead = (CNRead)nodeLoc.getNode(theCN);
+        
+        try {
+            SystemMetadata sysmeta = cnRead.getSystemMetadata(cnClientSession, pidToSync);
+            fail("Should NOT be able to retrieve sysmeta from CN after synchronization.");
+        } catch (NotFound e) {
+            
+        }
+    }
+    
+//    @Test
+    public void testSyncNewObject_nonAuthoritativeNode()
+    {}
+    
+//    @Test
+    public void testSyncReplica()
+    {  // this will run 2 TransferObjectTasks - with slightly different sysmeta
+    }
+    
+//    @Test
+    public void testResync_No_Op()
+    {}
+    
+//    @Test
+    public void testSyncUpdate()
+    {}
+
+        
+//      IMap<String,SystemMetadata> sysMetaMap = hzMember.getMap(hzSystemMetaMapString);
+//      sysMetaMap.put(o.getIdentifier().getValue(),o.getSystemMetadata());
+
+
     
     void outputLogEntries(Log entries) {
         for (LogEntry le : entries.getLogEntryList()) {

@@ -581,6 +581,8 @@ public class V2TransferObjectTask implements Callable<Void> {
         //
         Boolean exists = null;
         try {
+            // not going through TLS, so need to build a Session, and will use the submitter
+            // in the systemMetadata, since they should have access to their own reservation(?)
             Session verifySubmitter = new Session();
             verifySubmitter.setSubject(sysMeta.getSubmitter());
             if (!identifierReservationService.hasReservation(verifySubmitter, sysMeta.getSubmitter(), sysMeta.getIdentifier())) {
