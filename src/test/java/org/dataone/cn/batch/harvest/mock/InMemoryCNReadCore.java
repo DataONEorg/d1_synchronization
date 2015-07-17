@@ -147,7 +147,10 @@ public class InMemoryCNReadCore implements CNode {
                     );
         }
         Set<Subject> sessionSubjects = AuthUtils.authorizedClientSubjects(session);
-        sessionSubjects.add(nodeAdministrator);
+        if (sessionSubjects.contains(this.nodeAdministrator) ||
+                sessionSubjects.contains(this.cnClientUser)) {
+            return sysmeta;
+        }
         if (!AuthUtils.isAuthorized(sessionSubjects, perm, sysmeta)) {
             throw new NotAuthorized("000",String.format("Caller does not have %s" +
                     " permission on %s",
@@ -157,9 +160,12 @@ public class InMemoryCNReadCore implements CNode {
         return sysmeta;
     }
 
-    private SystemMetadata getSeriesHead(Identifier id)
+    private SystemMetadata getSeriesHead(Identifier id) throws NotFound
     {
         Set<Identifier> pidSet = seriesMap.get(id);
+        if (pidSet == null) {
+            throw new NotFound("000","Identifer not found (" + id.getValue() + ")");
+        }
         Iterator<Identifier> it = pidSet.iterator();
         SystemMetadata latest = null;
         Date date = null;
@@ -203,9 +209,9 @@ public class InMemoryCNReadCore implements CNode {
         Exception caught = null;
         try {
             ByteArrayOutputStream os = new ByteArrayOutputStream(512);
-            TypeMarshaller.marshalTypeToOutputStream(SystemMetadata.class, os);
+            TypeMarshaller.marshalTypeToOutputStream(sysmeta, os);
             os.close();
-            // maybe we don't need to reconstitute to validate...
+//            // maybe we don't need to reconstitute to validate...
             TypeMarshaller.unmarshalTypeFromStream(SystemMetadata.class,
                     new ByteArrayInputStream(os.toByteArray()) );
         } catch (JiBXException e) {
@@ -298,7 +304,7 @@ public class InMemoryCNReadCore implements CNode {
 
     @Override
     public ObjectList listObjects(Session session, Date fromDate, Date toDate,
-            ObjectFormatIdentifier formatid, Identifier id, Boolean replicaStatus,
+            ObjectFormatIdentifier formatid, NodeReference nodeId, Identifier id,
             Integer start, Integer count)
     throws InvalidRequest, InvalidToken, NotAuthorized, NotImplemented, ServiceFailure
     {
@@ -313,6 +319,8 @@ public class InMemoryCNReadCore implements CNode {
             if (toDate != null && s.getDateSysMetadataModified().equals(toDate))
                 continue;
             if (formatid != null && !s.getFormatId().equals(formatid))
+                continue;
+            if (nodeId != null && !s.getAuthoritativeMemberNode().equals(nodeId))
                 continue;
             if (id != null && !(s.getIdentifier().equals(id) || s.getSeriesId().equals(id)) )
                 continue;
@@ -533,7 +541,7 @@ public class InMemoryCNReadCore implements CNode {
             ServiceFailure, InvalidRequest, InvalidSystemMetadata,
             InvalidToken {
         // TODO implement
-        throw new NotImplemented("000","listQueryEngines is not implemented.");
+        throw new NotImplemented("000","updateSystemMetadata is not implemented.");
     }
 
 
@@ -542,7 +550,7 @@ public class InMemoryCNReadCore implements CNode {
             throws InvalidToken, ServiceFailure, NotAuthorized, NotFound,
             NotImplemented
     {
-        throw new NotImplemented("zzz","InMemoryCNReadCore doesn't implement this method");
+        throw new NotImplemented("zzz","InMemoryCNReadCore doesn't implement resolve");
     }
 
 
@@ -551,27 +559,27 @@ public class InMemoryCNReadCore implements CNode {
             throws InvalidToken, ServiceFailure, NotAuthorized, InvalidRequest,
             NotImplemented
     {
-        throw new NotImplemented("zzz","InMemoryCNReadCore doesn't implement this method");
+        throw new NotImplemented("zzz","InMemoryCNReadCore doesn't implement search method");
     }
 
     @Override
     public Date ping() throws NotImplemented, ServiceFailure,
             InsufficientResources
     {
-        throw new NotImplemented("zzz","InMemoryCNReadCore doesn't implement this method");
+        return new Date();
     }
 
     @Override
     public ObjectFormatList listFormats() throws ServiceFailure, NotImplemented
     {
-        throw new NotImplemented("zzz","InMemoryCNReadCore doesn't implement this method");
+        return ObjectFormatCache.getInstance().listFormats();
     }
 
     @Override
     public ObjectFormat getFormat(ObjectFormatIdentifier formatid)
             throws ServiceFailure, NotFound, NotImplemented, InvalidRequest
     {
-        throw new NotImplemented("zzz","InMemoryCNReadCore doesn't implement this method");
+        return ObjectFormatCache.getInstance().getFormat(formatid);
     }
 
     @Override
@@ -580,14 +588,14 @@ public class InMemoryCNReadCore implements CNode {
             throws ServiceFailure, NotFound, NotImplemented, InvalidRequest,
             NotAuthorized, InvalidToken
     {
-        throw new NotImplemented("zzz","InMemoryCNReadCore doesn't implement this method");
+        throw new NotImplemented("zzz","InMemoryCNReadCore doesn't implement addFormat method");
     }
 
     @Override
     public ChecksumAlgorithmList listChecksumAlgorithms()
             throws ServiceFailure, NotImplemented
     {
-        throw new NotImplemented("zzz","InMemoryCNReadCore doesn't implement this method");
+        throw new NotImplemented("zzz","InMemoryCNReadCore doesn't implement listChecksumAlg method");
     }
 
     @Override
@@ -641,7 +649,7 @@ public class InMemoryCNReadCore implements CNode {
     @Override
     public NodeList listNodes() throws NotImplemented, ServiceFailure
     {
-        throw new NotImplemented("zzz","InMemoryCNReadCore doesn't implement this method");
+        throw new NotImplemented("zzz","InMemoryCNReadCore doesn't implement listNodes method");
     }
 
     @Override
@@ -649,13 +657,13 @@ public class InMemoryCNReadCore implements CNode {
             throws InvalidToken, ServiceFailure, NotAuthorized,
             IdentifierNotUnique, NotImplemented, InvalidRequest
     {
-        throw new NotImplemented("zzz","InMemoryCNReadCore doesn't implement this method");
+        throw new NotImplemented("zzz","InMemoryCNReadCore doesn't implement reserveIdentifier method");
     }
 
     @Override
     public Node getCapabilities() throws NotImplemented, ServiceFailure
     {
-        throw new NotImplemented("zzz","InMemoryCNReadCore doesn't implement this method");
+        throw new NotImplemented("zzz","InMemoryCNReadCore doesn't implement getCapabilities method");
     }
 
     @Override
@@ -679,8 +687,19 @@ public class InMemoryCNReadCore implements CNode {
             SystemMetadata sysmeta) throws NotImplemented, NotAuthorized,
             ServiceFailure, InvalidRequest, InvalidSystemMetadata, InvalidToken
     {
-        // TODO Auto-generated method stub
-        return null;
+        try {
+            checkAvailableAndAuthorized(session, pid, Permission.READ);
+        } catch (NotFound nf) {
+            // technically not good, but maybe it's ok 
+//          throw new IdentifierNotUnique("000", pid.getValue() +
+//          ": An object with this identifier already exists.");
+        }
+        validateSystemMetadata(sysmeta);
+        this.metaStore.put(pid, sysmeta);
+        addToSeries(sysmeta.getSeriesId(), pid);
+        eventLog.add(buildLogEntry("RegisterSysMeta", pid, session));
+
+        return pid;
     }
 
     @Override
@@ -688,8 +707,7 @@ public class InMemoryCNReadCore implements CNode {
             throws NotImplemented, NotAuthorized, ServiceFailure,
             InvalidRequest, InvalidSystemMetadata, InvalidToken
     {
-        // TODO Auto-generated method stub
-        return false;
+        throw new NotImplemented("zzz", "InMemoryCNReadCore hasn't implement method synchronize");
     }
 
     @Override
