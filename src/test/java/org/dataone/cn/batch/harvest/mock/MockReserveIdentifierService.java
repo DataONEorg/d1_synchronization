@@ -62,6 +62,9 @@ public class MockReserveIdentifierService implements IdentifierReservationQueryS
 
 
     private void validateIdentifier(Identifier id) throws NotFound {
+        if (this.knownIdentifier == null) 
+            throw new NotFound("zzz", "Identifier not found!");
+        
         if (!id.getValue().equals(this.knownIdentifier.getValue()))
             throw new NotFound("zzz","Identifier not found!!");
     }

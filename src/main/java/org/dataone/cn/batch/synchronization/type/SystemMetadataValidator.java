@@ -63,7 +63,8 @@ public class SystemMetadataValidator {
      * @throws InvalidSystemMetadata - with pid from sysmeta if it can get it
      */
     public static void schemaValidateSystemMetadata(SystemMetadata sysmeta) throws InvalidSystemMetadata {
-        Exception caught = null;
+
+        logger.info("Entering schemaValidateSysMeta method...");
         ByteArrayOutputStream os = new ByteArrayOutputStream();
         try {
             TypeMarshaller.marshalTypeToOutputStream(sysmeta, os);
@@ -75,7 +76,7 @@ public class SystemMetadataValidator {
             }
             String errorMessage = "The SystemMetadata for pid: " + pid + " is not schema valid";
             InvalidSystemMetadata be = new InvalidSystemMetadata("000", errorMessage);
-            be.initCause(caught);
+            be.initCause(e);
             logger.error(errorMessage, be);
             throw be;
         }

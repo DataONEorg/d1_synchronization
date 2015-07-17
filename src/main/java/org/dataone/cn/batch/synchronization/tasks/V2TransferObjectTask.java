@@ -117,7 +117,7 @@ public class V2TransferObjectTask implements Callable<Void> {
     Logger logger = Logger.getLogger(V2TransferObjectTask.class.getName());
     private NodeComm nodeCommunications;
     private SyncObject task;
-    private Session session = null;
+    private Session session = null;  // null defaults to configured certificate
     // need this task queue if a failure occurs on the CN such that the task will
     // need to be processed on a separate CN
     private HazelcastInstance hazelcast = HazelcastInstanceFactory.getProcessingInstance();
@@ -143,21 +143,24 @@ public class V2TransferObjectTask implements Callable<Void> {
     
     /**
      * A constructor that allows the caller to pass in the HazelcastProcessingInstance
-     * (a Member instance)
+     * (a Member instance), and client Session.
      * 
      * Not intended for use in production.
      *  
      * @param nodeCommunications
      * @param task
      * @param testHzProcessingInstance - a testHzProcessingInstance
+     * @param clientSession - the session object to use when making client calls
      */
-     V2TransferObjectTask(NodeComm nodeCommunications, SyncObject task, HazelcastInstance testHzProcessingInstance) {
+     V2TransferObjectTask(NodeComm nodeCommunications, SyncObject task, 
+             HazelcastInstance testHzProcessingInstance, Session clientSession) {
         this.nodeCommunications = nodeCommunications;
         this.task = task;
         HazelcastInstance hzInst = nodeCommunications.getHzClient();
         this.hzSystemMetaMap = hzInst.getMap(hzSystemMetaMapString);
         this.identifierReservationService = nodeCommunications.getReserveIdentifierService();
         this.hazelcast = testHzProcessingInstance;
+        this.session = clientSession;
     }
     
     /**
@@ -313,14 +316,14 @@ public class V2TransferObjectTask implements Callable<Void> {
         do {
             try {
                 if (readImpl instanceof MNRead) {
-                    retrievedSysMeta = ((MNRead) readImpl).getSystemMetadata(null, id);
+                    retrievedSysMeta = ((MNRead) readImpl).getSystemMetadata(session, id);
                     needSystemMetadata = false;
                 } else if (readImpl instanceof CNRead) {
-                    retrievedSysMeta = ((CNRead) readImpl).getSystemMetadata(null, id);
+                    retrievedSysMeta = ((CNRead) readImpl).getSystemMetadata(session, id);
                     needSystemMetadata = false;
                 } else if (readImpl instanceof org.dataone.service.mn.tier1.v1.MNRead) {
                     org.dataone.service.types.v1.SystemMetadata oldSystemMetadata = 
-                            ((org.dataone.service.mn.tier1.v1.MNRead) readImpl).getSystemMetadata(null, id);
+                            ((org.dataone.service.mn.tier1.v1.MNRead) readImpl).getSystemMetadata(session, id);
                     needSystemMetadata = false;
                     try {
                         retrievedSysMeta = TypeMarshaller.convertTypeFromType(oldSystemMetadata,
@@ -644,10 +647,10 @@ public class V2TransferObjectTask implements Callable<Void> {
                         logger.debug(task.taskLabel() + " getting ScienceMetadata ");
                         Object mnRead = nodeCommunications.getMnRead();
                         if (mnRead instanceof MNRead) {
-                            sciMetaStream = ((MNRead) mnRead).get(null, systemMetadata.getIdentifier());
+                            sciMetaStream = ((MNRead) mnRead).get(session, systemMetadata.getIdentifier());
                             needSciMetadata = false;
                         } else if (mnRead instanceof org.dataone.service.mn.tier1.v1.MNRead) {
-                            sciMetaStream = ((org.dataone.service.mn.tier1.v1.MNRead) mnRead).get(null,
+                            sciMetaStream = ((org.dataone.service.mn.tier1.v1.MNRead) mnRead).get(session,
                                     systemMetadata.getIdentifier());
                             needSciMetadata = false;
                         }
@@ -679,7 +682,7 @@ public class V2TransferObjectTask implements Callable<Void> {
                    validateResourceMap(objectFormat, sciMetaStream);
                  */
                 logger.info(task.taskLabel() + " Creating Object");
-                d1Identifier = nodeCommunications.getCnCore().create(null, d1Identifier, sciMetaStream,
+                d1Identifier = nodeCommunications.getCnCore().create(session, d1Identifier, sciMetaStream,
                         systemMetadata);
                 logger.info(task.taskLabel() + " Created Object");
             } finally {
@@ -687,7 +690,7 @@ public class V2TransferObjectTask implements Callable<Void> {
             }
         } else {
             logger.info(task.taskLabel() + " Registering SystemMetadata");
-            nodeCommunications.getCnCore().registerSystemMetadata(null, d1Identifier,
+            nodeCommunications.getCnCore().registerSystemMetadata(session, d1Identifier,
                     systemMetadata);
             logger.info(task.taskLabel() + " Registered SystemMetadata");
         }
