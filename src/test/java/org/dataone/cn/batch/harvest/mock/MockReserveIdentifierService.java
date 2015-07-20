@@ -45,10 +45,11 @@ public class MockReserveIdentifierService implements IdentifierReservationQueryS
             throws NotAuthorized, NotFound, IdentifierNotUnique {
 
         authorize();
-        validateIdentifier(pid);
-
         if (alreadyCreated)
             throw new IdentifierNotUnique("zzz","Identifier is already in use (already associated with registered object)");
+
+        validateIdentifier(pid);
+
 
         return subject.equals(reservationHolder);
     }

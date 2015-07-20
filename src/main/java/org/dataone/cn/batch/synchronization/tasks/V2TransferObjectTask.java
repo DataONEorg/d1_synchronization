@@ -377,6 +377,7 @@ public class V2TransferObjectTask implements Callable<Void> {
      * @throws VersionMismatch
      */
     private void processTask(SystemMetadata mnSystemMetadata) throws VersionMismatch, SynchronizationFailed {
+        logger.debug(task.taskLabel() + " entering processTask...");
         try {
             validateSeriesId(mnSystemMetadata);
             if (alreadyExists(mnSystemMetadata)) {
@@ -410,6 +411,8 @@ public class V2TransferObjectTask implements Callable<Void> {
      * @throws SynchronizationFailed
      */
     private void processNewObject(SystemMetadata mnSystemMetadata) throws BaseException, SynchronizationFailed {
+        
+        logger.debug(task.taskLabel() + " entering processNewObject...");
         mnSystemMetadata = updateNewSystemMetadata(mnSystemMetadata);
         if (mnSystemMetadata != null) {
             createObject(mnSystemMetadata);
@@ -430,7 +433,7 @@ public class V2TransferObjectTask implements Callable<Void> {
     private SystemMetadata updateNewSystemMetadata(SystemMetadata systemMetadata) throws SynchronizationFailed {
 
         try {
-            logger.debug(task.taskLabel() + " Processing SystemMetadata");
+            logger.debug(task.taskLabel() + " entering updateNewSystemMetadata");
             /*
              * DataONE Bug #2603 Synchronization should delete existing replicas on create
              */
@@ -518,6 +521,7 @@ public class V2TransferObjectTask implements Callable<Void> {
      */
     private void validateSeriesId(SystemMetadata sysMeta) throws NotAuthorized, UnrecoverableException {
 
+        logger.debug(task.taskLabel() + " entering validateSeriesId...");
         Identifier sid = sysMeta.getSeriesId();
 
         if (sid == null || StringUtils.isBlank(sid.getValue()))
@@ -579,6 +583,7 @@ public class V2TransferObjectTask implements Callable<Void> {
         // indicating that the PID was reserved by another user
         // or true is returned, indicating that the subject indeed has the reservation
         //
+        logger.debug(task.taskLabel() + " entering alreadyExists...");
         Boolean exists = null;
         try {
             // not going through TLS, so need to build a Session, and will use the submitter
@@ -623,6 +628,9 @@ public class V2TransferObjectTask implements Callable<Void> {
     private void createObject(SystemMetadata systemMetadata) throws InvalidRequest, ServiceFailure,
             NotFound, InsufficientResources, NotImplemented, InvalidToken, NotAuthorized,
             InvalidSystemMetadata, IdentifierNotUnique, UnsupportedType {
+        
+        logger.debug(task.taskLabel() + " entering createObject...");
+        
         Identifier d1Identifier = new Identifier();
         d1Identifier.setValue(systemMetadata.getIdentifier().getValue());
         
@@ -710,6 +718,8 @@ public class V2TransferObjectTask implements Callable<Void> {
     //  XXX reviewed 6/20
     private void validateChecksum(SystemMetadata systemMetadata) throws InvalidSystemMetadata {
         
+        logger.debug(task.taskLabel() + " entering validateChecksum...");
+        
         if (systemMetadata.getSize().compareTo(CHECKSUM_VERIFICATION_SIZE_BYPASS_THRESHOLD) > 0) 
             return;
            
@@ -771,6 +781,7 @@ public class V2TransferObjectTask implements Callable<Void> {
      */
     private void validateResourceMap(ObjectFormat format, InputStream sciMetaStream) throws UnsupportedType, InsufficientResources {
 
+        logger.debug(task.taskLabel() + " entering validateResourceMap...");
         boolean attemptValidation = false;
         
         if (format != null && format.getFormatType().equalsIgnoreCase("RESOURCE"))
@@ -853,11 +864,16 @@ public class V2TransferObjectTask implements Callable<Void> {
     // TODO: Check that we are not updating V2 sysmeta with V1
     private void processUpdates(SystemMetadata newSystemMetadata) 
             throws RetryableException, UnrecoverableException, SynchronizationFailed {
+        
+        logger.debug(task.taskLabel() + " entering processUpdates...");
+        
         //XXX is cloning the identifier necessary?
         Identifier pid = D1TypeBuilder.cloneIdentifier(newSystemMetadata.getIdentifier());
         
         logger.info(task.taskLabel() + " Processing as an Update");
         logger.info(task.taskLabel() + " Getting sysMeta from HazelCast map");
+        // TODO: assume that if hasReservation indicates the id exists, that 
+        // hzSystemMetadata will not be null...can we make this assumption?
         SystemMetadata hzSystemMetadata = hzSystemMetaMap.get(pid);
         try {
             SystemMetadataValidator validator = new SystemMetadataValidator(hzSystemMetadata);
@@ -895,7 +911,7 @@ public class V2TransferObjectTask implements Callable<Void> {
     private void processPossibleNewReplica(SystemMetadata newSystemMetadata, SystemMetadata hzSystemMetadata) 
     throws RetryableException, UnrecoverableException 
     {
-        
+        logger.debug(task.taskLabel() + " entering processPossibleNewReplica...");
         for (Replica replica : hzSystemMetadata.getReplicaList()) {
             if (task.getNodeId().equals(replica.getReplicaMemberNode().getValue())) {
                 logger.info(task.taskLabel() + " Non-authoritative source, existing replica.  No action needed");
@@ -938,6 +954,7 @@ public class V2TransferObjectTask implements Callable<Void> {
     private void processAuthoritativeUpdate(SystemMetadata mnSystemMetadata, SystemMetadata hzSystemMetadata) 
     throws RetryableException, UnrecoverableException, SynchronizationFailed {
         
+        logger.debug(task.taskLabel() + " entering processAuthoritativeUpdate...");
         boolean validated = false;
         try {
             SystemMetadataValidator validator = new SystemMetadataValidator(hzSystemMetadata);

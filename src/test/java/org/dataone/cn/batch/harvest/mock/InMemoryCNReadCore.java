@@ -16,7 +16,10 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
 
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang.ArrayUtils;
+import org.apache.commons.lang.StringUtils;
 import org.dataone.client.D1Node;
 import org.dataone.client.v1.types.D1TypeBuilder;
 import org.dataone.client.v2.CNode;
@@ -75,6 +78,9 @@ import org.dataone.service.types.v2.SystemMetadata;
 import org.dataone.service.util.TypeMarshaller;
 import org.jibx.runtime.JiBXException;
 
+import com.hazelcast.core.HazelcastInstance;
+import com.hazelcast.core.IMap;
+
 /**
  * Built primarily for testing, this class is an MNode implementation that
  * holds all of its content as SystemMetadata, LogEntries, and byte arrays (for
@@ -91,6 +97,7 @@ public class InMemoryCNReadCore implements CNode {
 
     protected Map<Identifier, byte[]> objectStore;
     protected Map<Identifier, SystemMetadata> metaStore;
+    protected IMap<Identifier,SystemMetadata> hzSysMetaMap;
     protected Map<Identifier, Set<Identifier>> seriesMap;
     protected List<LogEntry> eventLog;
 
@@ -115,6 +122,11 @@ public class InMemoryCNReadCore implements CNode {
         this.metaStore = new HashMap<Identifier,SystemMetadata>();
         this.seriesMap = new HashMap<Identifier, Set<Identifier>>();
         this.eventLog = new ArrayList<LogEntry>();
+        
+    }
+    
+    public void setHzSysMetaMap(IMap<Identifier,SystemMetadata> hzSysMetaMap) {
+        this.hzSysMetaMap = hzSysMetaMap;
     }
 
     protected synchronized LogEntry buildLogEntry(String eventString, Identifier pid, Session session) {
@@ -405,7 +417,7 @@ public class InMemoryCNReadCore implements CNode {
                 sysmeta.setDateUploaded(new Date());
                 sysmeta.setOriginMemberNode(getNodeId());
                 validateSystemMetadata(sysmeta);
-                this.metaStore.put(pid, sysmeta);
+                putSystemMetadata(pid, sysmeta);
                 addToSeries(sysmeta.getSeriesId(), pid);
                 eventLog.add(buildLogEntry(Event.CREATE, pid, session));
 
@@ -476,7 +488,7 @@ public class InMemoryCNReadCore implements CNode {
                 oldSysMeta.setObsoletedBy(newPid);
                 oldSysMeta.setDateSysMetadataModified(new Date());
 
-                this.metaStore.put(newPid, sysmeta);
+                putSystemMetadata(newPid, sysmeta);
                 addToSeries(sysmeta.getSeriesId(), newPid);
                 eventLog.add(buildLogEntry(Event.UPDATE, pid, session));
 
@@ -695,7 +707,7 @@ public class InMemoryCNReadCore implements CNode {
 //          ": An object with this identifier already exists.");
         }
         validateSystemMetadata(sysmeta);
-        this.metaStore.put(pid, sysmeta);
+        putSystemMetadata(pid, sysmeta);
         addToSeries(sysmeta.getSeriesId(), pid);
         eventLog.add(buildLogEntry("RegisterSysMeta", pid, session));
 
@@ -962,5 +974,11 @@ public class InMemoryCNReadCore implements CNode {
             InsufficientResources
     {
         throw new NotImplemented("zzz","InMemoryCNReadCore doesn't implement this method");
+    }
+    
+    
+    private void putSystemMetadata(Identifier pid, SystemMetadata smd) {
+        this.metaStore.put(pid, smd);
+        this.hzSysMetaMap.put(pid,smd);
     }
 }
