@@ -63,7 +63,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
  */
 public class SyncObjectTask implements Callable<String> {
 
-    Logger logger = Logger.getLogger(TransferObjectTask.class.getName());
+    Logger logger = Logger.getLogger(V2TransferObjectTask.class.getName());
     private ThreadPoolTaskExecutor taskExecutor;
     private HazelcastInstance hazelcast;
     private Integer maxNumberOfClientsPerMemberNode;
@@ -146,7 +146,7 @@ public class SyncObjectTask implements Callable<String> {
 
                         // finally, execute the new task!
                         try {
-                            TransferObjectTask transferObject = new TransferObjectTask(nodeCommunications, task);
+                            V2TransferObjectTask transferObject = new V2TransferObjectTask(nodeCommunications, task);
                             FutureTask futureTask = new FutureTask(transferObject);
                             taskExecutor.execute(futureTask);
 
