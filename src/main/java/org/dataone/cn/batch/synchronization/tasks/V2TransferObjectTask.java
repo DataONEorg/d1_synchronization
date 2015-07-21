@@ -715,7 +715,6 @@ public class V2TransferObjectTask implements Callable<Void> {
      * @param systemMetadata
      * @throws InvalidSystemMetadata
      */
-    //  XXX reviewed 6/20
     private void validateChecksum(SystemMetadata systemMetadata) throws InvalidSystemMetadata {
         
         logger.debug(task.taskLabel() + " entering validateChecksum...");
