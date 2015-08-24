@@ -242,7 +242,12 @@ public class SystemMetadataValidator {
         }
 
         // dateUploaded - immutable  //TODO: should this be part of validateEssentialProperties?
-        if (!ObjectUtils.equals(cnSysMeta.getDateUploaded(), newSysMeta.getDateUploaded())) {
+        /*if (!ObjectUtils.equals(cnSysMeta.getDateUploaded(), newSysMeta.getDateUploaded())) {
+            illegalChangeFields.add("dateUploaded");
+        }*/
+        if((cnSysMeta.getDateUploaded() == null && newSysMeta.getDateUploaded() != null) ||
+                (cnSysMeta.getDateUploaded() != null && newSysMeta.getDateUploaded() == null) ||
+                (cnSysMeta.getDateUploaded() != null && newSysMeta.getDateUploaded() != null && cnSysMeta.getDateUploaded().getTime() != newSysMeta.getDateUploaded().getTime())) {
             illegalChangeFields.add("dateUploaded");
         }
 
