@@ -165,7 +165,13 @@ public class D1TypeUtils {
         }
     }
  
-    
+    /**
+     * Similar to equals method, but also returns true if one ID is null, and
+     * the other ID's value property is null.
+     * @param id1
+     * @param id2
+     * @return
+     */
     public static boolean valueEquals(Identifier id1, Identifier id2) {
         
         if (id1 == id2)
@@ -192,6 +198,13 @@ public class D1TypeUtils {
         return (id1.getValue().equals(id2.getValue()));
     }
 
+    /**
+     * Similar to equals method, but also returns true if one ID is null, and
+     * the other ID's value property is null.
+     * @param id1
+     * @param id2
+     * @return
+     */
     public static boolean valueEquals(NodeReference id1, NodeReference id2) {
         
         if (id1 == id2)
@@ -218,6 +231,13 @@ public class D1TypeUtils {
         return (id1.getValue().equals(id2.getValue()));
     }
 
+    /**
+     * Similar to equals method, but also returns true if one ID is null, and
+     * the other ID's value property is null.
+     * @param id1
+     * @param id2
+     * @return
+     */
     public static boolean valueEquals(ObjectFormatIdentifier id1, ObjectFormatIdentifier id2) {
         
         if (id1 == id2)
@@ -244,6 +264,13 @@ public class D1TypeUtils {
         return (id1.getValue().equals(id2.getValue()));
     }
 
+    /**
+     * Similar to equals method, but also returns true if one ID is null, and
+     * the other ID's value property is null.
+     * @param id1
+     * @param id2
+     * @return
+     */
     public static boolean valueEquals(Subject id1, Subject id2) {
         
         if (id1 == id2)
@@ -270,7 +297,13 @@ public class D1TypeUtils {
         return (id1.getValue().equals(id2.getValue()));
     }
  
-    
+    /**
+     * Similar to equals, but treats a null object, null value-property, and empty string
+     * value-property as equal to each other
+     * @param id1
+     * @param id2
+     * @return
+     */
     public static boolean emptyEquals(NodeReference id1, NodeReference id2) {
 
         // deal with all of the null & empty string cases first where:

@@ -53,6 +53,7 @@ import org.dataone.service.types.v1.util.AuthUtils;
 import org.dataone.service.types.v2.Log;
 import org.dataone.service.types.v2.LogEntry;
 import org.dataone.service.types.v2.SystemMetadata;
+import org.dataone.service.types.v2.TypeFactory;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -491,7 +492,7 @@ public class TransferObjectTaskTest {
             fail("Should be able to retrieve sysmeta from CN after first synchronization.");;  //
         }
         
-        SystemMetadata modifiedSysMeta = D1TypeBuilder.cloneSystemMetadata(authObject.getSystemMetadata());
+        SystemMetadata modifiedSysMeta = TypeFactory.clone(authObject.getSystemMetadata());
         
         
         // push the replica to the replicaMN
@@ -594,7 +595,7 @@ public class TransferObjectTaskTest {
             fail("Should be able to retrieve sysmeta from CN after first synchronization.");;  //
         }
         
-        SystemMetadata modifiedSysMeta = D1TypeBuilder.cloneSystemMetadata(authObject.getSystemMetadata());
+        SystemMetadata modifiedSysMeta = TypeFactory.clone(authObject.getSystemMetadata());
         
         
         // push the replica to the replicaMN
