@@ -32,6 +32,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.Logger;
@@ -79,6 +80,7 @@ import org.dataone.service.types.v1.util.ChecksumUtil;
 import org.dataone.service.types.v2.Node;
 import org.dataone.service.types.v2.ObjectFormat;
 import org.dataone.service.types.v2.SystemMetadata;
+import org.dataone.service.types.v2.TypeFactory;
 import org.dataone.service.util.TypeMarshaller;
 import org.dspace.foresite.OREException;
 import org.dspace.foresite.OREParserException;
@@ -164,7 +166,7 @@ public class V2TransferObjectTask implements Callable<Void> {
     }
     
     /**
-     * Attepts to process the item to be synchronized.  Retry logic is implemented
+     * Attempts to process the item to be synchronized.  Retry logic is implemented
      * here such that the object is requeued if the thread couldn't get the lock on
      * the pid, or the V1 MN needs to refresh its systemMetadata due to end-user 
      * changes to the systemMetadata via the v1 CN API that haven't been reflected
@@ -326,8 +328,7 @@ public class V2TransferObjectTask implements Callable<Void> {
                             ((org.dataone.service.mn.tier1.v1.MNRead) readImpl).getSystemMetadata(session, id);
                     needSystemMetadata = false;
                     try {
-                        retrievedSysMeta = TypeMarshaller.convertTypeFromType(oldSystemMetadata,
-                                SystemMetadata.class);
+                        retrievedSysMeta = TypeFactory.clone(oldSystemMetadata);
 
                     } catch (Exception e) { // catches conversion issues
                         e.printStackTrace();
@@ -418,6 +419,9 @@ public class V2TransferObjectTask implements Callable<Void> {
             createObject(mnSystemMetadata);
         }
     }
+    
+    
+    
     /**
      * Modify the systemMetadata with new values set by the CN during synchronization
      * 
@@ -431,9 +435,40 @@ public class V2TransferObjectTask implements Callable<Void> {
      *
      */
     private SystemMetadata updateNewSystemMetadata(SystemMetadata systemMetadata) throws SynchronizationFailed {
-
+    
+        logger.debug(task.taskLabel() + " entering updateNewSystemMetadata");
+        
+        systemMetadata = populateInitialReplicaList(systemMetadata);
+        
+        // the origin membernode may be different from the node
+        // being harvested.  
+        if (D1TypeUtils.emptyEquals(systemMetadata.getOriginMemberNode(),null)) {
+            NodeReference originMemberNode = new NodeReference();
+            originMemberNode.setValue(task.getNodeId());
+            systemMetadata.setOriginMemberNode(originMemberNode);
+        }
+        // Do not override the authoritative MemberNode assigned by a MemberNode
+        // part of redmine Task #3062
+        if (D1TypeUtils.emptyEquals(systemMetadata.getAuthoritativeMemberNode(), null)) {
+            //                InvalidSystemMetadata invalidSystemMetadata = new InvalidSystemMetadata("567100", "Identifier " + task.getPid() + " does not contain valid AuthoritativeNode Entry ");
+            //                logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + invalidSystemMetadata.serialize(invalidSystemMetadata.FMT_XML));
+            //                submitSynchronizationFailed(task.getPid(), invalidSystemMetadata);
+            //                return null;
+            // while I agree with the above comment, Authoritative MemberNode is a field that is optional
+            // but it is important for the usefulness of an object
+            // so for now, fill it in if it is empty
+            NodeReference authoritativeMemberNode = new NodeReference();
+            authoritativeMemberNode.setValue(task.getNodeId());
+            systemMetadata.setAuthoritativeMemberNode(authoritativeMemberNode);
+        }
+        return systemMetadata;
+    }
+    
+    
+    private SystemMetadata populateInitialReplicaList(SystemMetadata systemMetadata) throws SynchronizationFailed {
+        
         try {
-            logger.debug(task.taskLabel() + " entering updateNewSystemMetadata");
+            logger.debug(task.taskLabel() + " entering populateInitialReplicaList");
             /*
              * DataONE Bug #2603 Synchronization should delete existing replicas on create
              */
@@ -466,27 +501,6 @@ public class V2TransferObjectTask implements Callable<Void> {
                 logger.debug(task.taskLabel()
                         + " Added CN as replica because formatType " + objectFormat.getFormatType()
                         + " is not DATA");
-            }
-            // the origin membernode may be different from the node
-            // being harvested.  
-            if (D1TypeUtils.emptyEquals(systemMetadata.getOriginMemberNode(),null)) {
-                NodeReference originMemberNode = new NodeReference();
-                originMemberNode.setValue(task.getNodeId());
-                systemMetadata.setOriginMemberNode(originMemberNode);
-            }
-            // Do not override the authoritative MemberNode assigned by a MemberNode
-            // part of redmine Task #3062
-            if (D1TypeUtils.emptyEquals(systemMetadata.getAuthoritativeMemberNode(), null)) {
-                //                InvalidSystemMetadata invalidSystemMetadata = new InvalidSystemMetadata("567100", "Identifier " + task.getPid() + " does not contain valid AuthoritativeNode Entry ");
-                //                logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + invalidSystemMetadata.serialize(invalidSystemMetadata.FMT_XML));
-                //                submitSynchronizationFailed(task.getPid(), invalidSystemMetadata);
-                //                return null;
-                // while I agree with the above comment, Authoritative MemberNode is a field that is optional
-                // but it is important for the usefulness of an object
-                // so for now, fill it in if it is empty
-                NodeReference authoritativeMemberNode = new NodeReference();
-                authoritativeMemberNode.setValue(task.getNodeId());
-                systemMetadata.setAuthoritativeMemberNode(authoritativeMemberNode);
             }
 
         } catch (ServiceFailure ex) {
@@ -839,10 +853,11 @@ public class V2TransferObjectTask implements Callable<Void> {
      * 3) updates applied, or 4) addition of a replica.
      * <br/>
      * The first outcome is reached when the new system metadata contains one or more
-     * field values that cannot replace existing ones.  (Repica differences are
+     * field values that cannot replace existing ones OR the CN is not allowed to
+     * update the systemMetadata via synchronization  (Replica differences are
      * ignored)
      * <br/>
-     * The second outcome is when there aren't any differences, and usually occurs
+     * The second outcome occurs when there aren't any differences, and usually occurs
      * when an object is reharvested during a full-reharvest, or if an object
      * is synchronized by CN.synchronize ahead of it's scheduled harvest.
      * <br/>
@@ -960,11 +975,29 @@ public class V2TransferObjectTask implements Callable<Void> {
             if (validator.hasValidUpdates(mnSystemMetadata)) {
                 Identifier pid = mnSystemMetadata.getIdentifier();
                 validated = true;
+                
+                
+                if (CollectionUtils.isNotEmpty(hzSystemMetadata.getReplicaList())) {
+                    // copy the replica information from the CN copy to the new copy
+                    // (the CN is authoritative for this property and the MNs aren't expected
+                    // to maintain them.)
+                    mnSystemMetadata.setReplicaList(hzSystemMetadata.getReplicaList());
+                } 
+                else {
+                    // if somehow the replica section is empty, recreate it based on
+                    // this authoritative replica.
+                    // (replication depends on at least the authoritativeMN to
+                    // be listed in the replica section with a status of COMPLETED)
+                    mnSystemMetadata = populateInitialReplicaList(mnSystemMetadata); 
+                }
+                
                 // persist the new systemMetadata
                 nodeCommunications.getCnCore().updateSystemMetadata(session, pid, mnSystemMetadata);
+                
                 // propagate the changes
                 notifyReplicaNodes(pid);
-                logger.info(task.taskLabel() + " Update with new SystemMetadata");
+                
+                logger.info(task.taskLabel() + " Updated with new SystemMetadata");
             } else {
                 logger.info(task.taskLabel() + " No changes to update.");
             }

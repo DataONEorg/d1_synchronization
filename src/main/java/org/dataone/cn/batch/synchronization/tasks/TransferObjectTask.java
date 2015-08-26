@@ -67,6 +67,7 @@ import org.dataone.service.types.v1.util.ChecksumUtil;
 import org.dataone.service.types.v2.Node;
 import org.dataone.service.types.v2.ObjectFormat;
 import org.dataone.service.types.v2.SystemMetadata;
+import org.dataone.service.types.v2.TypeFactory;
 import org.dataone.service.util.TypeMarshaller;
 import org.dspace.foresite.OREException;
 import org.dspace.foresite.OREParserException;
@@ -270,7 +271,7 @@ public class TransferObjectTask implements Callable<Void> {
                     } else if (mnRead instanceof org.dataone.service.mn.tier1.v1.MNRead) {
                         org.dataone.service.types.v1.SystemMetadata oldSystemMetadata = ((org.dataone.service.mn.tier1.v1.MNRead) mnRead)
                                 .getSystemMetadata(null, identifier);
-                        systemMetadata = TypeMarshaller.convertTypeFromType(oldSystemMetadata,
+                        systemMetadata = TypeFactory.convertTypeFromType(oldSystemMetadata,
                                 SystemMetadata.class);
                         needSystemMetadata = false;
                     }
