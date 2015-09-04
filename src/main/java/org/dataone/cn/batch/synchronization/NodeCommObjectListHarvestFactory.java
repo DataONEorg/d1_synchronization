@@ -26,14 +26,24 @@ import org.apache.commons.logging.LogFactory;
 import org.dataone.client.auth.CertificateManager;
 import org.dataone.cn.batch.exceptions.NodeCommUnavailable;
 import org.dataone.cn.batch.synchronization.type.NodeComm;
+import org.dataone.cn.batch.synchronization.type.NodeRegistryQueryService;
 import org.dataone.cn.hazelcast.HazelcastClientInstance;
+import org.dataone.cn.ldap.NodeAccess;
 import org.dataone.configuration.Settings;
 import org.dataone.service.cn.impl.v2.NodeRegistryService;
+import org.dataone.service.cn.impl.v2.ReserveIdentifierService;
+import org.dataone.service.exceptions.IdentifierNotUnique;
+import org.dataone.service.exceptions.NotAuthorized;
 import org.dataone.service.exceptions.NotFound;
+import org.dataone.service.exceptions.NotImplemented;
 import org.dataone.service.exceptions.ServiceFailure;
 import org.dataone.service.types.v2.Node;
+import org.dataone.service.types.v2.NodeList;
+import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.NodeReference;
 import org.dataone.service.types.v1.Service;
+import org.dataone.service.types.v1.Session;
+import org.dataone.service.types.v1.Subject;
 
 
 /**
@@ -86,7 +96,30 @@ public class NodeCommObjectListHarvestFactory implements NodeCommFactory {
 
             // figure out what client impl to use for this node, default to v1
             Object mNode = org.dataone.client.v1.itk.D1Client.getMN(mnNodeId);
-            NodeRegistryService nodeRegistryService = new NodeRegistryService();
+            NodeRegistryQueryService nodeRegistryService = new NodeRegistryQueryService()
+            {
+                
+                private NodeRegistryService serviceImpl =
+                        new NodeRegistryService();
+                
+                @Override
+                public NodeList listNodes() 
+                        throws ServiceFailure, NotImplemented {
+                   
+                   return serviceImpl.listNodes();
+                }
+
+                @Override
+                public Node getNode(NodeReference nodeId) throws NotFound,
+                        ServiceFailure {
+                    return serviceImpl.getNode(nodeId);
+                }
+
+                @Override
+                public NodeAccess getNodeAccess() {
+                    return serviceImpl.getNodeAccess();
+                }
+            };
             Node node = null;
             try {
                 node = nodeRegistryService.getNode(mnNodeId);

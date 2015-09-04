@@ -75,9 +75,10 @@ import org.dataone.service.types.v1.ReplicationStatus;
 import org.dataone.service.types.v1.Service;
 import org.dataone.service.types.v1.Session;
 import org.dataone.service.types.v1.Subject;
-import org.dataone.service.types.v1.util.AuthUtils;
+import org.dataone.service.types.v2.util.AuthUtils;
 import org.dataone.service.types.v1.util.ChecksumUtil;
 import org.dataone.service.types.v2.Node;
+import org.dataone.service.types.v2.NodeList;
 import org.dataone.service.types.v2.ObjectFormat;
 import org.dataone.service.types.v2.SystemMetadata;
 import org.dataone.service.types.v2.TypeFactory;
@@ -380,9 +381,25 @@ public class V2TransferObjectTask implements Callable<Void> {
     private void processTask(SystemMetadata mnSystemMetadata) throws VersionMismatch, SynchronizationFailed {
         logger.debug(task.taskLabel() + " entering processTask...");
         try {
+            // this may be redundant, but it's good to start 
+            // off with an explicit check
+            // that we got the systemMetadata
+            if (mnSystemMetadata == null)
+                throw new ServiceFailure("434343", "the retrieved SystemMetadata passed into processTask was null!");
+            
             validateSeriesId(mnSystemMetadata);
             if (alreadyExists(mnSystemMetadata)) {
-                processUpdates(mnSystemMetadata);
+                NodeList nl = nodeCommunications.getNodeRegistryService().listNodes();
+                if (AuthUtils.isCNAuthorityForSystemMetadataUpdate(nl, mnSystemMetadata)) 
+                {
+                    throw SyncFailedTask.createSynchronizationFailed(mnSystemMetadata.getIdentifier().getValue(),
+                            new NotAuthorized("<sync>","Cannot accept SystemMetadata updates for this pids whose " +
+                                    "authoritative MNs implement v1.MNStorage.  Their SystemMetadata updates must be " +
+                                    "done using v1.CN methods"));
+                }
+                else {
+                    processUpdates(mnSystemMetadata);
+                }
             } else {
                 // TODO: review exception handling / wrapping
                 processNewObject(mnSystemMetadata);
@@ -407,64 +424,27 @@ public class V2TransferObjectTask implements Callable<Void> {
     
     /**
      * Handles processing new objects
-     * @param mnSystemMetadata
+     * @param mnSystemMetadata - expects non-Null 
      * @throws BaseException
      * @throws SynchronizationFailed
      */
-    private void processNewObject(SystemMetadata mnSystemMetadata) throws BaseException, SynchronizationFailed {
+    private void processNewObject(SystemMetadata  mnSystemMetadata) throws BaseException, SynchronizationFailed {
         
         logger.debug(task.taskLabel() + " entering processNewObject...");
-        mnSystemMetadata = updateNewSystemMetadata(mnSystemMetadata);
+        mnSystemMetadata = populateInitialReplicaList(mnSystemMetadata);
+        SystemMetadataValidator.validateCNRequiredNonNullFields(mnSystemMetadata);
         if (mnSystemMetadata != null) {
             createObject(mnSystemMetadata);
         }
     }
-    
-    
-    
+
     /**
-     * Modify the systemMetadata with new values set by the CN during synchronization
-     * 
-     * Primarily, it sets the ReplicaList with replicas it knows about (the source
-     * MN and the CN if it's not DATA object)
-     * 
-     * It also sets the Origin and Authoritative MemberNode fields appropriately.
-     *
-     * @param SystemMetadata
-     * @return SystemMetadata 
-     *
+     * overwrites existing ReplicaList with a list consisting of the source Node 
+     * and the CN (if not a DATA object)
+     * @param systemMetadata
+     * @return
+     * @throws SynchronizationFailed
      */
-    private SystemMetadata updateNewSystemMetadata(SystemMetadata systemMetadata) throws SynchronizationFailed {
-    
-        logger.debug(task.taskLabel() + " entering updateNewSystemMetadata");
-        
-        systemMetadata = populateInitialReplicaList(systemMetadata);
-        
-        // the origin membernode may be different from the node
-        // being harvested.  
-        if (D1TypeUtils.emptyEquals(systemMetadata.getOriginMemberNode(),null)) {
-            NodeReference originMemberNode = new NodeReference();
-            originMemberNode.setValue(task.getNodeId());
-            systemMetadata.setOriginMemberNode(originMemberNode);
-        }
-        // Do not override the authoritative MemberNode assigned by a MemberNode
-        // part of redmine Task #3062
-        if (D1TypeUtils.emptyEquals(systemMetadata.getAuthoritativeMemberNode(), null)) {
-            //                InvalidSystemMetadata invalidSystemMetadata = new InvalidSystemMetadata("567100", "Identifier " + task.getPid() + " does not contain valid AuthoritativeNode Entry ");
-            //                logger.error("Task-" + task.getNodeId() + "-" + task.getPid() + "\n" + invalidSystemMetadata.serialize(invalidSystemMetadata.FMT_XML));
-            //                submitSynchronizationFailed(task.getPid(), invalidSystemMetadata);
-            //                return null;
-            // while I agree with the above comment, Authoritative MemberNode is a field that is optional
-            // but it is important for the usefulness of an object
-            // so for now, fill it in if it is empty
-            NodeReference authoritativeMemberNode = new NodeReference();
-            authoritativeMemberNode.setValue(task.getNodeId());
-            systemMetadata.setAuthoritativeMemberNode(authoritativeMemberNode);
-        }
-        return systemMetadata;
-    }
-    
-    
     private SystemMetadata populateInitialReplicaList(SystemMetadata systemMetadata) throws SynchronizationFailed {
         
         try {
@@ -525,10 +505,10 @@ public class V2TransferObjectTask implements Callable<Void> {
     }
 
     /**
-     * For any sync task, (update or newObject) the submitter needs to have control
+     * For any sync task, (update or newObject) the sysmeta.submitter needs to have control
      * over the seriesId, so it makes sense to filter out seriesId problems first.
-     * Problems are filtered by throwing exceptions
-     * @param sysMeta
+     * Problems are filtered by throwing exceptions.
+     * @param sysMeta  - requires non-null systemMetadata object
      * @throws NotAuthorized - the seriesId is new and reserved by someone else OR is in use
      *                         by another rightsHolder
      * @throws UnrecoverableException - internal problems keep this validation from completing
@@ -583,7 +563,7 @@ public class V2TransferObjectTask implements Callable<Void> {
      * to determine this is that the call validates the legitimacy of the registration
      * by ensuring that submitter either matches the reservation or there is no
      * reservation.
-     * @param sysMeta
+     * @param sysMeta - expects non-null systemMetadata object
      * @return - true if the object is already registered, false otherwise
      * @throws NotAuthorized - when the sysmeta.submitter does not match the owner
      * of the identifier reservation.
@@ -626,7 +606,7 @@ public class V2TransferObjectTask implements Callable<Void> {
      * if a sci data object.
      *
      *
-     * @param SystemMetadata systemMetdata from the MN 
+     * @param SystemMetadata systemMetdata from the MN, expects non-null value
      * @throws InvalidRequest 
      * @throws ServiceFailure 
      * @throws NotFound
@@ -648,10 +628,15 @@ public class V2TransferObjectTask implements Callable<Void> {
         Identifier d1Identifier = new Identifier();
         d1Identifier.setValue(systemMetadata.getIdentifier().getValue());
         
-        // All though this should take place when the object is processsed, it needs to be
+        // All though this should take place when the object is processed, it needs to be
         // performed here due to the way last DateSysMetadataModified is used to
-        // determine the next batch of records to retreive from a MemberNode
-        systemMetadata.setDateSysMetadataModified(new Date());
+        // determine the next batch of records to retrieve from a MemberNode
+
+        // 9-2-2015: rnahf: I don't think we should be bumping the modification date
+        // in v2 (especially), and since we now can deactivate sync processing,
+        // the bump might be a very big bump forward in time.
+        
+        // systemMetadata.setDateSysMetadataModified(new Date());
         
         ObjectFormat objectFormat = nodeCommunications.getCnCore().getFormat(
                 systemMetadata.getFormatId());
@@ -884,6 +869,8 @@ public class V2TransferObjectTask implements Callable<Void> {
         //XXX is cloning the identifier necessary?
         Identifier pid = D1TypeBuilder.cloneIdentifier(newSystemMetadata.getIdentifier());
         
+        
+        
         logger.info(task.taskLabel() + " Processing as an Update");
         logger.info(task.taskLabel() + " Getting sysMeta from HazelCast map");
         // TODO: assume that if hasReservation indicates the id exists, that 
@@ -899,7 +886,7 @@ public class V2TransferObjectTask implements Callable<Void> {
             if (task.getNodeId().contentEquals(
                     hzSystemMetadata.getAuthoritativeMemberNode().getValue())) 
             {
-                processAuthoritativeUpdate(newSystemMetadata, hzSystemMetadata);
+                processAuthoritativeUpdate(newSystemMetadata, validator);
             } else {
                 processPossibleNewReplica(newSystemMetadata, hzSystemMetadata);
             }
@@ -965,23 +952,23 @@ public class V2TransferObjectTask implements Callable<Void> {
      * @throws UnrecoverableException 
      * @throws SynchronizationFailed
      */
-    private void processAuthoritativeUpdate(SystemMetadata mnSystemMetadata, SystemMetadata hzSystemMetadata) 
+    private void processAuthoritativeUpdate(SystemMetadata mnSystemMetadata, SystemMetadataValidator validator) 
     throws RetryableException, UnrecoverableException, SynchronizationFailed {
         
         logger.debug(task.taskLabel() + " entering processAuthoritativeUpdate...");
         boolean validated = false;
         try {
-            SystemMetadataValidator validator = new SystemMetadataValidator(hzSystemMetadata);
             if (validator.hasValidUpdates(mnSystemMetadata)) {
                 Identifier pid = mnSystemMetadata.getIdentifier();
                 validated = true;
                 
                 
-                if (CollectionUtils.isNotEmpty(hzSystemMetadata.getReplicaList())) {
+                if (CollectionUtils.isNotEmpty(validator.getReferenceSystemMetadata().getReplicaList())) {
                     // copy the replica information from the CN copy to the new copy
                     // (the CN is authoritative for this property and the MNs aren't expected
                     // to maintain them.)
-                    mnSystemMetadata.setReplicaList(hzSystemMetadata.getReplicaList());
+                    mnSystemMetadata.setReplicaList(validator.getReferenceSystemMetadata().getReplicaList());
+                    logger.info(task.taskLabel() + " Copied over existing Replica section from CN..");
                 } 
                 else {
                     // if somehow the replica section is empty, recreate it based on
@@ -989,6 +976,7 @@ public class V2TransferObjectTask implements Callable<Void> {
                     // (replication depends on at least the authoritativeMN to
                     // be listed in the replica section with a status of COMPLETED)
                     mnSystemMetadata = populateInitialReplicaList(mnSystemMetadata); 
+                    logger.info(task.taskLabel() + " replica sectiom empty, so initialized new ReplicaList");
                 }
                 
                 // persist the new systemMetadata
