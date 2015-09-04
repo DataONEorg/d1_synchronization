@@ -32,6 +32,7 @@ import org.dataone.cn.batch.synchronization.NodeCommFactory;
 import org.dataone.cn.batch.synchronization.NodeCommObjectListHarvestFactory;
 import org.dataone.cn.batch.synchronization.jobs.MemberNodeHarvestJob;
 import org.dataone.cn.batch.synchronization.type.NodeComm;
+import org.dataone.cn.batch.synchronization.type.NodeRegistryQueryService;
 import org.dataone.cn.hazelcast.HazelcastInstanceFactory;
 import org.dataone.cn.synchronization.types.SyncObject;
 import org.dataone.configuration.Settings;
@@ -66,7 +67,8 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
     private int total = 0;
     Integer batchSize;
     MutableDateTime currentDateTime = new MutableDateTime(new Date());
-    Date now;
+    Date endHarvestInterval;
+    int backoffSeconds = 10;
     Log logger = LogFactory.getLog(MemberNodeHarvestJob.class);
 
     public ObjectListHarvestTask(NodeReference d1NodeReference, Integer batchSize) {
@@ -94,20 +96,20 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
         // we are going to write directly to ldap for the updateLastHarvested
         // because we do not want hazelcast to spam us about
         // all of these updates since we have a listener in HarvestSchedulingManager
-        // that determines when updates/additions have occured and 
+        // that determines when updates/additions have occurred and 
         // re-adjusts scheduling
         
         // Assuming that only one MN harvesting job is executing at at time
-        // therefore the only one mnNodeComm per MemberNode is needed for all the runs of
+        // therefore, only one mnNodeComm per MemberNode is needed for all the runs of
         // the harvester
         NodeCommFactory nodeCommFactory = NodeCommObjectListHarvestFactory.getInstance();
         NodeComm mnNodeComm = nodeCommFactory.getNodeComm(d1NodeReference);
-        NodeRegistryService nodeRegistryService = mnNodeComm.getNodeRegistryService();
+        NodeRegistryQueryService nodeRegistryService = mnNodeComm.getNodeRegistryService();
         // logger is not  be serializable, but no need to make it transient imo
         Logger logger = Logger.getLogger(ObjectListHarvestTask.class.getName());
         HazelcastInstance hazelcast = HazelcastInstanceFactory.getProcessingInstance();
         BlockingQueue<SyncObject> hzSyncObjectQueue = hazelcast.getQueue(synchronizationObjectQueue);
-        // Need the LinkedHashMap to preserver insertion order
+        // Need the LinkedHashMap to preserve insertion order
         Node d1Node = nodeRegistryService.getNode(d1NodeReference);
         Date lastMofidiedDate = d1Node.getSynchronization().getLastHarvested();
         MutableDateTime startHarvestDateTime = new MutableDateTime(lastMofidiedDate);
@@ -117,19 +119,19 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
 
         List<ObjectInfo> readQueue = null;
         // subtract 10 seconds from the current date time 
-        currentDateTime.addSeconds(-10);
-        now = currentDateTime.toDate();
+        currentDateTime.addSeconds(-backoffSeconds);
+        endHarvestInterval = currentDateTime.toDate();
         if ((hzSyncObjectQueue.size() + batchSize) > maxSyncObjectQueueSize) {
             // if we don't have much capacity to process a single batch then 
             // make a smaller batch size for now
             batchSize = batchSize/2;
         }
         // make certain it is still after the lastModified date
-        if (startHarvestDate.before(now)) {
+        if (startHarvestDate.before(endHarvestInterval)) {
             // if not then do not run (we should be running this less than every ten seconds for a membernode
             logger.debug(d1NodeReference.getValue() + "- starting retrieval " + d1Node.getBaseURL() 
                     + " with startDate of " + DateTimeMarshaller.serializeDateToUTC(startHarvestDate) 
-                    + " and endDate of " + DateTimeMarshaller.serializeDateToUTC(now));
+                    + " and endDate of " + DateTimeMarshaller.serializeDateToUTC(endHarvestInterval));
             do {
                 activateJob = Boolean.parseBoolean(Settings.getConfiguration().getString("Synchronization.active"));
                 if (!activateJob) {
@@ -138,15 +140,15 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
                     // a reharvesting of all records
                     // if the DateLastHarvested was modified on the node
                     // to be the most recent lastMofidiedDate, then
-                    // it is likely on the next run, records will be missed
-                    // since nodeList is not an ordered list
+                    // it is likely that, on the next run, records will be missed
+                    // since nodeList(objectList?) is not an ordered list
                     ExecutionDisabledException ex = new ExecutionDisabledException(d1NodeReference.getValue() + "- Disabled");
                     throw ex;
                 }
-                // read upto a 1000 objects (the default, but it can be overwritten)
+                // read up to a 1000 objects (the default, but it can be overwritten)
                 // from ListObjects and process before retrieving more
                 if (start == 0 || (start < total)) {
-                    readQueue = this.retrieve(mnNodeComm, startHarvestDate, now);
+                    readQueue = this.retrieve(mnNodeComm, startHarvestDate, endHarvestInterval);
                     int loopCount = 0;
                     while (((hzSyncObjectQueue.size() + readQueue.size()) > maxSyncObjectQueueSize) && (loopCount < 1440)) {
                         activateJob = Boolean.parseBoolean(Settings.getConfiguration().getString("Synchronization.active"));
@@ -176,15 +178,15 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
                     for (ObjectInfo objectInfo : readQueue) {
                         SyncObject syncObject = new SyncObject(d1Node.getIdentifier().getValue(), objectInfo.getIdentifier().getValue());
 
-                        if ((objectInfo.getDateSysMetadataModified().after(lastMofidiedDate)) && !(objectInfo.getDateSysMetadataModified().after(now))) {
+                        if ((objectInfo.getDateSysMetadataModified().after(lastMofidiedDate)) && !(objectInfo.getDateSysMetadataModified().after(endHarvestInterval))) {
                             // increase the lastModifiedDate if the current record's modified date
                             // is after the date currently specified.
-                            // However, if the date returned is past now, then an update must have
+                            // However, if the date returned is past endHarvestInterval, then an update must have
                             // occurred between the time query was returned and this statement is processed
                             lastMofidiedDate = objectInfo.getDateSysMetadataModified();
                         }
                         // process the unexpected update, the next time synchronization is run
-                        if (!objectInfo.getDateSysMetadataModified().after(now))
+                        if (!objectInfo.getDateSysMetadataModified().after(endHarvestInterval))
                                 {
                                 hzSyncObjectQueue.put(syncObject);
                                 logger.debug("placed on hzSyncObjectQueue- " + syncObject.taskLabel());

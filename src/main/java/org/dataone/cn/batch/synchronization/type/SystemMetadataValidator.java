@@ -56,6 +56,10 @@ public class SystemMetadataValidator {
         SystemMetadataValidator.schemaValidateSystemMetadata(referenceSystemMetadata);
         this.referenceSysMeta = referenceSystemMetadata;
     }
+    
+    public SystemMetadata getReferenceSystemMetadata() {
+        return referenceSysMeta;
+    }
 
     /**
      * Makes sure the system metadata is valid against the schema.
@@ -84,7 +88,43 @@ public class SystemMetadataValidator {
             IOUtils.closeQuietly(os);
         }
     }
+    
+    
+    /**
+     * Checks to make sure that the properties that need to be set prior to 
+     * initial synchronization are not null.
+     * @param sysmeta
+     * @throws InvalidSystemMetadata
+     */
+    public static void validateCNRequiredNonNullFields(SystemMetadata sysmeta) throws InvalidSystemMetadata {
 
+
+        List<String> illegalNullFields = new LinkedList<String>(); 
+        if (sysmeta.getIdentifier() == null)
+            illegalNullFields.add("identifier");
+        
+        
+        if (sysmeta.getOriginMemberNode() == null)
+            illegalNullFields.add("originMemberNode");
+        
+        if (sysmeta.getAuthoritativeMemberNode() == null)
+            illegalNullFields.add("authoritativeMemberNode");
+        
+        if (sysmeta.getDateUploaded() == null)
+            illegalNullFields.add("dateUploaded");
+        
+        if (sysmeta.getDateSysMetadataModified() == null)
+            illegalNullFields.add("dateSysMetadataModified");
+        
+        if (sysmeta.getSubmitter() == null)
+            illegalNullFields.add("submitter");
+        
+        if (illegalNullFields.size() > 0) {
+            throw new InvalidSystemMetadata("-1", "The following properties cannot be null: "
+                    + StringUtils.join(illegalNullFields, ", "));
+        }
+    }
+ 
     /**
      * Validates the essential properties of the system metadata that determine
      * whether or not the two are describing the same object.  These properties
@@ -182,7 +222,8 @@ public class SystemMetadataValidator {
 
     /**
      * Ensures that fields that can't change or have restrictions on the types
-     * of changes (one-way setting of properties) validate
+     * of changes (one-way setting of properties) validate, and that fields that
+     * need to be initialized (either by client or MN) are not null.
      * @param newSysMeta
      * @param cnSysMeta
      * @return - count of valid, restricted changes
@@ -194,17 +235,17 @@ public class SystemMetadataValidator {
 
         List<String> illegalChangeFields = new LinkedList<String>();
 
-        // serialVersion:  CN controls it, it must be greater than or equal to the existing
-        if (newSysMeta.getSerialVersion().compareTo(cnSysMeta.getSerialVersion()) < 0) {
+        // serialVersion:  CN controls it, it must equal the existing in order to
+        // accept any changes
+        if (!(newSysMeta.getSerialVersion().compareTo(cnSysMeta.getSerialVersion()) == 0)) {
             illegalChangeFields.add("serialVersion");
         }
 
+        
         // identifier - already checked with validateEssentialProperties
 
-        // formatId - immutable
-        if (!D1TypeUtils.equals(cnSysMeta.getFormatId(), newSysMeta.getFormatId())) {
-            illegalChangeFields.add("formatId");
-        }
+        // formatID - cannot be null, but validated by schema validation
+
         // size - is immutable, TODO: should it be part of validateEssentialProperties?
         if (!ObjectUtils.equals(cnSysMeta.getSize(), newSysMeta.getSize())) {
             illegalChangeFields.add("size");
@@ -245,27 +286,26 @@ public class SystemMetadataValidator {
         /*if (!ObjectUtils.equals(cnSysMeta.getDateUploaded(), newSysMeta.getDateUploaded())) {
             illegalChangeFields.add("dateUploaded");
         }*/
-        if((cnSysMeta.getDateUploaded() == null && newSysMeta.getDateUploaded() != null) ||
+        if( (cnSysMeta.getDateUploaded() == null && newSysMeta.getDateUploaded() != null) ||
                 (cnSysMeta.getDateUploaded() != null && newSysMeta.getDateUploaded() == null) ||
-                (cnSysMeta.getDateUploaded() != null && newSysMeta.getDateUploaded() != null && cnSysMeta.getDateUploaded().getTime() != newSysMeta.getDateUploaded().getTime())) {
+                (cnSysMeta.getDateUploaded() != null && newSysMeta.getDateUploaded() != null && 
+                cnSysMeta.getDateUploaded().getTime() != newSysMeta.getDateUploaded().getTime())
+                ) {
             illegalChangeFields.add("dateUploaded");
         }
 
-        // dateSystemMetadataModified - can't be earlier than what we already have
-        if (newSysMeta.getDateSysMetadataModified().before(cnSysMeta.getDateSysMetadataModified())) {
-            illegalChangeFields.add("dateSystemMetdataModified");
-        }
-
-
-        // originMemberNode - immutable
+        // originMemberNode - immutable 
         if (!ObjectUtils.equals(cnSysMeta.getOriginMemberNode(), newSysMeta.getOriginMemberNode())) {
             illegalChangeFields.add("originMemberNode");
         }
         
+        
+        // authoritativeMemberNode - cannot be changed via synchronization (only changeable by manual process)
+        if (!ObjectUtils.equals(cnSysMeta.getAuthoritativeMemberNode(), newSysMeta.getAuthoritativeMemberNode())) {
+            illegalChangeFields.add("authoritativeMemberNode");
+        }
+        
         // seriesId:   can only go from null => a value
-        // XXX should there be any other validation that the series ID doesn't 
-        // conflict with existing identifiers (pids?), and that there isn't a 
-        // reservation on it? 
         if (!D1TypeUtils.equals(cnSysMeta.getSeriesId(), newSysMeta.getSeriesId())) {
             if (cnSysMeta.getSeriesId() == null) {
                 changes++;
@@ -274,13 +314,13 @@ public class SystemMetadataValidator {
             }
         }
         
-        
         if (illegalChangeFields.size() > 0) {
             throw new InvalidRequest("-1", "Illegal changes attempted to the fields: "
                     + StringUtils.join(illegalChangeFields, ", "));
         }
         return changes;
     }
+
 
     private boolean findChangesInUnrestrictedFields(SystemMetadata newSysMeta, SystemMetadata cnSysMeta) throws ServiceFailure {
 

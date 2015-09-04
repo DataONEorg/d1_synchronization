@@ -23,11 +23,13 @@ import org.dataone.client.v2.impl.NodeListNodeLocator;
 import org.dataone.client.v2.itk.D1Object;
 import org.dataone.client.v2.types.D1TypeBuilder;
 import org.dataone.cn.batch.harvest.mock.InMemoryCNReadCore;
+import org.dataone.cn.batch.harvest.mock.MockNodeRegistryService;
 import org.dataone.cn.batch.harvest.mock.MockReserveIdentifierService;
 import org.dataone.cn.batch.synchronization.type.IdentifierReservationQueryService;
 import org.dataone.cn.batch.synchronization.type.NodeComm;
 import org.dataone.cn.synchronization.types.SyncObject;
 import org.dataone.configuration.Settings;
+import org.dataone.service.cn.impl.v2.NodeRegistryService;
 import org.dataone.service.cn.v2.CNCore;
 import org.dataone.service.cn.v2.CNRead;
 import org.dataone.service.cn.v2.CNReplication;
@@ -52,6 +54,7 @@ import org.dataone.service.types.v1.Subject;
 import org.dataone.service.types.v1.util.AuthUtils;
 import org.dataone.service.types.v2.Log;
 import org.dataone.service.types.v2.LogEntry;
+import org.dataone.service.types.v2.NodeList;
 import org.dataone.service.types.v2.SystemMetadata;
 import org.dataone.service.types.v2.TypeFactory;
 import org.junit.After;
@@ -78,18 +81,21 @@ public class TransferObjectTaskTest {
 
     static NodeLocator nodeLoc;
 
-    static NodeReference theCN = D1TypeBuilder.buildNodeReference("urn:node:theCN");
-    static NodeReference authMN = D1TypeBuilder.buildNodeReference("urn:node:authMN");
-    static NodeReference preRepMN = D1TypeBuilder.buildNodeReference("urn:node:preRepMN");
-    static NodeReference replicaMN = D1TypeBuilder.buildNodeReference("urn:node:replicaMN");
-    static NodeReference otherMN = D1TypeBuilder.buildNodeReference("urn:node:otherMN");
+    static NodeReference theCN = TypeFactory.buildNodeReference("urn:node:theCN");
+    static NodeReference authMN = TypeFactory.buildNodeReference("urn:node:authMN");
+    static NodeReference preRepMN = TypeFactory.buildNodeReference("urn:node:preRepMN");
+    static NodeReference replicaMN = TypeFactory.buildNodeReference("urn:node:replicaMN");
+    static NodeReference otherMN = TypeFactory.buildNodeReference("urn:node:otherMN");
     static Session cnClientSession;
     {
         cnClientSession = new Session();
-        cnClientSession.setSubject(D1TypeBuilder.buildSubject("cnClient"));
+        cnClientSession.setSubject(TypeFactory.buildSubject("cnClient"));
         /* this property can't be left null, or it creates invalid replicas in the CN systemMetadata */
         Settings.getConfiguration().setProperty("cn.router.nodeId", theCN.getValue());
     }
+    
+    
+    static MockNodeRegistryService nodeRegistryService;
 
 
 
@@ -99,7 +105,7 @@ public class TransferObjectTaskTest {
     }
 
     @Before
-    public void setUpContext() throws ClientSideException {
+    public void setUpContext() throws ClientSideException, NotImplemented, ServiceFailure {
 
         Config hzConfig = new ClasspathXmlConfig("org/dataone/configuration/hazelcast.xml");
 
@@ -152,6 +158,13 @@ public class TransferObjectTaskTest {
         nodeLoc.putNode(preRepMN, preRepMNode);
         nodeLoc.putNode(replicaMN, replicaMNode);
         nodeLoc.putNode(otherMN, otherMNode);
+        
+        NodeList nl = new NodeList();
+        nl.addNode(authMNode.getCapabilities());
+        nl.addNode(preRepMNode.getCapabilities());
+        nl.addNode(replicaMNode.getCapabilities());
+        nl.addNode(otherMNode.getCapabilities());
+        nodeRegistryService = new MockNodeRegistryService(nl);
     }
     
     @Test
@@ -737,16 +750,16 @@ public class TransferObjectTaskTest {
         String mediaType = null;
         ObjectFormatIdentifier formatId = null;
         if (isDataType) {
-            formatId = D1TypeBuilder.buildFormatIdentifier("text/csv");
+            formatId = TypeFactory.buildFormatIdentifier("text/csv");
             mediaType = "text/csv";
         } else {
-            formatId = D1TypeBuilder.buildFormatIdentifier("eml://ecoinformatics.org/eml-2.1.0");
+            formatId = TypeFactory.buildFormatIdentifier("eml://ecoinformatics.org/eml-2.1.0");
             mediaType = "text/xml";
         }
         
         // build the 'what'
         String idString = String.format("SyncUnitTest-%s", new Date().getTime());
-        Identifier pidToSync = D1TypeBuilder.buildIdentifier(idString);
+        Identifier pidToSync = TypeFactory.buildIdentifier(idString);
         D1Object d1o = new D1Object(pidToSync, new ByteArrayDataSource("a,b,c,d".getBytes(),mediaType),
                 formatId,
                 submitter,
@@ -764,7 +777,8 @@ public class TransferObjectTaskTest {
                 nodeLoc.getNode(theCN), (CNCore)nodeLoc.getNode(theCN), (CNReplication)nodeLoc.getNode(theCN),
                 hasRes,
                 hzMember);
-
+        nc.setNodeRegistryService(nodeRegistryService);
+        
         SyncObject so = new SyncObject(sourceNode, pidToSync);
         V2TransferObjectTask task = new V2TransferObjectTask(nc, so, hzMember, cnClientSession);
         task.call();
