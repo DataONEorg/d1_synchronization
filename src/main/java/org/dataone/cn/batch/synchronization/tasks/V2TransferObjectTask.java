@@ -329,7 +329,8 @@ public class V2TransferObjectTask implements Callable<Void> {
                             ((org.dataone.service.mn.tier1.v1.MNRead) readImpl).getSystemMetadata(session, id);
                     needSystemMetadata = false;
                     try {
-                        retrievedSysMeta = TypeFactory.clone(oldSystemMetadata);
+                        //retrievedSysMeta = TypeFactory.clone(oldSystemMetadata);
+                        retrievedSysMeta = TypeFactory.convertTypeFromType(oldSystemMetadata, SystemMetadata.class);
 
                     } catch (Exception e) { // catches conversion issues
                         e.printStackTrace();
