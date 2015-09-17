@@ -553,6 +553,12 @@ public class V2TransferObjectTask implements Callable<Void> {
                 logger.info(task.taskLabel() + " SeriesId doesn't exist for any object on the CN...");
                 return; //ok
             }
+        } catch (InvalidRequest e) {
+            // an invalid request is thrown when the pid or subject is null. 
+            // if we get here something went seriously wrong, and ID service 
+            // issues get swallowed and logged.
+            throw new UnrecoverableException("Unexpected InvalidRequest!! " + e.getDescription(), e);
+            
         }
     }
 
@@ -567,8 +573,9 @@ public class V2TransferObjectTask implements Callable<Void> {
      * @return - true if the object is already registered, false otherwise
      * @throws NotAuthorized - when the sysmeta.submitter does not match the owner
      * of the identifier reservation.
+     * @throws UnrecoverableException 
      */
-    private boolean alreadyExists(SystemMetadata sysMeta) throws NotAuthorized {
+    private boolean alreadyExists(SystemMetadata sysMeta) throws NotAuthorized, UnrecoverableException {
         // use the identity manager to determine if the PID already exists or is previously
         // reserved. 
         // If the PID is already created, hasReservation throws an IdentifierNotUnique
@@ -596,6 +603,11 @@ public class V2TransferObjectTask implements Callable<Void> {
         } catch (IdentifierNotUnique ex) {
             logger.info(task.taskLabel() + " Pid Exists. Must be a systemMetadata update.");
             exists = true;
+        } catch (InvalidRequest e) {
+            // an invalid request is thrown when the pid or subject is null. 
+            // if we get here something went seriously wrong, and ID service 
+            // issues get swallowed and logged.
+            throw new UnrecoverableException("Unexpected InvalidRequest!! " + e.getDescription(), e);
         }
         return exists;
     }
