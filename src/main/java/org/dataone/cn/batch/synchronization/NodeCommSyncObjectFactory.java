@@ -39,6 +39,7 @@ import org.dataone.configuration.Settings;
 import org.dataone.service.cn.impl.v2.NodeRegistryService;
 import org.dataone.service.cn.impl.v2.ReserveIdentifierService;
 import org.dataone.service.exceptions.IdentifierNotUnique;
+import org.dataone.service.exceptions.InvalidRequest;
 import org.dataone.service.exceptions.NotAuthorized;
 import org.dataone.service.exceptions.NotFound;
 import org.dataone.service.exceptions.NotImplemented;
@@ -158,7 +159,7 @@ public class NodeCommSyncObjectFactory implements NodeCommFactory {
                     
                     @Override
                     public boolean hasReservation(Session session, Subject subject, Identifier pid) 
-                            throws NotAuthorized, NotFound, IdentifierNotUnique {
+                            throws NotAuthorized, NotFound, IdentifierNotUnique, InvalidRequest {
                        
                        return serviceImpl.hasReservation(session, subject, pid);
                     }
