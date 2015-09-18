@@ -507,8 +507,7 @@ public class TransferObjectTask implements Callable<Void> {
                 }
             } else {
                 // determine if this is a valid update
-                SystemMetadata cnSystemMetadata = hzSystemMetaMap.get(systemMetadata
-                        .getIdentifier());
+                SystemMetadata cnSystemMetadata = hzSystemMetaMap.get(systemMetadata.getIdentifier());
                 if (cnSystemMetadata != null && cnSystemMetadata.getChecksum() != null) {
                     Checksum existingChecksum = cnSystemMetadata.getChecksum(); // maybe an update, maybe duplicate, maybe a conflicting pid
                     Checksum newChecksum = systemMetadata.getChecksum();
@@ -850,9 +849,9 @@ public class TransferObjectTask implements Callable<Void> {
             InvalidRequest, InvalidToken, VersionMismatch {
         // Only update the systemMetadata fields that can be updated by a membernode
         //
-        // obsoletedBy
-        // archived
-        // replicas
+        // obsoletedBy - via mn.update
+        // archived - via mn.archive
+        // replicas - via peer-to-peer-replication (outside of D1 api)?
         //
         Identifier pid = new Identifier();
         pid.setValue(newSystemMetadata.getIdentifier().getValue());

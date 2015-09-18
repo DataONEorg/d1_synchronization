@@ -87,7 +87,11 @@ public class SyncFailedTask implements Callable<String> {
         if (exception instanceof BaseException) {
                 be = (BaseException)exception;
         } else {
-            be = new ServiceFailure("-1", exception.getMessage());
+            be = new ServiceFailure("-1", 
+                    String.format("%s - %s", 
+                            exception.getClass().getCanonicalName(),
+                            exception.getMessage()));
+            be.initCause(exception);
         }
         SynchronizationFailed syncFailed = new SynchronizationFailed(
                 "6001", 

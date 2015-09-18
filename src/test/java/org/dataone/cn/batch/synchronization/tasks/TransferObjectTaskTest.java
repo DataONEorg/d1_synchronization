@@ -59,6 +59,7 @@ import org.dataone.service.types.v2.SystemMetadata;
 import org.dataone.service.types.v2.TypeFactory;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import com.hazelcast.config.ClasspathXmlConfig;
@@ -474,7 +475,7 @@ public class TransferObjectTaskTest {
     
     
     /**
-     * Replicas will be (re)synchronized if they update their sysmeta as requested by
+     * Replicas will get (re)synchronized if they update their sysmeta as requested by
      * the CN, and the new dateSysMetaModified is more recent than that nodes
      * latest scheduled sync.  The behavior should be to treat it as a no-op.
      * (after confirming it is the same object (validates essential properties)
@@ -652,10 +653,13 @@ public class TransferObjectTaskTest {
         d1o.getAccessPolicyEditor().addAccess(new Subject[]{newAllowed}, Permission.READ);
         
         //update the sysmeta on the authNode
+        // (changed access policy)
         Boolean success = ((MNStorage)nodeLoc.getNode(authMN)).updateSystemMetadata(
                 submitterSession, d1o.getIdentifier(), d1o.getSystemMetadata());
         
         //sync again from the authNode
+        // this is manual for the test, because we don't have cn.synchronize set up
+        // or a queueing service for SyncObjectTasks
         Date sync2Date = new Date();
         syncTheObject(this.createMockReserveIdService(null, null, true /* already exists */, true),
                 d1o.getIdentifier(), authMN);
@@ -667,6 +671,7 @@ public class TransferObjectTaskTest {
         assertEquals("Second Sync should NOT generate a synchronizationFailed", 0, events.getLogEntryList().size());
 
         // should reflect new sysmeta from the authMN
+        // (should find newAllowed subject)
         CNRead cnRead = (CNRead)nodeLoc.getNode(theCN);
         try {
             SystemMetadata cnSysmeta = cnRead.getSystemMetadata(cnClientSession, d1o.getIdentifier());
@@ -679,7 +684,8 @@ public class TransferObjectTaskTest {
         }
     }
     
-//  @Test
+    @Ignore("not finished writing test")
+    @Test
     public void testSyncUpdate_NonAuthoritativeNode() throws Exception
     {
 
@@ -687,7 +693,9 @@ public class TransferObjectTaskTest {
 
         
       //update the sysmeta on the replica
-      
+      //how?
+        
+        
       //sync again from a replica node
         
       // should yield a synFailed
@@ -698,6 +706,7 @@ public class TransferObjectTaskTest {
         Session submitterSession = new Session();
         submitterSession.setSubject(submitter);
         D1Object d1o = createTestObjectOnMN(submitter, authMN, true);
+        
         
         // push a replica 
         
@@ -771,6 +780,15 @@ public class TransferObjectTaskTest {
         return d1o;
     }
     
+    /**
+     * Directly calls V2TransferObjectTask to execute the sync from the sourceNode,
+     * using the static NodeRegistryService, NodeLocator, hzMember, and cnClientSession
+     * to create a NodeComm for the test.
+     * @param hasRes - The MockIdentifierReservationQueryService impl that will determine the hasReservation response. 
+     * @param pidToSync - the object to sync
+     * @param sourceNode - the MNode to sync from
+     * @throws Exception
+     */
     private void syncTheObject(IdentifierReservationQueryService hasRes, Identifier pidToSync, NodeReference sourceNode) throws Exception {
         NodeComm nc = new NodeComm(
                 nodeLoc.getNode(sourceNode),

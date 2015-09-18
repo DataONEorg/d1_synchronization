@@ -133,7 +133,7 @@ public class SystemMetadataValidator {
      * 
      * @param newSysMeta
      * @param authoritativeNodeReadImpl
-     * @throws IdentifierNotUnique - if the newSysMeta's identifier doesn't match
+     * @throws IdentifierNotUnique - if the newSysMeta's identifier or checksum doesn't match
      * @throws ServiceFailure - if the reference sysMeta's checksum is null
      * @throws NotFound - if authMNImpl is used and the pid was not found
      * @throws NotImplemented - if the getChecksum method was not available
