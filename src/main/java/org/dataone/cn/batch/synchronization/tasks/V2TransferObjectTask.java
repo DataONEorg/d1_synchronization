@@ -69,6 +69,7 @@ import org.dataone.service.types.v1.Checksum;
 import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.NodeReference;
 import org.dataone.service.types.v1.NodeType;
+import org.dataone.service.types.v1.ObjectFormatIdentifier;
 import org.dataone.service.types.v1.Permission;
 import org.dataone.service.types.v1.Replica;
 import org.dataone.service.types.v1.ReplicationStatus;
@@ -421,6 +422,7 @@ public class V2TransferObjectTask implements Callable<Void> {
         
         logger.debug(task.taskLabel() + " entering processNewObject...");
         mnSystemMetadata = populateInitialReplicaList(mnSystemMetadata);
+        mnSystemMetadata.setSerialVersion(BigInteger.ONE);
         SystemMetadataValidator.validateCNRequiredNonNullFields(mnSystemMetadata);
         if (mnSystemMetadata != null) {
             createObject(mnSystemMetadata);
@@ -883,11 +885,10 @@ public class V2TransferObjectTask implements Callable<Void> {
 
             // if here, we know that the new system metadata is referring to the same
             // object, and we can consider updating other values.
-            boolean isV1Object = false;
+           
             NodeList nl = nodeCommunications.getNodeRegistryService().listNodes();
-            if (AuthUtils.isCNAuthorityForSystemMetadataUpdate(nl, newSystemMetadata)) {
-                isV1Object = true;
-            }
+            boolean isV1Object = AuthUtils.isCNAuthorityForSystemMetadataUpdate(nl, newSystemMetadata);
+            
             if (task.getNodeId().contentEquals(hzSystemMetadata.getAuthoritativeMemberNode().getValue())) {
                 
                  if (isV1Object) {
@@ -1059,7 +1060,6 @@ public class V2TransferObjectTask implements Callable<Void> {
                 Identifier pid = mnSystemMetadata.getIdentifier();
                 validated = true;
                 
-                
                 if (CollectionUtils.isNotEmpty(validator.getReferenceSystemMetadata().getReplicaList())) {
                     // copy the replica information from the CN copy to the new copy
                     // (the CN is authoritative for this property and the MNs aren't expected
@@ -1072,9 +1072,19 @@ public class V2TransferObjectTask implements Callable<Void> {
                     // this authoritative replica.
                     // (replication depends on at least the authoritativeMN to
                     // be listed in the replica section with a status of COMPLETED)
-                    mnSystemMetadata = populateInitialReplicaList(mnSystemMetadata); 
-                    logger.info(task.taskLabel() + " replica sectiom empty, so initialized new ReplicaList");
+                    mnSystemMetadata = populateInitialReplicaList(mnSystemMetadata);
+                    logger.info(task.taskLabel() + " replica section empty, so initialized new ReplicaList");
                 }
+                
+                // copy over the SerialVersion from the CN version or initialize
+                BigInteger cnSerialVersion = validator.getReferenceSystemMetadata().getSerialVersion();
+                if (cnSerialVersion == null) {
+                    cnSerialVersion = BigInteger.ONE;
+                    logger.info(task.taskLabel() + " serialVersion empty, so initialized to 1.");
+                }
+                mnSystemMetadata.setSerialVersion(cnSerialVersion);
+                
+                logFormatTypeChanges(mnSystemMetadata.getFormatId(), validator.getReferenceSystemMetadata().getFormatId());
                 
                 // persist the new systemMetadata
                 nodeCommunications.getCnCore().updateSystemMetadata(session, pid, mnSystemMetadata);
@@ -1103,6 +1113,40 @@ public class V2TransferObjectTask implements Callable<Void> {
             
         } catch (NotImplemented|NotAuthorized|InvalidToken|InvalidSystemMetadata e) {
             throw new UnrecoverableException("from processV2AuthoritativeUpdate: ", e);
+        }
+    }
+    
+    /**
+     * Emit a log WARN if the formatId changes, and the FormatType changes.
+     * see https://redmine.dataone.org/issues/7371
+     * @param mnFormatId
+     * @param cnFormatId
+     */
+    private void logFormatTypeChanges(ObjectFormatIdentifier mnFormatId, ObjectFormatIdentifier cnFormatId) 
+    {
+        
+        try {
+            if (mnFormatId.getValue().equals(cnFormatId.getValue())) 
+                return;
+            
+            String mnType = nodeCommunications.getCnCore().getFormat(mnFormatId).getFormatType();
+            String cnType = nodeCommunications.getCnCore().getFormat(cnFormatId).getFormatType();
+            
+            if (mnType.equals(cnType))
+                return;
+
+            // if one and only one (XOR) is data, there's been a loggable change 
+            if (!mnType.equalsIgnoreCase(cnType))  
+                logger.warn(String.format("Format type for %s has changed from %s to %s",
+                        task.getPid(), cnFormatId.getValue().toUpperCase(), mnFormatId.getValue().toUpperCase()));
+
+        } catch (ServiceFailure | NotFound | NotImplemented | InvalidRequest e) {
+            logger.warn(String.format("Format type change for %s could not be determined due to %s while looking up the ObjectFormat.", 
+                    task.getPid(), e.getClass().getSimpleName()));
+        } catch (Exception e) {
+            logger.warn(String.format("Format type change for %s could not be determined due to %s.", 
+                    task.getPid(), e.getClass().getSimpleName()),
+                    e);
         }
     }
 
@@ -1182,8 +1226,7 @@ public class V2TransferObjectTask implements Callable<Void> {
                 if (mNode instanceof MNRead) {
                     SystemMetadata mnSystemMetadata = ((MNRead) mNode).getSystemMetadata(
                             session, cnSystemMetadata.getIdentifier());
-                    if (mnSystemMetadata.getSerialVersion() != cnSystemMetadata
-                            .getSerialVersion()) {
+                    if (mnSystemMetadata.getSerialVersion() != cnSystemMetadata.getSerialVersion()) {
                         ((MNRead) mNode)
                         .systemMetadataChanged(session, cnSystemMetadata
                                 .getIdentifier(), cnSystemMetadata
@@ -1193,12 +1236,11 @@ public class V2TransferObjectTask implements Callable<Void> {
                 } else if (mNode instanceof org.dataone.client.v1.MNode) {
                     org.dataone.service.types.v1.SystemMetadata mnSystemMetadata = ((org.dataone.client.v1.MNode) mNode)
                             .getSystemMetadata(session, cnSystemMetadata.getIdentifier());
-                    if (mnSystemMetadata.getSerialVersion() != cnSystemMetadata
-                            .getSerialVersion()) {
-                        ((org.dataone.client.v1.MNode) mNode).systemMetadataChanged(
-                                session, cnSystemMetadata.getIdentifier(), cnSystemMetadata
-                                .getSerialVersion().longValue(), cnSystemMetadata
-                                .getDateSysMetadataModified());
+                    if (mnSystemMetadata.getSerialVersion() != cnSystemMetadata.getSerialVersion()) {
+                        ((org.dataone.client.v1.MNode) mNode).systemMetadataChanged(session, 
+                                cnSystemMetadata.getIdentifier(), 
+                                cnSystemMetadata.getSerialVersion().longValue(), 
+                                cnSystemMetadata.getDateSysMetadataModified());
                     }
                 }
                 logger.info(task.taskLabel() + " Notified " + nodeId.getValue());
