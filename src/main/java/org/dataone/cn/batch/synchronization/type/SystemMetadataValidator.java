@@ -235,11 +235,11 @@ public class SystemMetadataValidator {
 
         List<String> illegalChangeFields = new LinkedList<String>();
 
-        // serialVersion:  CN controls it, it must equal the existing in order to
-        // accept any changes
-        if (!(newSysMeta.getSerialVersion().compareTo(cnSysMeta.getSerialVersion()) == 0)) {
-            illegalChangeFields.add("serialVersion");
-        }
+        // serialVersion:  it changes rapidly during replication so it is
+        // unreasonable to expect the MN or Client to keep up with it.
+//        if (!(newSysMeta.getSerialVersion().compareTo(cnSysMeta.getSerialVersion()) == 0)) {
+//            illegalChangeFields.add("serialVersion");
+//        }
 
         
         // identifier - already checked with validateEssentialProperties
