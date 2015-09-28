@@ -307,7 +307,7 @@ public class V2TransferObjectTask implements Callable<Void> {
      * @param readImpl - the MNRead or CNRead implementation for the source sysMeta
      * @return SystemMetadata
      * @throws NotAuthorized   - retries up to 2x
-     * @throws ServiceFailure  - retired up to 6x
+     * @throws ServiceFailure  - retries up to 6x
      * @throws InvalidToken
      * @throws NotImplemented
      * @throws NotFound
@@ -391,7 +391,6 @@ public class V2TransferObjectTask implements Callable<Void> {
             if (alreadyExists(mnSystemMetadata)) {
                 processUpdates(mnSystemMetadata);
             } else {
-                // TODO: review exception handling / wrapping
                 processNewObject(mnSystemMetadata);
             }
         } catch (NotAuthorized ex) {
@@ -420,6 +419,9 @@ public class V2TransferObjectTask implements Callable<Void> {
      */
     private void processNewObject(SystemMetadata  mnSystemMetadata) throws BaseException, SynchronizationFailed {
         
+        // TODO: should new objects from replica nodes process or throw SyncFailed?
+        // as per V1 logic (TransferObjectTask), this class currently does not check
+        // the authoritativeMN field and allows the object to sync.
         logger.debug(task.taskLabel() + " entering processNewObject...");
         mnSystemMetadata = populateInitialReplicaList(mnSystemMetadata);
         mnSystemMetadata.setSerialVersion(BigInteger.ONE);
@@ -515,17 +517,18 @@ public class V2TransferObjectTask implements Callable<Void> {
         try {
             Session verifySubmitter = new Session();
             verifySubmitter.setSubject(sysMeta.getSubmitter());
-            if (!identifierReservationService.hasReservation(verifySubmitter, sysMeta.getSubmitter(), sysMeta.getIdentifier())) {
-                throw new NotAuthorized("0000","someone else (other than submitter) holds the reservation on the seriesId!");
+            if (!identifierReservationService.hasReservation(verifySubmitter, sysMeta.getSubmitter(), sid)) {
+                throw new NotAuthorized("0000","someone else (other than submitter) holds the reservation on the seriesId! " + sid.getValue());
             }
             logger.info(task.taskLabel() + " SeriesId is reserved by sysmeta.submitter");
             return;  // ok
         } catch (NotFound ex) {
-            // assume if identifierReservationService has thrown NotFound exception SystemMetadata does not exist
-            logger.info(task.taskLabel() + " SeriesId doesn't exist as reservation or object on the CN...");
+            // assume if identifierReservationService has thrown NotFound exception, SystemMetadata does not exist
+            logger.info(task.taskLabel() + " SeriesId (" + sid.getValue() + ") doesn't exist as reservation or object on the CN...");
             return; // ok
         } catch (IdentifierNotUnique ex) {
             logger.info(task.taskLabel() + " SeriesId is in use....");
+            // attempt to give information on the pid that is the current head of the chain
             try {
                 SystemMetadata sidSysMeta = getSystemMetadataHandleRetry(nodeCommunications.getCnRead(), sid);
                 if (!AuthUtils.isAuthorized(
@@ -541,7 +544,7 @@ public class V2TransferObjectTask implements Callable<Void> {
                 e.printStackTrace();
                 throw new UnrecoverableException(message, e);
             } catch (NotFound e) {
-                logger.info(task.taskLabel() + " SeriesId doesn't exist for any object on the CN...");
+                logger.info(task.taskLabel() + " SeriesId (" + sid.getValue() + ") doesn't exist for any object on the CN...");
                 return; //ok
             }
         } catch (InvalidRequest e) {
@@ -562,8 +565,8 @@ public class V2TransferObjectTask implements Callable<Void> {
      * reservation.
      * @param sysMeta - expects non-null systemMetadata object
      * @return - true if the object is already registered, false otherwise
-     * @throws NotAuthorized - when the sysmeta.submitter does not match the owner
-     * of the identifier reservation.
+     * @throws NotAuthorized - when the sysmeta.submitter or associated equivalent identities do
+     *  not match the owner of the identifier reservation.
      * @throws UnrecoverableException 
      */
     private boolean alreadyExists(SystemMetadata sysMeta) throws NotAuthorized, UnrecoverableException {
@@ -582,10 +585,13 @@ public class V2TransferObjectTask implements Callable<Void> {
             // in the systemMetadata, since they should have access to their own reservation(?)
             Session verifySubmitter = new Session();
             verifySubmitter.setSubject(sysMeta.getSubmitter());
-            if (!identifierReservationService.hasReservation(verifySubmitter, sysMeta.getSubmitter(), sysMeta.getIdentifier())) {
-                throw new NotAuthorized("0000","someone else (other than submitter) holds the reservation on the pid!");
+            // use hasReservation to dissect no-reservation from reserved by others from already created
+            if (identifierReservationService.hasReservation(verifySubmitter, sysMeta.getSubmitter(), sysMeta.getIdentifier())) {
+                logger.info(task.taskLabel() + " Pid is reserved by sysmeta.submitter");
+            } else {
+               // throw new NotAuthorized("0000","someone else (other than submitter) holds the reservation on the pid!");
+               logger.info(task.taskLabel() + " Pid is not reserved by anyone");
             }
-            logger.info(task.taskLabel() + " Pid is reserved by sysmeta.submitter");
             exists = false;
         } catch (NotFound ex) {
             // assume if identifierReservationService has thrown NotFound exception SystemMetadata does not exist

@@ -49,6 +49,7 @@ import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.NodeReference;
 import org.dataone.service.types.v1.ObjectFormatIdentifier;
 import org.dataone.service.types.v1.Permission;
+import org.dataone.service.types.v1.Replica;
 import org.dataone.service.types.v1.Session;
 import org.dataone.service.types.v1.Subject;
 import org.dataone.service.types.v1.util.AuthUtils;
@@ -207,8 +208,21 @@ public class TransferObjectTaskTest {
         
     }
 
-    private IdentifierReservationQueryService createMockReserveIdService(Identifier knownIdentifier, Subject reservationHolder, boolean alreadyCreated, boolean acceptSession) {
-        return new MockReserveIdentifierService( knownIdentifier,  reservationHolder,  alreadyCreated,  acceptSession);
+    private IdentifierReservationQueryService createMockReserveIdService(
+            Identifier knownIdentifier, Subject reservationHolder, Boolean alreadyCreated, 
+            Boolean acceptSession) throws NotAuthorized, InvalidRequest, IdentifierNotUnique, ClientSideException {
+        MockReserveIdentifierService idService = new MockReserveIdentifierService(acceptSession, (CNRead)nodeLoc.getNode(theCN));
+        try {
+            if (knownIdentifier != null) {
+                idService.reserveIdentifier(reservationHolder, knownIdentifier);
+                if (alreadyCreated) {
+                    idService.objectCreated(knownIdentifier);
+                }
+            }
+        } catch (IdentifierNotUnique e) {
+            ; // the object is already in existence on the CN
+        }
+        return idService;
     }
 
     /**
@@ -366,6 +380,40 @@ public class TransferObjectTaskTest {
      * @throws Exception
      */
     @Test
+    public void testSyncNewObject_v2MN_SidReservedByOther_DATA_object() throws Exception {
+
+        Identifier sid = TypeFactory.buildIdentifier("theSid");
+        
+        Subject submitter = D1TypeBuilder.buildSubject("groucho");
+        Identifier pidToSync = createTestObjectOnMN(submitter, authMN, true, sid).getIdentifier();
+        
+        Date fromFilter = new Date();
+        MockReserveIdentifierService idService = new MockReserveIdentifierService(true, (CNRead)nodeLoc.getNode(theCN));
+        idService.reserveIdentifier(D1TypeBuilder.buildSubject("zeppo"), pidToSync);
+        idService.reserveIdentifier(D1TypeBuilder.buildSubject("zeppo"), sid);
+        syncTheObject(idService, pidToSync, authMN);
+
+        
+        Log events = ((org.dataone.client.v2.MNode)nodeLoc.getNode(authMN)).getLogRecords(cnClientSession, fromFilter, null, Event.SYNCHRONIZATION_FAILED.toString(), pidToSync.getValue(), null, null);
+        outputLogEntries(events);
+        
+        assertEquals("Task should generate a synchronizationFailed", 1, events.getLogEntryList().size());
+
+        CNRead cnRead = (CNRead)nodeLoc.getNode(theCN);
+        
+        try {
+            SystemMetadata sysmeta = cnRead.getSystemMetadata(cnClientSession, pidToSync);
+            fail("Should NOT be able to retrieve sysmeta from CN after synchronization.");
+        } catch (NotFound e) {
+            ;  //
+        }
+    }
+    
+    /**
+     * Tests that an object with an id reserved by another subject generates a syncFailure
+     * @throws Exception
+     */
+    @Test
     public void testSyncNewObject_v2MN_pid_collision() throws Exception {
 
         Subject submitter = D1TypeBuilder.buildSubject("groucho");
@@ -401,7 +449,7 @@ public class TransferObjectTaskTest {
                 otherSubmitterSession, pidToSync, o.getDataSource().getInputStream(), o.getSystemMetadata());
  
         Date sync2Date = new Date();
-        syncTheObject(this.createMockReserveIdService(null, null, true /*already created*/, true),
+        syncTheObject(this.createMockReserveIdService(pidToSync, TypeFactory.buildSubject("groucho"), true /*already created*/, true),
                 pidToSync, otherMN);
         
         events = ((org.dataone.client.v2.MNode)nodeLoc.getNode(otherMN)).getLogRecords(cnClientSession, sync2Date, null, Event.SYNCHRONIZATION_FAILED.toString(), pidToSync.getValue(), null, null);
@@ -416,60 +464,73 @@ public class TransferObjectTaskTest {
         } catch (NotFound e) {
             fail("Should be able to retrieve sysmeta from CN after first synchronization.");;  //
         }
-
     }
     
+
+    /**
+     * synchronizing the object from the non authoritative node should throw
+     * a syncFailed.  This would be new behavior in v2.
+     * @throws Exception
+     */
+    @Ignore
     @Test
-    public void testSyncNewObject_nonAuthoritativeNode() throws Exception
+    public void testSyncNewObject_nonAuthoritativeNode_alt_SyncFail() throws Exception
     {
-        Subject submitter = D1TypeBuilder.buildSubject("groucho");
-        Identifier pidToSync = createTestObjectOnMN(submitter, authMN, true).getIdentifier();
+        testSyncNewObject_nonAuthoritativeNode_impl(true,"Syncing a replica as newObject should generate a SyncFailed exception.");
+    }
+    
+    
+    /**
+     * synchronizing the object from the non authoritative node for now should work,
+     * keeping with previous logic from v1.  
+     * @throws Exception
+     */
+    @Test
+    public void testSyncNewObject_nonAuthoritativeNode_v1_accept() throws Exception
+    {
+        testSyncNewObject_nonAuthoritativeNode_impl(false,"Syncing a replica as newObject should not generate a SyncFailed exception.");
         
-        Date sync1Date = new Date();
-        syncTheObject(this.createMockReserveIdService(null, null, false, true),
-                pidToSync, authMN);
-
-        Log events = ((org.dataone.client.v2.MNode)nodeLoc.getNode(authMN)).getLogRecords(cnClientSession, sync1Date, null, Event.SYNCHRONIZATION_FAILED.toString(), pidToSync.getValue(), null, null);
-        outputLogEntries(events);
-        
-        assertEquals("First Sync should NOT generate a synchronizationFailed", 0, events.getLogEntryList().size());
-
-        CNRead cnRead = (CNRead)nodeLoc.getNode(theCN);
-        
-        try {
-            SystemMetadata sysmeta = cnRead.getSystemMetadata(cnClientSession, pidToSync);
-        } catch (NotFound e) {
-            fail("Should be able to retrieve sysmeta from CN after first synchronization.");;  //
-        }
-        
+    }
+    
+    private void testSyncNewObject_nonAuthoritativeNode_impl(boolean shouldFail, String message) throws Exception {
+        // create an object and sync it to a different node
+        Identifier pidToSync = TypeFactory.buildIdentifier("foo");
         Subject otherSubmitter = D1TypeBuilder.buildSubject("gummo");
         D1Object o = new D1Object(pidToSync, new ByteArrayDataSource("123,456,789".getBytes(),"text/csv"),
                 D1TypeBuilder.buildFormatIdentifier("text/csv"),
                 otherSubmitter,
                 otherMN);
         
+        // set these explicitly
+        o.getSystemMetadata().setAuthoritativeMemberNode(authMN);
+        o.getSystemMetadata().setOriginMemberNode(otherMN);
+        
         Session otherSubmitterSession = new Session();
         otherSubmitterSession.setSubject(otherSubmitter);
-        // create it on the MN
+        
+        
+        // create it on the MN which is the origin, but not the authoritative MN
         ((org.dataone.client.v2.MNode)nodeLoc.getNode(otherMN)).create(
                 otherSubmitterSession, pidToSync, o.getDataSource().getInputStream(), o.getSystemMetadata());
  
         Date sync2Date = new Date();
-        syncTheObject(this.createMockReserveIdService(null, null, true /*already created*/, true),
+        syncTheObject(this.createMockReserveIdService(pidToSync, otherSubmitter, true /*already created*/, true),
                 pidToSync, otherMN);
         
-        events = ((org.dataone.client.v2.MNode)nodeLoc.getNode(otherMN)).getLogRecords(cnClientSession, sync2Date, null, Event.SYNCHRONIZATION_FAILED.toString(), pidToSync.getValue(), null, null);
+        // expect the sync to not fail, but 
+        Log events = ((org.dataone.client.v2.MNode)nodeLoc.getNode(otherMN)).getLogRecords(cnClientSession, sync2Date, null, Event.SYNCHRONIZATION_FAILED.toString(), pidToSync.getValue(), null, null);
         outputLogEntries(events);
         
-        assertEquals("Second Sync should generate a synchronizationFailed", 1, events.getLogEntryList().size());
+        int expectedSyncFails = shouldFail ? 1 : 0;
+        assertEquals(message, expectedSyncFails, events.getLogEntryList().size());
 
         
-        try {
-            SystemMetadata sysmeta = cnRead.getSystemMetadata(cnClientSession, pidToSync);
-            assertTrue("Submitter should still be the submitter of the first object",sysmeta.getSubmitter().equals(submitter));
-        } catch (NotFound e) {
-            fail("Should be able to retrieve sysmeta from CN after first synchronization.");;  //
-        }
+//        try {
+//            SystemMetadata sysmeta = cnRead.getSystemMetadata(cnClientSession, pidToSync);
+//            assertTrue("Submitter should still be the submitter of the first object",sysmeta.getSubmitter().equals(submitter));
+//        } catch (NotFound e) {
+//            fail("Should be able to retrieve sysmeta from CN after first synchronization.");;  //
+//        }
         
     }
     
@@ -683,74 +744,146 @@ public class TransferObjectTaskTest {
             fail("Should be able to retrieve sysmeta from CN after first synchronization.");;  //
         }
     }
-    
-    @Ignore("not finished writing test")
+
+
     @Test
     public void testSyncUpdate_NonAuthoritativeNode() throws Exception
     {
 
-      
-
-        
-      //update the sysmeta on the replica
-      //how?
-        
-        
-      //sync again from a replica node
-        
-      // should yield a synFailed
-      // should NOT reflect new SysMeta from the replica node
-        
-        //create, sync from authNode
+        // create the object on authMN
         Subject submitter = D1TypeBuilder.buildSubject("groucho");
         Session submitterSession = new Session();
         submitterSession.setSubject(submitter);
         D1Object d1o = createTestObjectOnMN(submitter, authMN, true);
         
+        Identifier pidToSync = d1o.getIdentifier();
+
+        // create the same object on the otherMN
+        ((org.dataone.client.v2.MNode)nodeLoc.getNode(otherMN)).create(submitterSession, 
+                pidToSync, d1o.getDataSource().getInputStream(), d1o.getSystemMetadata());
         
-        // push a replica 
+
+        // sync as newObject from authMN
+        Date sync2Date = new Date();
+        IdentifierReservationQueryService idService = this.createMockReserveIdService(pidToSync, submitter, false, true);
+        syncTheObject(idService, pidToSync, authMN);
         
-        Date sync1Date = new Date();
-        syncTheObject(this.createMockReserveIdService(null, null, false, true),
-                d1o.getIdentifier(), authMN);
+        // expect the sync to not fail
+        Log events = ((org.dataone.client.v2.MNode)nodeLoc.getNode(authMN))
+                .getLogRecords(cnClientSession, sync2Date, null, Event.SYNCHRONIZATION_FAILED.toString(), pidToSync.getValue(), null, null);
+        outputLogEntries(events);
         
+        assertEquals("Should not have a syncFailed on sync from authMN",0,events.sizeLogEntryList());
+        
+        // change the sysmetadata on the otherMN
         Subject newAllowed = D1TypeBuilder.buildSubject("oprah");
         d1o.getAccessPolicyEditor().addAccess(new Subject[]{newAllowed}, Permission.READ);
         
-        //update the sysmeta on the authNode
-        Boolean success = ((MNStorage)nodeLoc.getNode(authMN)).updateSystemMetadata(
-                submitterSession, d1o.getIdentifier(), d1o.getSystemMetadata());
-        
-        //sync again from the authNode
-        Date sync2Date = new Date();
-        syncTheObject(this.createMockReserveIdService(null, null, true /* already exists */, true),
-                d1o.getIdentifier(), authMN);
-        
-        // shouldn't be any errors
-        Log events = ((org.dataone.client.v2.MNode)nodeLoc.getNode(otherMN)).getLogRecords(
-                cnClientSession, sync2Date, null, Event.SYNCHRONIZATION_FAILED.toString(), d1o.getIdentifier().getValue(), null, null);
-        outputLogEntries(events);
-        assertEquals("Second Sync should NOT generate a synchronizationFailed", 0, events.getLogEntryList().size());
+        ((org.dataone.client.v2.MNode)nodeLoc.getNode(otherMN))
+                .updateSystemMetadata(submitterSession, pidToSync, d1o.getSystemMetadata());
 
-        // should reflect new sysmeta from the authMN
+        // sync as systemMetadata update
+        sync2Date = new Date();
+        syncTheObject(idService,pidToSync, otherMN);
+        
+        
+//        Subject newAllowed = D1TypeBuilder.buildSubject("oprah");
+//        d1o.getAccessPolicyEditor().addAccess(new Subject[]{newAllowed}, Permission.READ);
+//        
+//        //update the sysmeta on the authNode
+//        Boolean success = ((MNStorage)nodeLoc.getNode(authMN)).updateSystemMetadata(
+//                submitterSession, d1o.getIdentifier(), d1o.getSystemMetadata());
+
+        // should throw syncFailed back to otherMN
+        events = ((org.dataone.client.v2.MNode)nodeLoc.getNode(otherMN)).getLogRecords(
+                cnClientSession, sync2Date, null, Event.SYNCHRONIZATION_FAILED.toString(), 
+                pidToSync.getValue(), null, null);
+        
+        outputLogEntries(events);
+        
+        assertEquals("Sync from non-auth node should  generate a synchronizationFailed", 1, events.getLogEntryList().size());
+    }
+    
+    @Test
+    public void testSyncUpdate_NonAuthoritativeNode_addPossibleReplica() throws Exception
+    {
+
+        // create the object on authMN
+        Subject submitter = D1TypeBuilder.buildSubject("groucho");
+        Session submitterSession = new Session();
+        submitterSession.setSubject(submitter);
+        D1Object d1o = createTestObjectOnMN(submitter, authMN, true);
+        
+        Identifier pidToSync = d1o.getIdentifier();
+
+        // create the same object on the otherMN
+        ((org.dataone.client.v2.MNode)nodeLoc.getNode(otherMN)).create(submitterSession, 
+                pidToSync, d1o.getDataSource().getInputStream(), d1o.getSystemMetadata());
+
+        // sync as newObject from authMN
+        Date sync2Date = new Date();
+        IdentifierReservationQueryService idService = this.createMockReserveIdService(pidToSync, submitter, false, true);
+        syncTheObject(idService, pidToSync, authMN);
+        
+        // expect the sync to not fail
+        Log events = ((org.dataone.client.v2.MNode)nodeLoc.getNode(authMN))
+                .getLogRecords(cnClientSession, sync2Date, null, Event.SYNCHRONIZATION_FAILED.toString(), pidToSync.getValue(), null, null);
+        outputLogEntries(events);
+        
+        assertEquals("Should not have a syncFailed on sync from authMN",0,events.sizeLogEntryList());
+        
+        // change the sysmetadata on the otherMN
+//        Subject newAllowed = D1TypeBuilder.buildSubject("oprah");
+//        d1o.getAccessPolicyEditor().addAccess(new Subject[]{newAllowed}, Permission.READ);
+//        
+//        ((org.dataone.client.v2.MNode)nodeLoc.getNode(otherMN))
+//                .updateSystemMetadata(submitterSession, pidToSync, d1o.getSystemMetadata());
+
+        // sync as systemMetadata update
+        sync2Date = new Date();
+        syncTheObject(idService,pidToSync, otherMN);
+
+
+        // should throw syncFailed back to otherMN
+        events = ((org.dataone.client.v2.MNode)nodeLoc.getNode(otherMN)).getLogRecords(
+                cnClientSession, sync2Date, null, Event.SYNCHRONIZATION_FAILED.toString(), 
+                pidToSync.getValue(), null, null);
+        
+        outputLogEntries(events);
+        
+        assertEquals("Sync from non-auth node with no differences should not generate a synchronizationFailed", 
+                1, events.getLogEntryList().size());
+        
         CNRead cnRead = (CNRead)nodeLoc.getNode(theCN);
+        boolean foundReplica = false;
         try {
-            SystemMetadata cnSysmeta = cnRead.getSystemMetadata(cnClientSession, d1o.getIdentifier());
-            LinkedList<Subject> subjects = new LinkedList<Subject>();
-            subjects.add(newAllowed);
-            assertTrue("Synced sysmeta should contain the updated AccessPolicy",
-                    AuthUtils.isAuthorized(subjects, Permission.READ, cnSysmeta));
+            SystemMetadata sysmeta = cnRead.getSystemMetadata(cnClientSession, pidToSync);
+            for (Replica r : sysmeta.getReplicaList()) {
+                if (r.getReplicaMemberNode().equals(otherMN)) {
+                    foundReplica = true;
+                }
+            }
+            assertTrue("Should have found 'otherMN' in replica list on the CN", foundReplica);
         } catch (NotFound e) {
-            fail("Should be able to retrieve sysmeta from CN after first synchronization.");;  //
+            fail("Failed test configuration: should be able to retrieve sysmeta from CN after first synchronization.");
         }
     }
 
 
+
 ///////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////
 
-    
     private D1Object createTestObjectOnMN(Subject submitter, NodeReference mn, boolean isDataType) 
+    throws NoSuchAlgorithmException, NotFound, InvalidRequest, IdentifierNotUnique, 
+    InsufficientResources, InvalidSystemMetadata, InvalidToken, NotAuthorized, NotImplemented, 
+    ServiceFailure, UnsupportedType, IOException, ClientSideException {
+        
+        return createTestObjectOnMN(submitter,  mn,  isDataType,  /* sid */ null);
+    }
+    
+    
+    private D1Object createTestObjectOnMN(Subject submitter, NodeReference mn, boolean isDataType, Identifier sid) 
             throws NoSuchAlgorithmException, NotFound, InvalidRequest, IOException, IdentifierNotUnique, InsufficientResources, InvalidSystemMetadata, InvalidToken, NotAuthorized, NotImplemented, ServiceFailure, UnsupportedType, ClientSideException {
         // build the 'who'
         Session submitterSession = new Session();
@@ -773,7 +906,8 @@ public class TransferObjectTaskTest {
                 formatId,
                 submitter,
                 mn);
-        
+        if (sid != null && sid.getValue() != null)
+            d1o.getSystemMetadata().setSeriesId(sid);
         // create it on the MN
         ((org.dataone.client.v2.MNode)nodeLoc.getNode(mn)).create(
                 submitterSession, pidToSync, d1o.getDataSource().getInputStream(), d1o.getSystemMetadata());
