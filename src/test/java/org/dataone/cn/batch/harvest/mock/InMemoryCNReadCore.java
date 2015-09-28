@@ -54,6 +54,7 @@ import org.dataone.service.types.v1.NodeType;
 import org.dataone.service.types.v1.ObjectFormatIdentifier;
 import org.dataone.service.types.v1.ObjectInfo;
 import org.dataone.service.types.v1.ObjectList;
+import org.dataone.service.types.v1.ObjectLocation;
 import org.dataone.service.types.v1.ObjectLocationList;
 import org.dataone.service.types.v1.Permission;
 import org.dataone.service.types.v1.Person;
@@ -562,7 +563,16 @@ public class InMemoryCNReadCore implements CNode {
             throws InvalidToken, ServiceFailure, NotAuthorized, NotFound,
             NotImplemented
     {
-        throw new NotImplemented("zzz","InMemoryCNReadCore doesn't implement resolve");
+        SystemMetadata sysmeta = checkAvailableAndAuthorized(session,id, Permission.READ);
+        ObjectLocationList oll = new ObjectLocationList();
+        for (Replica repl : sysmeta.getReplicaList()) {
+            if (repl.getReplicationStatus() == ReplicationStatus.COMPLETED) {
+                ObjectLocation ol = new ObjectLocation();
+                ol.setNodeIdentifier(repl.getReplicaMemberNode());
+                oll.addObjectLocation(ol);
+            }
+        }
+        return oll;
     }
 
 
@@ -917,13 +927,20 @@ public class InMemoryCNReadCore implements CNode {
         throw new NotImplemented("zzz","InMemoryCNReadCore doesn't implement this method");
     }
 
+    /**
+     * Doesn't check serialVersion
+     */
     @Override
     public boolean updateReplicationMetadata(Session session, Identifier pid,
             Replica replicaMetadata, long serialVersion) throws NotImplemented,
             NotAuthorized, ServiceFailure, NotFound, InvalidRequest,
             InvalidToken, VersionMismatch
     {
-        throw new NotImplemented("zzz","InMemoryCNReadCore doesn't implement this method");
+        SystemMetadata sysmeta = checkAvailableAndAuthorized(session, pid, Permission.WRITE);
+        // TODO: check the serialVersion
+        sysmeta.addReplica(replicaMetadata);
+        
+        return true;
     }
 
     @Override
