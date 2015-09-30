@@ -405,8 +405,8 @@ public class V2TransferObjectTask implements Callable<Void> {
             logger.error(task.taskLabel() + "\n" + be.serialize(BaseException.FMT_XML));
             throw SyncFailedTask.createSynchronizationFailed(mnSystemMetadata.getIdentifier().getValue(), be); 
         } catch (Exception ex) {
-            ex.printStackTrace();
-            logger.error(task.taskLabel() + "\n" + ex.getMessage());
+//            ex.printStackTrace();
+            logger.error(task.taskLabel() + "\n" + ex.getMessage(), ex);
             throw SyncFailedTask.createSynchronizationFailed(mnSystemMetadata.getIdentifier().getValue(), ex);
         }
     }
@@ -885,8 +885,9 @@ public class V2TransferObjectTask implements Callable<Void> {
         // TODO: assume that if hasReservation indicates the id exists, that 
         // hzSystemMetadata will not be null...can we make this assumption?
         SystemMetadata hzSystemMetadata = hzSystemMetaMap.get(pid);
+        SystemMetadataValidator validator = null;
         try {
-            SystemMetadataValidator validator = new SystemMetadataValidator(hzSystemMetadata);
+            validator = new SystemMetadataValidator(hzSystemMetadata);
             validator.validateEssentialProperties(newSystemMetadata,nodeCommunications.getMnRead());
 
             // if here, we know that the new system metadata is referring to the same
@@ -906,7 +907,10 @@ public class V2TransferObjectTask implements Callable<Void> {
                 processPossibleNewReplica(newSystemMetadata, hzSystemMetadata, isV1Object);
             }
         } catch (InvalidSystemMetadata e) {
-            throw new UnrecoverableException("In processUpdates, bad SystemMetadata from the HzMap", e);
+            if (validator == null) 
+                throw new UnrecoverableException("In processUpdates, bad SystemMetadata from the HzMap", e);
+            else 
+                throw new UnrecoverableException("In processUpdates, could not find authoritativeMN in the NodeList", e);
         } catch (IdentifierNotUnique | InvalidRequest | InvalidToken | NotAuthorized | NotImplemented | NotFound e) {
             throw SyncFailedTask.createSynchronizationFailed(task.getPid(), e);
         } catch (ServiceFailure e) {

@@ -1,6 +1,7 @@
 package org.dataone.cn.batch.synchronization.tasks;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -63,6 +64,8 @@ import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
 
+import sun.util.logging.resources.logging;
+
 import com.hazelcast.config.ClasspathXmlConfig;
 import com.hazelcast.config.Config;
 import com.hazelcast.core.Hazelcast;
@@ -81,7 +84,7 @@ public class TransferObjectTaskTest {
     String hzSystemMetaMapString =
             Settings.getConfiguration().getString("dataone.hazelcast.systemMetadata");
 
-    static NodeLocator nodeLoc;
+    static NodeListNodeLocator nodeLoc;
 
     static NodeReference theCN = TypeFactory.buildNodeReference("urn:node:theCN");
     static NodeReference authMN = TypeFactory.buildNodeReference("urn:node:authMN");
@@ -160,6 +163,7 @@ public class TransferObjectTaskTest {
         nodeLoc.putNode(preRepMN, preRepMNode);
         nodeLoc.putNode(replicaMN, replicaMNode);
         nodeLoc.putNode(otherMN, otherMNode);
+        nodeLoc.initCnList();
         
         NodeList nl = new NodeList();
         nl.addNode(authMNode.getCapabilities());
@@ -628,75 +632,8 @@ public class TransferObjectTaskTest {
             fail("Should  be able to retrieve sysmeta from CN after synchronization.");
         }
     }
-    
-    /**
-     * Some MemberNodes already replicate objects between themselves (some Metacat
-     * communities), so the first time the CN sees an object, it could be from the
-     * non-authoritative, replica MN.
-     * 
-     * We expect in these situations that the two sysmetas will be identical, but
-     * don't have any guarantee (It could have the wrong checksum, for example, and
-     * in that case, the authoritative copy would be blocked from being registered.)
-     * 
-     * The CN should get the SystemMetadata from the origin or authoritative MN
-     * and compare the two.  A sync failed should be returned to the Replica MN
-     * if their copy is determined to be faulty.
-     * 
-     * @throws Exception
-     */
-//    @Test
-    public void testSyncNewObject_preReplica() throws Exception
-    {
-        Subject submitter = D1TypeBuilder.buildSubject("groucho");
-        D1Object authObject = createTestObjectOnMN(submitter, authMN, true);
-        
-        Date sync1Date = new Date();
-        
-        syncTheObject(this.createMockReserveIdService(null, null, false, true),
-                authObject.getIdentifier(), authMN);
 
-        Log events = ((org.dataone.client.v2.MNode)nodeLoc.getNode(authMN)).getLogRecords(
-                cnClientSession, sync1Date, null, Event.SYNCHRONIZATION_FAILED.toString(), 
-                authObject.getIdentifier().getValue(), null, null);
-        outputLogEntries(events);
-        
-        assertEquals("First Sync should NOT generate a synchronizationFailed", 0, events.getLogEntryList().size());
 
-        CNRead cnRead = (CNRead)nodeLoc.getNode(theCN);
-        
-        try {
-            SystemMetadata sysmeta = cnRead.getSystemMetadata(cnClientSession, authObject.getIdentifier());
-        } catch (NotFound e) {
-            fail("Should be able to retrieve sysmeta from CN after first synchronization.");;  //
-        }
-        
-        SystemMetadata modifiedSysMeta = TypeFactory.clone(authObject.getSystemMetadata());
-        
-        
-        // push the replica to the replicaMN
-        ((org.dataone.cn.batch.harvest.mock.InMemoryMockReplicaMNode)nodeLoc.getNode(replicaMN)).pushReplica(
-                authObject.getDataSource().getInputStream(), authObject.getSystemMetadata());
- 
-        Date sync2Date = new Date();
-        syncTheObject(this.createMockReserveIdService(null, null, true /*already created*/, true),
-                authObject.getIdentifier(), replicaMN);
-        
-        events = ((org.dataone.client.v2.MNode)nodeLoc.getNode(otherMN)).getLogRecords(
-                cnClientSession, sync2Date, null, Event.SYNCHRONIZATION_FAILED.toString(), authObject.getIdentifier().getValue(), null, null);
-        outputLogEntries(events);
-        
-        assertEquals("Second Sync should NOT generate a synchronizationFailed", 0, events.getLogEntryList().size());
-
-        
-        try {
-            SystemMetadata sysmeta = cnRead.getSystemMetadata(cnClientSession, authObject.getIdentifier());
-            assertTrue("Submitter should still be the submitter of the first object",sysmeta.getSubmitter().equals(submitter));
-        } catch (NotFound e) {
-            fail("Should be able to retrieve sysmeta from CN after first synchronization.");;  //
-        }
-    }
-
-    
     @Test
     public void testSyncUpdate() throws Exception
     {
@@ -804,6 +741,22 @@ public class TransferObjectTaskTest {
         assertEquals("Sync from non-auth node should  generate a synchronizationFailed", 1, events.getLogEntryList().size());
     }
     
+    
+    /**
+     * Some MemberNodes already replicate objects between themselves (some Metacat
+     * communities), so the first time the CN sees an object, it could be from the
+     * non-authoritative, replica MN.
+     * 
+     * We expect in these situations that the two sysmetas will be identical, but
+     * don't have any guarantee (It could have the wrong checksum, for example, and
+     * in that case, the authoritative copy would be blocked from being registered.)
+     * 
+     * The CN should get the SystemMetadata from the origin or authoritative MN
+     * and compare the two.  A sync failed should be returned to the Replica MN
+     * if their copy is determined to be faulty.
+     * 
+     * @throws Exception
+     */
     @Test
     public void testSyncUpdate_NonAuthoritativeNode_addPossibleReplica() throws Exception
     {
@@ -867,6 +820,56 @@ public class TransferObjectTaskTest {
         } catch (NotFound e) {
             fail("Failed test configuration: should be able to retrieve sysmeta from CN after first synchronization.");
         }
+    }
+    
+
+    @Test
+    public void syncNewObject_unassigned_AuthNode_Should_fail() throws Exception {
+        
+        Subject submitter = D1TypeBuilder.buildSubject("groucho");
+        Session submitterSession = new Session();
+        submitterSession.setSubject(submitter);
+        
+        String idString = String.format("SyncUnitTest-%s", new Date().getTime());
+        Identifier pidToSync = TypeFactory.buildIdentifier(idString);
+ 
+        // build the object
+        D1Object d1o = new D1Object(pidToSync, new ByteArrayDataSource("a,b,c,d".getBytes(),null),
+                TypeFactory.buildFormatIdentifier("text/csv"),
+                submitter,
+                authMN);
+        
+        System.out.println("pre-sync authMN value: " + d1o.getSystemMetadata().getAuthoritativeMemberNode());
+
+        // create it on the MN
+        ((org.dataone.client.v2.MNode)nodeLoc.getNode(authMN)).create(
+                submitterSession, pidToSync, d1o.getDataSource().getInputStream(), d1o.getSystemMetadata());
+        
+        // the MN fills in blank authMN on create, but doesn't yet on updateSystemMetadata, so "break"
+        // it with and updateSystemMetadata call
+        SystemMetadata clonedSystemMetadata = TypeFactory.clone(d1o.getSystemMetadata());
+        clonedSystemMetadata.setAuthoritativeMemberNode(null);
+        ((org.dataone.client.v2.MNode)nodeLoc.getNode(authMN)).updateSystemMetadata(submitterSession, pidToSync, clonedSystemMetadata);
+
+        // does the MN set the authMN?  it shouldn't
+        SystemMetadata sysmeta = ((org.dataone.client.v2.MNode)nodeLoc.getNode(authMN)).getSystemMetadata(submitterSession, pidToSync);
+        System.out.println("post-create authMN value: " + sysmeta.getAuthoritativeMemberNode());
+
+        assertNull("AuthoritativeMN field should be null",sysmeta.getAuthoritativeMemberNode());
+        
+        Date sync2Date = new Date();
+        syncTheObject(this.createMockReserveIdService(pidToSync, submitter, false, true),pidToSync,authMN);
+        
+        // should throw syncFailed back to otherMN
+        Log events = ((org.dataone.client.v2.MNode)nodeLoc.getNode(authMN)).getLogRecords(
+                cnClientSession, sync2Date, null, Event.SYNCHRONIZATION_FAILED.toString(), 
+                pidToSync.getValue(), null, null);
+        
+        outputLogEntries(events);
+        
+        assertEquals("Sync with null authMN should generate a synchronizationFailed", 
+                1, events.getLogEntryList().size());
+        
     }
 
 
