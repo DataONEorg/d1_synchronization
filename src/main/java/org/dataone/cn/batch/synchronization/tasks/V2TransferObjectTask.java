@@ -897,7 +897,7 @@ public class V2TransferObjectTask implements Callable<Void> {
            
             // the nodeRegistryService property isn't set for this NodeComm type
             // using CNCore instead...
-            NodeList nl = nodeCommunications.getCnCore().listNodes();
+            NodeList nl = nodeCommunications.getNodeRegistryService().listNodes();
             boolean isV1Object = AuthUtils.isCNAuthorityForSystemMetadataUpdate(nl, newSystemMetadata);
             
             if (task.getNodeId().contentEquals(hzSystemMetadata.getAuthoritativeMemberNode().getValue())) {

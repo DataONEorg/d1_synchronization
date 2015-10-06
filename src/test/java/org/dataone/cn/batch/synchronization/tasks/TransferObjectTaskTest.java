@@ -196,8 +196,8 @@ public class TransferObjectTaskTest {
 
         hzClient = hzMember;
         NodeComm nc = new NodeComm(
-                nodeLoc.getNode(authMN),
-                nodeLoc.getNode(theCN), (CNCore)nodeLoc.getNode(theCN), (CNReplication)nodeLoc.getNode(theCN),
+                nodeLoc.getNode(authMN), nodeLoc.getNode(theCN),
+                nodeRegistryService, (CNCore)nodeLoc.getNode(theCN), (CNReplication)nodeLoc.getNode(theCN),
                 this.createMockReserveIdService(pidToSync, sysMetaSubmitter, false, true),
                 hzClient);
         SyncObject so = new SyncObject(authMN, pidToSync);
@@ -929,10 +929,10 @@ public class TransferObjectTaskTest {
     private void syncTheObject(IdentifierReservationQueryService hasRes, Identifier pidToSync, NodeReference sourceNode) throws Exception {
         NodeComm nc = new NodeComm(
                 nodeLoc.getNode(sourceNode),
-                nodeLoc.getNode(theCN), (CNCore)nodeLoc.getNode(theCN), (CNReplication)nodeLoc.getNode(theCN),
+                nodeLoc.getNode(theCN), 
+                nodeRegistryService, (CNCore)nodeLoc.getNode(theCN), (CNReplication)nodeLoc.getNode(theCN),
                 hasRes,
                 hzMember);
-        nc.setNodeRegistryService(nodeRegistryService);
         
         SyncObject so = new SyncObject(sourceNode, pidToSync);
         V2TransferObjectTask task = new V2TransferObjectTask(nc, so, hzMember, cnClientSession);

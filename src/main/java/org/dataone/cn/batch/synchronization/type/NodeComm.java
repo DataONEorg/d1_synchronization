@@ -28,7 +28,8 @@ import org.dataone.service.cn.v2.CNCore;
 import org.dataone.service.cn.v2.CNReplication;
 
 /**
- * Assemble and manage communication channels used by TransferObjectTask
+ * Assemble and manage communication channels used by TransferObjectTask. Different
+ * constructors populate different sets of properties (communication channels) 
  *
  * @author waltz
  */
@@ -57,9 +58,11 @@ public class NodeComm {
         this.cnRead = null;
     }
 
-    public NodeComm(Object mnRead, Object cnRead, CNCore cnCore, CNReplication cnReplication, IdentifierReservationQueryService reserveIdentifierService, HazelcastInstance hzClient) {
+    public NodeComm(Object mnRead, Object cnRead, NodeRegistryQueryService nodeRegistryService, 
+            CNCore cnCore, CNReplication cnReplication, IdentifierReservationQueryService reserveIdentifierService, HazelcastInstance hzClient) {
         this.mnRead = mnRead;
         this.cnRead = cnRead;
+        this.nodeRegistryService = nodeRegistryService;
         this.cnCore = cnCore;
         this.cnReplication = cnReplication;
         this.reserveIdentifierService = reserveIdentifierService;
