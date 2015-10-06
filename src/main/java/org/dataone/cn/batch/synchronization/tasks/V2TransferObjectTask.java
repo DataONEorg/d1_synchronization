@@ -762,11 +762,13 @@ public class V2TransferObjectTask implements Callable<Void> {
             if (!D1TypeUtils.valueEquals(systemMetadata.getIdentifier(), null)) {
                 pid = systemMetadata.getIdentifier().getValue();
             }
+            String actualChecksumValue = actualChecksum != null ? actualChecksum.getValue() : null;
+            String expectedChecksumValue = expectedChecksum != null ? expectedChecksum.getValue() : null;
             String errorMessage = "The checksum for pid: " + pid
                     + " does not match the actual checksum supplied by the member node: "
                     + task.getNodeId() + ".  Actual checksum: "
-                    + actualChecksum.getValue() + ". System metadata checksum: "
-                    + expectedChecksum.getValue();
+                    + actualChecksumValue + ". System metadata checksum: "
+                    + expectedChecksumValue;
             InvalidSystemMetadata be = new InvalidSystemMetadata("000", errorMessage);
             if (checksumException != null) {
                 be.initCause(checksumException);
@@ -893,7 +895,9 @@ public class V2TransferObjectTask implements Callable<Void> {
             // if here, we know that the new system metadata is referring to the same
             // object, and we can consider updating other values.
            
-            NodeList nl = nodeCommunications.getNodeRegistryService().listNodes();
+            // the nodeRegistryService property isn't set for this NodeComm type
+            // using CNCore instead...
+            NodeList nl = nodeCommunications.getCnCore().listNodes();
             boolean isV1Object = AuthUtils.isCNAuthorityForSystemMetadataUpdate(nl, newSystemMetadata);
             
             if (task.getNodeId().contentEquals(hzSystemMetadata.getAuthoritativeMemberNode().getValue())) {
