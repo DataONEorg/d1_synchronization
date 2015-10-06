@@ -34,7 +34,9 @@ import org.dataone.cn.batch.exceptions.NodeCommUnavailable;
 import org.dataone.cn.batch.synchronization.type.IdentifierReservationQueryService;
 import org.dataone.cn.batch.synchronization.type.NodeComm;
 import org.dataone.cn.batch.synchronization.type.NodeCommState;
+import org.dataone.cn.batch.synchronization.type.NodeRegistryQueryService;
 import org.dataone.cn.hazelcast.HazelcastClientInstance;
+import org.dataone.cn.ldap.NodeAccess;
 import org.dataone.configuration.Settings;
 import org.dataone.service.cn.impl.v2.NodeRegistryService;
 import org.dataone.service.cn.impl.v2.ReserveIdentifierService;
@@ -50,6 +52,7 @@ import org.dataone.service.types.v1.Service;
 import org.dataone.service.types.v1.Session;
 import org.dataone.service.types.v1.Subject;
 import org.dataone.service.types.v2.Node;
+import org.dataone.service.types.v2.NodeList;
 
 /**
  * Creates/maintains a NodeComm (node communications) pool for use by the TransferObjectTask
@@ -167,7 +170,31 @@ public class NodeCommSyncObjectFactory implements NodeCommFactory {
 
         // TODO: figure out what client impl to use for this node, default to v1
         Object mNode = org.dataone.client.v1.itk.D1Client.getMN(mnNodeId);
-        NodeRegistryService nodeRegistryService = new NodeRegistryService();
+
+        
+        NodeRegistryQueryService nodeRegistryService = new NodeRegistryQueryService()
+        {
+            private NodeRegistryService serviceImpl =
+                    new NodeRegistryService();
+            
+            @Override
+            public NodeList listNodes() 
+                    throws ServiceFailure, NotImplemented {
+               
+               return serviceImpl.listNodes();
+            }
+
+            @Override
+            public Node getNode(NodeReference nodeId) throws NotFound,
+                    ServiceFailure {
+                return serviceImpl.getNode(nodeId);
+            }
+
+            @Override
+            public NodeAccess getNodeAccess() {
+                return serviceImpl.getNodeAccess();
+            }
+        };
         Node node = null;
         try {
             node = nodeRegistryService.getNode(mnNodeId);
@@ -181,7 +208,8 @@ public class NodeCommSyncObjectFactory implements NodeCommFactory {
             throw new ServiceFailure("0000", ex.getDescription());
         }
 
-        NodeComm nodeComm = new NodeComm(mNode, cNode, cNode, cNode, reserveIdentifierService, hzclient);
+
+        NodeComm nodeComm = new NodeComm(mNode, cNode, nodeRegistryService, cNode, cNode, reserveIdentifierService, hzclient);
         return nodeComm;
     }
 }
