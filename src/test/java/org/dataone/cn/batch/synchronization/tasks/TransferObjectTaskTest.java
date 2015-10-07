@@ -64,7 +64,6 @@ import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
 
-import sun.util.logging.resources.logging;
 
 import com.hazelcast.config.ClasspathXmlConfig;
 import com.hazelcast.config.Config;
@@ -198,12 +197,11 @@ public class TransferObjectTaskTest {
         NodeComm nc = new NodeComm(
                 nodeLoc.getNode(authMN), nodeLoc.getNode(theCN),
                 nodeRegistryService, (CNCore)nodeLoc.getNode(theCN), (CNReplication)nodeLoc.getNode(theCN),
-                this.createMockReserveIdService(pidToSync, sysMetaSubmitter, false, true),
-                hzClient);
+                this.createMockReserveIdService(pidToSync, sysMetaSubmitter, false, true));
         SyncObject so = new SyncObject(authMN, pidToSync);
 
         Date fromFilter = new Date();
-        V2TransferObjectTask task = new V2TransferObjectTask(nc, so, hzMember, cnClientSession);
+        V2TransferObjectTask task = new V2TransferObjectTask(nc, so, cnClientSession);
         task.call();
         
         Log events = ((org.dataone.client.v2.MNode)nodeLoc.getNode(authMN)).getLogRecords(cnClientSession, fromFilter, null, Event.SYNCHRONIZATION_FAILED.toString(), pidToSync.getValue(), null, null);
@@ -931,11 +929,10 @@ public class TransferObjectTaskTest {
                 nodeLoc.getNode(sourceNode),
                 nodeLoc.getNode(theCN), 
                 nodeRegistryService, (CNCore)nodeLoc.getNode(theCN), (CNReplication)nodeLoc.getNode(theCN),
-                hasRes,
-                hzMember);
+                hasRes);
         
         SyncObject so = new SyncObject(sourceNode, pidToSync);
-        V2TransferObjectTask task = new V2TransferObjectTask(nc, so, hzMember, cnClientSession);
+        V2TransferObjectTask task = new V2TransferObjectTask(nc, so,  cnClientSession);
         task.call();
     }
     

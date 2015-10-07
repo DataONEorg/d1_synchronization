@@ -4,4 +4,6 @@
 	<properties fileName="synchronization.properties"/>
         <properties fileName="d1client.properties"/>
         <properties fileName="registryLdap.properties"/>
+        <properties fileName="hazelcastProcessingClient.properties"/>
+        <properties fileName="hazelcastStorageClient.properties"/>
 </configuration>

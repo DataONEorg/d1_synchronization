@@ -17,7 +17,8 @@
  */
 package org.dataone.cn.batch.synchronization.tasks;
 
-import com.hazelcast.core.HazelcastInstance;
+import com.hazelcast.client.HazelcastClient;
+
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Date;
@@ -33,10 +34,11 @@ import org.dataone.cn.batch.synchronization.NodeCommObjectListHarvestFactory;
 import org.dataone.cn.batch.synchronization.jobs.MemberNodeHarvestJob;
 import org.dataone.cn.batch.synchronization.type.NodeComm;
 import org.dataone.cn.batch.synchronization.type.NodeRegistryQueryService;
-import org.dataone.cn.hazelcast.HazelcastInstanceFactory;
+import org.dataone.cn.hazelcast.HazelcastClientFactory;
+
 import org.dataone.cn.synchronization.types.SyncObject;
 import org.dataone.configuration.Settings;
-import org.dataone.service.cn.impl.v2.NodeRegistryService;
+
 import org.dataone.service.exceptions.InvalidRequest;
 import org.dataone.service.exceptions.InvalidToken;
 import org.dataone.service.exceptions.NotAuthorized;
@@ -107,7 +109,7 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
         NodeRegistryQueryService nodeRegistryService = mnNodeComm.getNodeRegistryService();
         // logger is not  be serializable, but no need to make it transient imo
         Logger logger = Logger.getLogger(ObjectListHarvestTask.class.getName());
-        HazelcastInstance hazelcast = HazelcastInstanceFactory.getProcessingInstance();
+        HazelcastClient hazelcast = HazelcastClientFactory.getProcessingClient();
         BlockingQueue<SyncObject> hzSyncObjectQueue = hazelcast.getQueue(synchronizationObjectQueue);
         // Need the LinkedHashMap to preserve insertion order
         Node d1Node = nodeRegistryService.getNode(d1NodeReference);
