@@ -40,5 +40,5 @@ import org.dataone.service.types.v1.NodeReference;
 public interface NodeCommFactory {
 
     public NodeComm getNodeComm(NodeReference mnNode) throws ServiceFailure, NodeCommUnavailable;
-    public NodeComm getNodeComm(NodeReference mnNode, String hzConfigLocation) throws ServiceFailure, NodeCommUnavailable;
+//    public NodeComm getNodeComm(NodeReference mnNode, String hzConfigLocation) throws ServiceFailure, NodeCommUnavailable;
 }

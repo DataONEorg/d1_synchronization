@@ -22,7 +22,8 @@
 
 package org.dataone.cn.batch.synchronization.type;
 
-import com.hazelcast.core.HazelcastInstance;
+
+import com.hazelcast.client.HazelcastClient;
 import java.util.Date;
 import org.dataone.service.cn.v2.CNCore;
 import org.dataone.service.cn.v2.CNReplication;
@@ -39,7 +40,6 @@ public class NodeComm {
     private Object cnRead;
     private CNCore cnCore;
     private CNReplication cnReplication;
-    private HazelcastInstance hzClient;
     private IdentifierReservationQueryService reserveIdentifierService;
     private NodeRegistryQueryService nodeRegistryService;
     // helpful for debugging
@@ -50,23 +50,21 @@ public class NodeComm {
     // help to determine if thread is blocking, used as timeout
     private Date runningStartDate;
     
-    public NodeComm(Object mnRead, NodeRegistryQueryService nodeRegistryService, HazelcastInstance hzClient) {
+    public NodeComm(Object mnRead, NodeRegistryQueryService nodeRegistryService) {
         this.mnRead = mnRead;
         this.reserveIdentifierService = null;
         this.nodeRegistryService = nodeRegistryService;
-        this.hzClient = hzClient;
         this.cnRead = null;
     }
 
     public NodeComm(Object mnRead, Object cnRead, NodeRegistryQueryService nodeRegistryService, 
-            CNCore cnCore, CNReplication cnReplication, IdentifierReservationQueryService reserveIdentifierService, HazelcastInstance hzClient) {
+            CNCore cnCore, CNReplication cnReplication, IdentifierReservationQueryService reserveIdentifierService) {
         this.mnRead = mnRead;
         this.cnRead = cnRead;
         this.nodeRegistryService = nodeRegistryService;
         this.cnCore = cnCore;
         this.cnReplication = cnReplication;
         this.reserveIdentifierService = reserveIdentifierService;
-        this.hzClient = hzClient;
     }
 
     public Object getMnRead() {
@@ -116,14 +114,6 @@ public class NodeComm {
 
     public void setRunningStartDate(Date runningStartDate) {
         this.runningStartDate = runningStartDate;
-    }
-
-    public HazelcastInstance getHzClient() {
-        return hzClient;
-    }
-
-    public void setHzClient(HazelcastInstance hzClient) {
-        this.hzClient = hzClient;
     }
 
     public CNReplication getCnReplication() {

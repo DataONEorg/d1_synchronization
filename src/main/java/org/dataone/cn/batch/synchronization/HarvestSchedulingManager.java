@@ -17,13 +17,12 @@
  */
 package org.dataone.cn.batch.synchronization;
 
+import com.hazelcast.client.HazelcastClient;
 import static org.quartz.CronScheduleBuilder.cronSchedule;
 import static org.quartz.JobBuilder.newJob;
 import static org.quartz.TriggerBuilder.newTrigger;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Properties;
 import java.util.Set;
 
@@ -50,13 +49,16 @@ import org.springframework.context.ApplicationContextAware;
 
 import com.hazelcast.core.EntryEvent;
 import com.hazelcast.core.EntryListener;
-import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.IMap;
-import com.hazelcast.core.Member;
-import com.hazelcast.partition.MigrationEvent;
-import com.hazelcast.partition.MigrationListener;
-import com.hazelcast.partition.Partition;
-import com.hazelcast.partition.PartitionService;
+import java.io.File;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import org.dataone.client.auth.CertificateManager;
+import org.dataone.cn.hazelcast.HazelcastClientFactory;
+import org.dataone.service.cn.impl.v2.NodeRegistryService;
+import org.dataone.service.exceptions.NotImplemented;
+import org.dataone.service.exceptions.ServiceFailure;
+import org.dataone.service.types.v2.NodeList;
 
 /**
  * this bean must be managed by Spring upon startup of spring it will execute via init method
@@ -69,20 +71,23 @@ import com.hazelcast.partition.PartitionService;
  *
  * @author waltz
  */
-public class HarvestSchedulingManager implements ApplicationContextAware, EntryListener<NodeReference, Node>, MigrationListener {
+public class HarvestSchedulingManager implements ApplicationContextAware, EntryListener<NodeReference, Node> {
 
     public static Log logger = LogFactory.getLog(HarvestSchedulingManager.class);
     // Quartz GroupName for Jobs and Triggers, should be unique for a set of jobs that are related
     private static String groupName = "MemberNodeHarvesting";
-    private HazelcastInstance hazelcast;
+
     private HazelcastLdapStore hazelcastLdapStore;
     private Scheduler scheduler;
     ApplicationContext applicationContext;
-    PartitionService partitionService;
-    Member localMember;
+    private NodeRegistryService nodeRegistryService
+            = new NodeRegistryService();
+    private static String clientCertificateLocation
+            = Settings.getConfiguration().getString("D1Client.certificate.directory")
+            + File.separator + Settings.getConfiguration().getString("D1Client.certificate.filename");
     private static final String hzNodesName = Settings.getConfiguration().getString("dataone.hazelcast.nodes");
     /*
-    /* 
+     /* 
      * Called by Spring to bootstrap Synchronization
      * 
      * it will initialize Quartz
@@ -95,22 +100,20 @@ public class HarvestSchedulingManager implements ApplicationContextAware, EntryL
      *
      *
      */
+
     public void init() {
         try {
+            HazelcastClient hazelcast = HazelcastClientFactory.getProcessingClient();
             logger.info("HarvestingScheduler starting up");
-            partitionService = hazelcast.getPartitionService();
-
-            localMember = hazelcast.getCluster().getLocalMember();
-            hazelcastLdapStore.loadAllKeys();
+            CertificateManager.getInstance().setCertificateLocation(clientCertificateLocation);
 
             Properties properties = new Properties();
             properties.load(this.getClass().getResourceAsStream("/org/dataone/configuration/synchQuartz.properties"));
             StdSchedulerFactory schedulerFactory = new StdSchedulerFactory(properties);
             scheduler = schedulerFactory.getScheduler();
 
-
             this.manageHarvest();
-            partitionService.addMigrationListener(this);
+
             IMap<NodeReference, Node> hzNodes = hazelcast.getMap(hzNodesName);
             hzNodes.addEntryListener(this, true);
         } catch (IOException ex) {
@@ -121,50 +124,53 @@ public class HarvestSchedulingManager implements ApplicationContextAware, EntryL
     }
 
     /**
-     * will perform the recalculation of the scheduler. 
-     * if scheduler is running, it will be disabled All jobs will be
-     * deleted for this node All nodes that are considered 'local' by hazelcast 
-     * will be scheduled with synchronization jobs
+     * will perform the recalculation of the scheduler. if scheduler is running, it will be disabled All jobs will be
+     * deleted for this node All nodes that are considered 'local' by hazelcast will be scheduled with synchronization
+     * jobs
      *
-     * Seems that the listeners could call this in parallel, and it should
-     * be an atomic operation, so it is synchronized
+     * Seems that the listeners could call this in parallel, and it should be an atomic operation, so it is synchronized
      */
     public synchronized void manageHarvest() throws SchedulerException {
+        try {
+            // halt all operations
+            if (scheduler.isStarted()) {
+                scheduler.standby();
+                while (!(scheduler.getCurrentlyExecutingJobs().isEmpty())) {
+                    try {
+                        Thread.sleep(2000L);
+                    } catch (InterruptedException ex) {
+                        logger.warn("Sleep interrupted. check again!");
+                    }
+                }
+                // remove any existing jobs
+                GroupMatcher<JobKey> groupMatcher = GroupMatcher.groupEquals(groupName);
+                Set<JobKey> jobsInGroup = scheduler.getJobKeys(groupMatcher);
 
-        // halt all operations
-        if (scheduler.isStarted()) {
-            scheduler.standby();
-            while (!(scheduler.getCurrentlyExecutingJobs().isEmpty())) {
-                try {
-                    Thread.sleep(2000L);
-                } catch (InterruptedException ex) {
-                    logger.warn("Sleep interrupted. check again!");
+                for (JobKey jobKey : jobsInGroup) {
+                    logger.info("deleting job " + jobKey.getGroup() + " " + jobKey.getName());
+                    scheduler.deleteJob(jobKey);
                 }
             }
-            // remove any existing jobs
-            GroupMatcher<JobKey> groupMatcher = GroupMatcher.groupEquals(groupName);
-            Set<JobKey> jobsInGroup = scheduler.getJobKeys(groupMatcher);
+            // populate the nodeList
 
-            for (JobKey jobKey : jobsInGroup) {
-                logger.info("deleting job " + jobKey.getGroup() + " " + jobKey.getName());
-                scheduler.deleteJob(jobKey);
+            NodeList nodeList = nodeRegistryService.listNodes();
+            logger.info("Node map has " + nodeList.sizeNodeList() + " entries");
+            // construct new jobs and triggers based on ownership of nodes in the nodeList
+            for (Node node : nodeList.getNodeList()) {
+                // exclude from the set any CNs or membernodes that are down or do not
+                // want to be synchronized
+
+                addHarvest(node.getIdentifier(), node);
             }
-        }
-        // populate the nodeList
-        IMap<NodeReference, Node> hzNodes = hazelcast.getMap(hzNodesName);
+            scheduler.start();
 
-        logger.info("Node map has " + hzNodes.size() + " entries");
-        // construct new jobs and triggers based on ownership of nodes in the nodeList
-        for (NodeReference key : hzNodes.localKeySet()) {
-            // exclude from the set any CNs or membernodes that are down or do not
-            // want to be synchronized
-            Node node = hzNodes.get(key);
-            addHarvest(key, node);
-        }
-        scheduler.start();
-
-        if (scheduler.isStarted()) {
-            logger.info("Scheduler is started");
+            if (scheduler.isStarted()) {
+                logger.info("Scheduler is started");
+            }
+        } catch (NotImplemented ex) {
+            Logger.getLogger(HarvestSchedulingManager.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (ServiceFailure ex) {
+            Logger.getLogger(HarvestSchedulingManager.class.getName()).log(Level.SEVERE, null, ex);
         }
 
     }
@@ -287,75 +293,27 @@ public class HarvestSchedulingManager implements ApplicationContextAware, EntryL
      * should only be noted if updateNodeCapabilities is called on the CN, or if
      * the nodeApproval tool is run by administrator
      * 
-     * may result in recalculation of Quartz job scheduling
-     * if any nodes are determined to be locally owned
-     * 
-     * @param EntryEvent<NodeReference, Node>
+     * will result in recalculation of Quartz job scheduling
+     *
      */
+
     @Override
     public void entryUpdated(EntryEvent<NodeReference, Node> event) {
         logger.info("Node Entry updated key=" + event.getKey().getValue());
-        synchronized(this) {
-            Partition partition = partitionService.getPartition(event.getKey());
-            Member ownerMember = partition.getOwner();
+        synchronized (this) {
 
-            if (localMember.equals(ownerMember)) {
-                try {
-                    this.manageHarvest();
-                } catch (SchedulerException ex) {
-                    throw new IllegalStateException("Unable to initialize jobs for scheduling: " + ex.getMessage());
-                }
+            try {
+                this.manageHarvest();
+            } catch (SchedulerException ex) {
+                throw new IllegalStateException("Unable to initialize jobs for scheduling: " + ex.getMessage());
             }
+
         }
     }
 
     @Override
     public void entryEvicted(EntryEvent<NodeReference, Node> event) {
         logger.warn("Entry evicted key=" + event.getKey().getValue());
-    }
-
-    //
-    // http://code.google.com/p/hazelcast/source/browse/trunk/hazelcast/src/main/java/com/hazelcast/impl/TestUtil.java?r=1824
-    // http://groups.google.com/group/hazelcast/browse_thread/thread/3856d5829e26f81c?fwc=1
-    //
-    public void migrationCompleted(MigrationEvent migrationEvent) {
-        logger.debug("migrationCompleted " + migrationEvent.getPartitionId());
-        // this is the partition that was moved from 
-        // one node to the other
-        // try to determine if a Node has migrated home servers
-        if (localMember.equals(migrationEvent.getNewOwner()) || localMember.equals(migrationEvent.getOldOwner())) {
-            Integer partitionId = migrationEvent.getPartitionId();
-
-            IMap<NodeReference, Node> hzNodes = hazelcast.getMap(hzNodesName);
-
-            List<Integer> nodePartitions = new ArrayList<Integer>();
-            for (NodeReference key : hzNodes.keySet()) {
-                nodePartitions.add(partitionService.getPartition(key).getPartitionId());
-            }
-
-            if (nodePartitions.contains(partitionId)) {
-                logger.info("Node Partions migrated ");
-                try {
-                    this.manageHarvest();
-                } catch (SchedulerException ex) {
-                    throw new IllegalStateException("Unable to initialize jobs for scheduling: " + ex.getMessage());
-                }
-            }
-        }
-
-
-    }
-
-    public void migrationStarted(MigrationEvent migrationEvent) {
-        logger.debug("migrationStarted " + migrationEvent.getPartitionId());
-    }
-
-    public HazelcastInstance getHazelcast() {
-        return hazelcast;
-    }
-
-    public void setHazelcast(HazelcastInstance hazelcast) {
-        this.hazelcast = hazelcast;
     }
 
     public HazelcastLdapStore getHazelcastLdapStore() {
@@ -379,8 +337,4 @@ public class HarvestSchedulingManager implements ApplicationContextAware, EntryL
         this.applicationContext = applicationContext;
     }
 
-    @Override
-    public void migrationFailed(MigrationEvent migrationEvent) {
-         logger.warn("migrationFailed " + migrationEvent.getPartitionId());
-    }
 }

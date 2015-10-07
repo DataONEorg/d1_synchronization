@@ -19,28 +19,16 @@ package org.dataone.cn.batch.synchronization.jobs;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.dataone.cn.batch.exceptions.ExecutionDisabledException;
 import org.dataone.cn.batch.synchronization.tasks.ObjectListHarvestTask;
-import org.dataone.cn.hazelcast.HazelcastInstanceFactory;
 import org.dataone.configuration.Settings;
-import org.dataone.service.types.v2.Node;
 import org.dataone.service.types.v1.NodeReference;
 import org.quartz.DisallowConcurrentExecution;
 import org.quartz.Job;
 import org.quartz.JobExecutionContext;
 import org.quartz.JobExecutionException;
-
-import com.hazelcast.core.DistributedTask;
-import com.hazelcast.core.HazelcastInstance;
-import com.hazelcast.core.IMap;
 
 /**
  * Quartz Job that starts off the hazelcast distributed execution of harvesting for a nodeList from a Membernode It
@@ -59,65 +47,32 @@ public class MemberNodeHarvestJob implements Job {
         JobExecutionException jex = null;
         NodeReference nodeReference = new NodeReference();
         SimpleDateFormat format = new SimpleDateFormat("EEE MMM dd yyyy HH:mm:ss zzz");
-        boolean nodeLocked = false;
-        IMap<NodeReference, Node> hzNodes = null;
-        String synchronizationExecutorName = Settings.getConfiguration().getString("dataone.hazelcast.synchronizationExecutorService");
+
         String mnIdentifier = null;
         try {
             boolean activateJob = Boolean.parseBoolean(Settings.getConfiguration().getString("Synchronization.active"));
             if (activateJob) {
                 mnIdentifier = jobContext.getMergedJobDataMap().getString("mnIdentifier");
                 logger.info(mnIdentifier + " - Execute Service ObjectListHarvestTask Start");
-                HazelcastInstance hazelcast = HazelcastInstanceFactory.getProcessingInstance();
-
-                hzNodes = hazelcast.getMap("hzNodes");
 
                 nodeReference.setValue(mnIdentifier);
 
                 Integer batchSize = Settings.getConfiguration().getInt("Synchronization.mn_listobjects_batch_size");
 
-                nodeLocked = hzNodes.tryLock(nodeReference, 5L, TimeUnit.SECONDS);
-                if (nodeLocked) {
+                ObjectListHarvestTask harvestTask = new ObjectListHarvestTask(nodeReference, batchSize);
 
-                    ObjectListHarvestTask harvestTask = new ObjectListHarvestTask(nodeReference, batchSize);
-                    ExecutorService executor = hazelcast.getExecutorService(synchronizationExecutorName);
-                    DistributedTask dtask = new DistributedTask((Callable<Date>) harvestTask);
-                    Future future = executor.submit(dtask);
-                    Date lastProcessingCompletedDate = null;
-                    try {
-                        lastProcessingCompletedDate = (Date) future.get();
-                    } catch (ExecutionDisabledException ex) {
-                        logger.error("ExecutionDisabledException: " + ex.getMessage() 
-                                + "\n\t\tExecutionDisabledException: Will fire Job again\n");
-                        jex = new JobExecutionException();
-                        jex.setRefireImmediately(true);
-                        Thread.sleep(5000L);
-                    } catch (InterruptedException ex) {
-                        logger.error("InterruptedException: " + ex.getMessage());
-                    } catch (ExecutionException ex) {
-                        if (ex.getCause() instanceof ExecutionDisabledException) {
-                            logger.error("ExecutionDisabledException: " + ex.getMessage() 
-                                    + "\n\tExecutionDisabledException: Will fire Job again\n");
-                            jex = new JobExecutionException();
-                            jex.setStackTrace(ex.getStackTrace());
-                            jex.setRefireImmediately(true);
-                            Thread.sleep(5000L);
-                        } else {
-                            logger.error("ExecutionException: " + ex.getMessage());
-                            ex.printStackTrace();
-                        }
-                    }
+                Date lastProcessingCompletedDate = harvestTask.call();
 
                     // if the lastProcessingCompletedDate has changed then it should be persisted, but where?
-                    // Does not need to be stored, maybe just printed?
-                    if (lastProcessingCompletedDate == null) {
-                        logger.info(mnIdentifier + " - Execute Service ObjectListHarvestTask did not finish.");
-                    } else {
-                        logger.info(mnIdentifier + " - Execute Service ObjectListHarvestTask End at " 
-                                + format.format(lastProcessingCompletedDate));
-                    }
+                // Does not need to be stored, maybe just printed?
+                if (lastProcessingCompletedDate == null) {
+                    logger.info(mnIdentifier + " - Execute Service ObjectListHarvestTask did not finish.");
+                } else {
+                    logger.info(mnIdentifier + " - Execute Service ObjectListHarvestTask End at "
+                            + format.format(lastProcessingCompletedDate));
                 }
             }
+
         } catch (Exception ex) {
             ex.printStackTrace();
             logger.error(mnIdentifier + " - " + jobContext.getJobDetail().getKey().getName() + " died: " + ex.getMessage());
@@ -125,10 +80,6 @@ public class MemberNodeHarvestJob implements Job {
             jex = new JobExecutionException();
             jex.unscheduleFiringTrigger();
             jex.setStackTrace(ex.getStackTrace());
-        } finally {
-            if (nodeLocked) {
-                hzNodes.unlock(nodeReference);
-            }
         }
         if (jex != null) {
             throw jex;

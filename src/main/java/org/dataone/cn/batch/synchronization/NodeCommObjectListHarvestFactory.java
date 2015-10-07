@@ -17,57 +17,43 @@
  */
 package org.dataone.cn.batch.synchronization;
 
-import com.hazelcast.core.HazelcastInstance;
-import java.io.File;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.dataone.client.auth.CertificateManager;
 import org.dataone.cn.batch.exceptions.NodeCommUnavailable;
 import org.dataone.cn.batch.synchronization.type.NodeComm;
 import org.dataone.cn.batch.synchronization.type.NodeRegistryQueryService;
-import org.dataone.cn.hazelcast.HazelcastClientInstance;
+
 import org.dataone.cn.ldap.NodeAccess;
-import org.dataone.configuration.Settings;
 import org.dataone.service.cn.impl.v2.NodeRegistryService;
-import org.dataone.service.cn.impl.v2.ReserveIdentifierService;
-import org.dataone.service.exceptions.IdentifierNotUnique;
-import org.dataone.service.exceptions.NotAuthorized;
 import org.dataone.service.exceptions.NotFound;
 import org.dataone.service.exceptions.NotImplemented;
 import org.dataone.service.exceptions.ServiceFailure;
 import org.dataone.service.types.v2.Node;
 import org.dataone.service.types.v2.NodeList;
-import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.NodeReference;
 import org.dataone.service.types.v1.Service;
-import org.dataone.service.types.v1.Session;
-import org.dataone.service.types.v1.Subject;
-
 
 /**
  *
- * Creates a NodeComm (node communications) pool for use by the ObjectListHarvestTask.
- * A NodeComm object is memberNode specific
+ * Creates a NodeComm (node communications) pool for use by the ObjectListHarvestTask. A NodeComm object is memberNode
+ * specific
  *
- * Sets up instances that should be reused by the ObjectListHarvestTask
- * Assume that most of the pooled instances (mNode/nodeRegistry) are not thread-safe,
- * in other words the instances created by this factory will be re-used by threads,
- * but no two concurrent threads should access the same instances
- * (with the exception of hazelcast client instance)
+ * Sets up instances that should be reused by the ObjectListHarvestTask Assume that most of the pooled instances
+ * (mNode/nodeRegistry) are not thread-safe, in other words the instances created by this factory will be re-used by
+ * threads, but no two concurrent threads should access the same instances (with the exception of hazelcast client
+ * instance)
  *
  * @author waltz
  */
 public class NodeCommObjectListHarvestFactory implements NodeCommFactory {
 
     public final static Log logger = LogFactory.getLog(NodeCommObjectListHarvestFactory.class);
-    private static HazelcastInstance hzclient;
-    private static String clientCertificateLocation =
-            Settings.getConfiguration().getString("D1Client.certificate.directory")
-            + File.separator + Settings.getConfiguration().getString("D1Client.certificate.filename");
+
     private static ConcurrentMap<NodeReference, NodeComm> initializedMemberNodes = new ConcurrentHashMap<NodeReference, NodeComm>();
     private static NodeCommFactory nodeCommFactory = null;
+
     private NodeCommObjectListHarvestFactory() {
     }
 
@@ -80,33 +66,23 @@ public class NodeCommObjectListHarvestFactory implements NodeCommFactory {
 
     @Override
     public NodeComm getNodeComm(NodeReference mnNodeId) throws ServiceFailure, NodeCommUnavailable {
-        return this.getNodeComm(mnNodeId, null);
-    }
-
-    @Override
-    public NodeComm getNodeComm(NodeReference mnNodeId, String hzConfigLocation) throws ServiceFailure, NodeCommUnavailable {
 
         if (initializedMemberNodes.containsKey(mnNodeId)) {
             return initializedMemberNodes.get(mnNodeId);
         } else {
-            if (hzclient == null) {
-                hzclient = HazelcastClientInstance.getHazelcastClient();
-                CertificateManager.getInstance().setCertificateLocation(clientCertificateLocation);
-            }
 
             // figure out what client impl to use for this node, default to v1
             Object mNode = org.dataone.client.v1.itk.D1Client.getMN(mnNodeId);
-            NodeRegistryQueryService nodeRegistryService = new NodeRegistryQueryService()
-            {
-                
-                private NodeRegistryService serviceImpl =
-                        new NodeRegistryService();
-                
+            NodeRegistryQueryService nodeRegistryService = new NodeRegistryQueryService() {
+
+                private NodeRegistryService serviceImpl
+                        = new NodeRegistryService();
+
                 @Override
-                public NodeList listNodes() 
+                public NodeList listNodes()
                         throws ServiceFailure, NotImplemented {
-                   
-                   return serviceImpl.listNodes();
+
+                    return serviceImpl.listNodes();
                 }
 
                 @Override
@@ -123,7 +99,7 @@ public class NodeCommObjectListHarvestFactory implements NodeCommFactory {
             Node node = null;
             try {
                 node = nodeRegistryService.getNode(mnNodeId);
-                for (Service service: node.getServices().getServiceList()) {
+                for (Service service : node.getServices().getServiceList()) {
                     if (service.getVersion().equals("v2")) {
                         mNode = org.dataone.client.v2.itk.D1Client.getMN(mnNodeId);
                         break;
@@ -133,7 +109,7 @@ public class NodeCommObjectListHarvestFactory implements NodeCommFactory {
                 throw new NodeCommUnavailable(ex.getDescription());
             }
 
-            NodeComm nodeComm = new NodeComm(mNode, nodeRegistryService, hzclient);
+            NodeComm nodeComm = new NodeComm(mNode, nodeRegistryService);
             initializedMemberNodes.putIfAbsent(mnNodeId, nodeComm);
             return nodeComm;
         }

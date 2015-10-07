@@ -17,6 +17,8 @@
  */
 package org.dataone.cn.batch.synchronization.tasks;
 
+import com.hazelcast.client.HazelcastClient;
+import com.hazelcast.core.IMap;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -37,11 +39,10 @@ import org.dataone.cn.batch.exceptions.NodeCommUnavailable;
 import org.dataone.cn.batch.synchronization.NodeCommSyncObjectFactory;
 import org.dataone.cn.batch.synchronization.type.IdentifierReservationQueryService;
 import org.dataone.cn.batch.synchronization.type.NodeComm;
-import org.dataone.cn.hazelcast.HazelcastInstanceFactory;
+import org.dataone.cn.hazelcast.HazelcastClientFactory;
 import org.dataone.cn.synchronization.types.SyncObject;
 import org.dataone.configuration.Settings;
 import org.dataone.ore.ResourceMapFactory;
-import org.dataone.service.cn.impl.v2.ReserveIdentifierService;
 import org.dataone.service.exceptions.BaseException;
 import org.dataone.service.exceptions.IdentifierNotUnique;
 import org.dataone.service.exceptions.InsufficientResources;
@@ -73,9 +74,6 @@ import org.dspace.foresite.OREException;
 import org.dspace.foresite.OREParserException;
 import org.jibx.runtime.JiBXException;
 
-import com.hazelcast.core.HazelcastInstance;
-import com.hazelcast.core.IMap;
-
 /**
  * Transfer an object from a MemberNode(MN) to a CoordinatingNode(CN). Executes as a thread that is executed by the
  * SyncObjectTask class
@@ -95,8 +93,8 @@ import com.hazelcast.core.IMap;
  */
 public class TransferObjectTask implements Callable<Void> {
 
-    private static final BigInteger CHECKSUM_VERIFICATION_SIZE_BYPASS_THRESHOLD = 
-            Settings.getConfiguration().getBigInteger(
+    private static final BigInteger CHECKSUM_VERIFICATION_SIZE_BYPASS_THRESHOLD
+            = Settings.getConfiguration().getBigInteger(
                     "Synchronization.checksum.verify.size.bypass.threshold",
                     BigInteger.valueOf(10000000));
 
@@ -106,23 +104,24 @@ public class TransferObjectTask implements Callable<Void> {
     private Session session = null;
     // need this task queue if a failure occurs on the CN such that the task will
     // need to be processed on a separate CN
-    private HazelcastInstance hazelcast = HazelcastInstanceFactory.getProcessingInstance();
-    String cnIdentifier = 
-            Settings.getConfiguration().getString("cn.router.nodeId");
-    String synchronizationObjectQueue = 
-            Settings.getConfiguration().getString("dataone.hazelcast.synchronizationObjectQueue");
-    String hzNodesName = 
-            Settings.getConfiguration().getString("dataone.hazelcast.nodes");
-    String hzSystemMetaMapString = 
-            Settings.getConfiguration().getString("dataone.hazelcast.systemMetadata");
-    
+    private HazelcastClient hzProcessingClient = HazelcastClientFactory.getProcessingClient();
+    private HazelcastClient hzStorageClient = HazelcastClientFactory.getStorageClient();
+    String cnIdentifier
+            = Settings.getConfiguration().getString("cn.router.nodeId");
+    String synchronizationObjectQueue
+            = Settings.getConfiguration().getString("dataone.hzProcessingClient.synchronizationObjectQueue");
+    String hzNodesName
+            = Settings.getConfiguration().getString("dataone.hzProcessingClient.nodes");
+    String hzSystemMetaMapString
+            = Settings.getConfiguration().getString("dataone.hzProcessingClient.systemMetadata");
+
     IMap<Identifier, SystemMetadata> hzSystemMetaMap;
     IdentifierReservationQueryService reserveIdentifierService;
 
     public TransferObjectTask(NodeComm nodeCommunications, SyncObject task) {
         this.nodeCommunications = nodeCommunications;
         this.task = task;
-        this.hzSystemMetaMap = nodeCommunications.getHzClient().getMap(hzSystemMetaMapString);
+        this.hzSystemMetaMap = hzStorageClient.getMap(hzSystemMetaMapString);
         this.reserveIdentifierService = nodeCommunications.getReserveIdentifierService();
     }
 
@@ -142,12 +141,12 @@ public class TransferObjectTask implements Callable<Void> {
         String lockPid = task.getPid();
         boolean isPidLocked = false;
         try {
-            
-            // this will be from the hazelcast client running against metacat
+
+            // this will be from the hzProcessingClient client running against metacat
             logger.info(task.taskLabel()
                     + " Locking task of attempt " + task.getAttempt());
 
-            hzPidLock = hazelcast.getLock(lockPid);
+            hzPidLock = hzProcessingClient.getLock(lockPid);
             isPidLocked = hzPidLock.tryLock(1, TimeUnit.SECONDS); // both parameters define the wait time
             if (isPidLocked) {
                 logger.info(task.taskLabel() + " Processing task");
@@ -159,8 +158,8 @@ public class TransferObjectTask implements Callable<Void> {
                     } catch (VersionMismatch ex) {
 
                         logger.warn(task.taskLabel()
-                                + " Pid altered before processing complete! " +
-                                "Placing back on hzSyncObjectQueue of attempt "
+                                + " Pid altered before processing complete! "
+                                + "Placing back on hzSyncObjectQueue of attempt "
                                 + task.getAttempt());
                         if (task.getAttempt() == 1) {
                             // Member node should be informed to update its systemMetadata. 
@@ -187,7 +186,7 @@ public class TransferObjectTask implements Callable<Void> {
                                 logger.error(task.taskLabel() + " " + iex.getMessage());
 
                             }
-                            hazelcast.getQueue(synchronizationObjectQueue).put(task);
+                            hzProcessingClient.getQueue(synchronizationObjectQueue).put(task);
                             task.setAttempt(task.getAttempt() + 1);
                         } else {
                             logger.error(task.taskLabel() + " Pid altered before processing complete! Unable to process");
@@ -196,39 +195,35 @@ public class TransferObjectTask implements Callable<Void> {
                     }
                 } // else it was a failure and it should have been reported to MN so do nothing
             } else { // could not lock the pid
-                try {
-                    // there should be a max # of attempts from locking
-                    if (task.getAttempt() < 100) {
 
-                        logger.warn(task.taskLabel()
-                                + " Pid Locked! Placing back on hzSyncObjectQueue of attempt "
-                                + task.getAttempt());
+                // there should be a max # of attempts from locking
+                if (task.getAttempt() < 100) {
 
-                        /*
-                         * allow a maximum number of attempts before permanent failure
-                         */
-                        task.setAttempt(task.getAttempt() + 1);
+                    logger.warn(task.taskLabel()
+                            + " Pid Locked! Placing back on hzSyncObjectQueue of attempt "
+                            + task.getAttempt());
+
+                    /*
+                     * allow a maximum number of attempts before permanent failure
+                     */
+                    task.setAttempt(task.getAttempt() + 1);
                         // wait a second to give the CN (replication processing) a bit of time to complete
-                        // its action and release the lock before the next sync
-                        // attempt on this object.
-                        try {
-                            Thread.sleep(1000L);
-                        } catch (InterruptedException iex) {
-                            logger.error(task.taskLabel() + " " + iex.getMessage());
+                    // its action and release the lock before the next sync
+                    // attempt on this object.
+                    try {
+                        Thread.sleep(1000L);
+                    } catch (InterruptedException iex) {
+                        logger.error(task.taskLabel() + " " + iex.getMessage());
 
-                        }
-                        hazelcast.getQueue(synchronizationObjectQueue).put(task);
-
-                    } else {
-                        logger.error(task.taskLabel()
-                                + " Pid Locked! Unable to process pid " + task.getPid()
-                                + " from node " + task.getNodeId());
                     }
-                } catch (InterruptedException ex) {
+                    hzProcessingClient.getQueue(synchronizationObjectQueue).put(task);
+
+                } else {
                     logger.error(task.taskLabel()
-                            + " Pid Locked! Unable to process pid " + task.getPid() 
+                            + " Pid Locked! Unable to process pid " + task.getPid()
                             + " from node " + task.getNodeId());
                 }
+
             }
         } catch (Exception ex) {
             ex.printStackTrace();
@@ -251,7 +246,6 @@ public class TransferObjectTask implements Callable<Void> {
      * @return SystemMetadata
      *
      */
-
     private SystemMetadata retrieveSystemMetadata() {
         String memberNodeId = task.getNodeId();
         SystemMetadata systemMetadata = null;
@@ -308,10 +302,10 @@ public class TransferObjectTask implements Callable<Void> {
                 InvalidSystemMetadata invalidSystemMetadata = new InvalidSystemMetadata(
                         "567100",
                         "Identifier "
-                                + task.getPid()
-                                + " retrieved from getObjectList is different from that contained in systemMetadata "
-                                + systemMetadata.getIdentifier().getValue());
-                logger.error(task.taskLabel() + "\n" 
+                        + task.getPid()
+                        + " retrieved from getObjectList is different from that contained in systemMetadata "
+                        + systemMetadata.getIdentifier().getValue());
+                logger.error(task.taskLabel() + "\n"
                         + invalidSystemMetadata.serialize(invalidSystemMetadata.FMT_XML));
                 submitSynchronizationFailed(task.getPid(), invalidSystemMetadata);
                 return null;
@@ -369,7 +363,7 @@ public class TransferObjectTask implements Callable<Void> {
     private SystemMetadata processSystemMetadata(SystemMetadata systemMetadata) {
 
         try {
-            IMap<NodeReference, Node> hzNodes = hazelcast.getMap(hzNodesName);
+            IMap<NodeReference, Node> hzNodes = hzProcessingClient.getMap(hzNodesName);
             logger.debug(task.taskLabel() + " Processing SystemMetadata");
             boolean addOriginalReplica = true;
             /*
@@ -434,7 +428,7 @@ public class TransferObjectTask implements Callable<Void> {
             submitSynchronizationFailed(task.getPid(), ex);
             return null;
         } catch (NotFound ex) {
-            logger.error(task.taskLabel() +  "\n" + ex.serialize(ex.FMT_XML));
+            logger.error(task.taskLabel() + "\n" + ex.serialize(ex.FMT_XML));
             submitSynchronizationFailed(task.getPid(), ex);
             return null;
         } catch (NotImplemented ex) {
@@ -514,8 +508,8 @@ public class TransferObjectTask implements Callable<Void> {
                     if (!existingChecksum.getAlgorithm().equalsIgnoreCase(
                             systemMetadata.getChecksum().getAlgorithm())) {
                         // we can't check algorithms that do not match, so get MN to recalculate with original checksum
-                        logger.info(task.taskLabel() + " Try to retrieve a checksum from " +
-                                "membernode that matches the checksum of existing systemMetadata");
+                        logger.info(task.taskLabel() + " Try to retrieve a checksum from "
+                                + "membernode that matches the checksum of existing systemMetadata");
                         Object mnRead = nodeCommunications.getMnRead();
                         if (mnRead instanceof MNRead) {
                             newChecksum = ((MNRead) mnRead)
@@ -529,7 +523,7 @@ public class TransferObjectTask implements Callable<Void> {
                     }
                     if (newChecksum.getValue().contentEquals(existingChecksum.getValue())) {
                         // how do we determine what is unique about this and whether it should be processed?
-                        logger.info(task.taskLabel()  + " Update sysMeta because checksum is same");
+                        logger.info(task.taskLabel() + " Update sysMeta because checksum is same");
                         updateSystemMetadata(systemMetadata);
                     } else {
                         logger.info(task.taskLabel() + " Update sysMeta Not Unique! Checksum is different");
@@ -541,7 +535,7 @@ public class TransferObjectTask implements Callable<Void> {
                     }
                 } else {
                     if (cnSystemMetadata == null) {
-                        logger.error(task.taskLabel()  + " cn's systemMetadata is null when get called from Hazelcast "
+                        logger.error(task.taskLabel() + " cn's systemMetadata is null when get called from Hazelcast "
                                 + hzSystemMetaMapString + " Map");
                     } else {
                         logger.error(task.taskLabel()
@@ -581,7 +575,7 @@ public class TransferObjectTask implements Callable<Void> {
             logger.error(task.taskLabel() + "\n" + ex.serialize(ex.FMT_XML));
             submitSynchronizationFailed(systemMetadata.getIdentifier().getValue(), ex);
         } catch (IdentifierNotUnique ex) {
-            logger.error(task.taskLabel() + "\n"  + ex.serialize(ex.FMT_XML));
+            logger.error(task.taskLabel() + "\n" + ex.serialize(ex.FMT_XML));
             submitSynchronizationFailed(systemMetadata.getIdentifier().getValue(), ex);
         } catch (Exception ex) {
             ex.printStackTrace();
@@ -626,7 +620,7 @@ public class TransferObjectTask implements Callable<Void> {
         if ((objectFormat != null) && !objectFormat.getFormatType().equalsIgnoreCase("DATA")) {
             InputStream sciMetaStream = null;
             // get the scimeta object and then feed it to metacat
-            
+
             try {
                 int tryAgain = 0;
 
@@ -676,23 +670,22 @@ public class TransferObjectTask implements Callable<Void> {
                 // see: https://redmine.dataone.org/issues/6848
                 // commenting out for now. BRL 20150211
                 /*
-            if (isResource(objectFormat)) {
-                byte[] resourceBytes = null;
-                try {
-                    resourceBytes = IOUtils.toByteArray(sciMetaStream);
-                } catch (IOException e) {
-                    throw new InsufficientResources("413",
-                            "Unable to create ByteArrayInputStream for pid: "
-                                    + systemMetadata.getIdentifier().getValue() + " with message: "
-                                    + e.getMessage());
-                }
-                if (resourceBytes != null) {
-                    sciMetaStream = new ByteArrayInputStream(resourceBytes);
-                    validateResource(resourceBytes);
-                }
-            }
+                 if (isResource(objectFormat)) {
+                 byte[] resourceBytes = null;
+                 try {
+                 resourceBytes = IOUtils.toByteArray(sciMetaStream);
+                 } catch (IOException e) {
+                 throw new InsufficientResources("413",
+                 "Unable to create ByteArrayInputStream for pid: "
+                 + systemMetadata.getIdentifier().getValue() + " with message: "
+                 + e.getMessage());
+                 }
+                 if (resourceBytes != null) {
+                 sciMetaStream = new ByteArrayInputStream(resourceBytes);
+                 validateResource(resourceBytes);
+                 }
+                 }
                  */
-
                 logger.info(task.taskLabel() + " Creating Object");
                 d1Identifier = nodeCommunications.getCnCore().create(null, d1Identifier, sciMetaStream,
                         systemMetadata);
@@ -795,6 +788,7 @@ public class TransferObjectTask implements Callable<Void> {
 
     /**
      * Throws InvalidSystemMetadata if the input sysmeta param is not schema valid.
+     *
      * @param sysmeta
      * @throws InvalidSystemMetadata
      */
@@ -856,14 +850,14 @@ public class TransferObjectTask implements Callable<Void> {
         Identifier pid = new Identifier();
         pid.setValue(newSystemMetadata.getIdentifier().getValue());
         SystemMetadata cnSystemMetadata = hzSystemMetaMap.get(pid);
-        
+
         if (task.getNodeId().contentEquals(
                 cnSystemMetadata.getAuthoritativeMemberNode().getValue())) {
 
             // this is an update from the authoritative memberNode
             // so look for fields with valid changes
             boolean foundValidMNChange = false;
-            
+
             // obsoletedBy can be updated to a value only if its value hasn't
             // already been set.  Once set, it cannot change.
             if ((cnSystemMetadata.getObsoletedBy() == null)
@@ -878,7 +872,7 @@ public class TransferObjectTask implements Callable<Void> {
                 logger.info(task.taskLabel() + " Updated ObsoletedBy");
                 foundValidMNChange = true;
             }
-            
+
             // (getArchived() returns a boolean)
             // only process the update if the new sysmeta set it to true and the 
             // existing value is null or false.  Cannot change the value from true
@@ -968,7 +962,7 @@ public class TransferObjectTask implements Callable<Void> {
      */
     private void auditReplicaSystemMetadata(Identifier pid) throws InvalidToken, ServiceFailure,
             NotAuthorized, NotFound, InvalidRequest, NotImplemented {
-        IMap<NodeReference, Node> hzNodes = hazelcast.getMap(hzNodesName);
+        IMap<NodeReference, Node> hzNodes = hzProcessingClient.getMap(hzNodesName);
         SystemMetadata cnSystemMetadata = hzSystemMetaMap.get(pid);
         if (cnSystemMetadata != null) {
             List<Replica> prevReplicaList = cnSystemMetadata.getReplicaList();
@@ -1013,15 +1007,15 @@ public class TransferObjectTask implements Callable<Void> {
                                     .getSerialVersion()) {
                                 ((org.dataone.client.v1.MNode) mNode).systemMetadataChanged(
                                         session, cnSystemMetadata.getIdentifier(), cnSystemMetadata
-                                                .getSerialVersion().longValue(), cnSystemMetadata
-                                                .getDateSysMetadataModified());
+                                        .getSerialVersion().longValue(), cnSystemMetadata
+                                        .getDateSysMetadataModified());
                             }
                         }
                     }
                 }
             }
         } else {
-            logger.error(task.taskLabel() + " is null when get called from Hazelcast " 
+            logger.error(task.taskLabel() + " is null when get called from Hazelcast "
                     + hzSystemMetaMapString + " Map");
         }
     }
@@ -1033,7 +1027,6 @@ public class TransferObjectTask implements Callable<Void> {
      * @param BaseException message showing reason of failure
      *
      */
-
     private void submitSynchronizationFailed(String pid, BaseException exception) {
         SyncFailedTask syncFailedTask = new SyncFailedTask(nodeCommunications, task);
         syncFailedTask.submitSynchronizationFailed(pid, exception);
