@@ -17,6 +17,7 @@
  */
 package org.dataone.cn.batch.synchronization.tasks;
 
+import com.hazelcast.client.HazelcastClient;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.IMap;
 import java.util.ArrayList;
@@ -37,6 +38,7 @@ import org.dataone.cn.batch.synchronization.NodeCommFactory;
 import org.dataone.cn.batch.synchronization.NodeCommSyncObjectFactory;
 import org.dataone.cn.batch.synchronization.type.NodeComm;
 import org.dataone.cn.batch.synchronization.type.NodeCommState;
+import org.dataone.cn.hazelcast.HazelcastClientFactory;
 import org.dataone.cn.synchronization.types.SyncObject;
 import org.dataone.configuration.Settings;
 import org.dataone.service.exceptions.ServiceFailure;
@@ -65,7 +67,7 @@ public class SyncObjectTask implements Callable<String> {
 
     Logger logger = Logger.getLogger(V2TransferObjectTask.class.getName());
     private ThreadPoolTaskExecutor taskExecutor;
-    private HazelcastInstance hazelcast;
+
     private Integer maxNumberOfClientsPerMemberNode;
     private NodeCommFactory nodeCommunicationsFactory;
     private static final String nodecommName = "NODECOMM";
@@ -82,7 +84,7 @@ public class SyncObjectTask implements Callable<String> {
      */
     @Override
     public String call() throws Exception {
-
+        HazelcastClient hazelcast = HazelcastClientFactory.getProcessingClient();
         logger.info("Starting SyncObjectTask");
 
         String hzNodesName = Settings.getConfiguration().getString("dataone.hazelcast.nodes");
@@ -337,15 +339,6 @@ public class SyncObjectTask implements Callable<String> {
             ex.printStackTrace();
             logger.error(ex.getMessage());
         }
-    }
-
-    // how do we or what actions  call shutdown on the executor such that no more tasks are created?
-    public HazelcastInstance getHazelcast() {
-        return hazelcast;
-    }
-
-    public void setHazelcast(HazelcastInstance hazelcast) {
-        this.hazelcast = hazelcast;
     }
 
     public ThreadPoolTaskExecutor getThreadPoolTaskExecutor() {
