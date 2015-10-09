@@ -43,6 +43,7 @@ import org.dataone.cn.hazelcast.HazelcastClientFactory;
 import org.dataone.cn.synchronization.types.SyncObject;
 import org.dataone.configuration.Settings;
 import org.dataone.ore.ResourceMapFactory;
+import org.dataone.service.cn.impl.v2.NodeRegistryService;
 import org.dataone.service.exceptions.BaseException;
 import org.dataone.service.exceptions.IdentifierNotUnique;
 import org.dataone.service.exceptions.InsufficientResources;
@@ -109,11 +110,10 @@ public class TransferObjectTask implements Callable<Void> {
     String cnIdentifier
             = Settings.getConfiguration().getString("cn.router.nodeId");
     String synchronizationObjectQueue
-            = Settings.getConfiguration().getString("dataone.hzProcessingClient.synchronizationObjectQueue");
-    String hzNodesName
-            = Settings.getConfiguration().getString("dataone.hzProcessingClient.nodes");
+            = Settings.getConfiguration().getString("dataone.hazelcast.synchronizationObjectQueue");
+
     String hzSystemMetaMapString
-            = Settings.getConfiguration().getString("dataone.hzProcessingClient.systemMetadata");
+            = Settings.getConfiguration().getString("dataone.hazelcast.systemMetadata");
 
     IMap<Identifier, SystemMetadata> hzSystemMetaMap;
     IdentifierReservationQueryService reserveIdentifierService;
@@ -363,7 +363,6 @@ public class TransferObjectTask implements Callable<Void> {
     private SystemMetadata processSystemMetadata(SystemMetadata systemMetadata) {
 
         try {
-            IMap<NodeReference, Node> hzNodes = hzProcessingClient.getMap(hzNodesName);
             logger.debug(task.taskLabel() + " Processing SystemMetadata");
             boolean addOriginalReplica = true;
             /*
@@ -962,14 +961,14 @@ public class TransferObjectTask implements Callable<Void> {
      */
     private void auditReplicaSystemMetadata(Identifier pid) throws InvalidToken, ServiceFailure,
             NotAuthorized, NotFound, InvalidRequest, NotImplemented {
-        IMap<NodeReference, Node> hzNodes = hzProcessingClient.getMap(hzNodesName);
+        
         SystemMetadata cnSystemMetadata = hzSystemMetaMap.get(pid);
         if (cnSystemMetadata != null) {
             List<Replica> prevReplicaList = cnSystemMetadata.getReplicaList();
             Session session = null;
             logger.info(task.taskLabel() + " auditReplicaSystemMetadata");
             for (Replica replica : prevReplicaList) {
-                Node node = hzNodes.get(replica.getReplicaMemberNode());
+                Node node = nodeCommunications.getNodeRegistryService().getNode(replica.getReplicaMemberNode());
                 if (node.getType().equals(NodeType.MN)) {
                     boolean isTier3 = false;
                     // Find out if a tier 3 node, if not then do not callback since it is not implemented
