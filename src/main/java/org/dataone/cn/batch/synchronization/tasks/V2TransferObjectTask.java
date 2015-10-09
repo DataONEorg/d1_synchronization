@@ -84,6 +84,7 @@ import org.dspace.foresite.OREException;
 import org.dspace.foresite.OREParserException;
 
 import com.hazelcast.core.IMap;
+import org.dataone.cn.batch.synchronization.type.NodeRegistryQueryService;
 import org.dataone.cn.hazelcast.HazelcastClientFactory;
 
 /**
@@ -125,15 +126,15 @@ public class V2TransferObjectTask implements Callable<Void> {
     String cnIdentifier
             = Settings.getConfiguration().getString("cn.router.nodeId");
     String synchronizationObjectQueue
-            = Settings.getConfiguration().getString("dataone.hzProcessingClient.synchronizationObjectQueue");
-    String hzNodesName
-            = Settings.getConfiguration().getString("dataone.hzProcessingClient.nodes");
+            = Settings.getConfiguration().getString("dataone.hazelcast.synchronizationObjectQueue");
+
     String hzSystemMetaMapString
-            = Settings.getConfiguration().getString("dataone.hzProcessingClient.systemMetadata");
+            = Settings.getConfiguration().getString("dataone.hazelcast.systemMetadata");
 
     IMap<Identifier, SystemMetadata> hzSystemMetaMap;
     IdentifierReservationQueryService identifierReservationService;
-
+    
+    
     public V2TransferObjectTask(NodeComm nodeCommunications, SyncObject task) {
         this.nodeCommunications = nodeCommunications;
         this.task = task;
@@ -1191,8 +1192,7 @@ public class V2TransferObjectTask implements Callable<Void> {
     private void notifyReplicaNode(SystemMetadata cnSystemMetadata, NodeReference nodeId)
             throws InvalidToken, NotAuthorized, NotImplemented, ServiceFailure, NotFound, InvalidRequest {
 
-        IMap<NodeReference, Node> hzNodes = hzProcessingClient.getMap(hzNodesName);
-        Node node = hzNodes.get(nodeId);
+        Node node = nodeCommunications.getNodeRegistryService().getNode(nodeId);
         if (node.getType().equals(NodeType.MN)) {
             boolean isTier3 = false;
             // Find out if a tier 3 node, if not then do not callback since it is not implemented
