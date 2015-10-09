@@ -87,13 +87,12 @@ public class SyncObjectTask implements Callable<String> {
         HazelcastClient hazelcast = HazelcastClientFactory.getProcessingClient();
         logger.info("Starting SyncObjectTask");
 
-        String hzNodesName = Settings.getConfiguration().getString("dataone.hazelcast.nodes");
         String syncObjectQueue = Settings.getConfiguration().getString("dataone.hazelcast.synchronizationObjectQueue");
         BlockingQueue<SyncObject> hzSyncObjectQueue = hazelcast.getQueue(syncObjectQueue);
-        IMap<NodeReference, Node> hzNodes = hazelcast.getMap(hzNodesName);
+
         
         NodeCommFactory nodeCommFactory = NodeCommSyncObjectFactory.getInstance();
-        
+
         HashMap<FutureTask, HashMap<String, Object>> futuresMap = new HashMap<FutureTask, HashMap<String, Object>>();
         // the futures map is helpful in tracking the state of a TransferObjectTask
         // submitted to the task executor as a FutureTask
@@ -143,8 +142,8 @@ public class SyncObjectTask implements Callable<String> {
                         // investigate the task for membernode
                         NodeReference nodeReference = new NodeReference();
                         nodeReference.setValue(task.getNodeId());
-                        Node mnNode = hzNodes.get(nodeReference);
-                        NodeComm nodeCommunications = nodeCommFactory.getNodeComm(mnNode.getIdentifier());
+                        
+                        NodeComm nodeCommunications = nodeCommFactory.getNodeComm(nodeReference);
 
                         // finally, execute the new task!
                         try {
