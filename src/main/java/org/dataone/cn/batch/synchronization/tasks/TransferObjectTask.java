@@ -478,8 +478,8 @@ public class TransferObjectTask implements Callable<Void> {
                 doCreate = true;
                 // assume if identifierReservationService has thrown NotFound exception SystemMetadata does not exist
                 logger.info(task.taskLabel() + " Create from Exception");
-            } catch (IdentifierNotUnique ex) {
-                logger.info(task.taskLabel() + " Pid Exists. Must be an Update");
+//            } catch (IdentifierNotUnique ex) {
+//                logger.info(task.taskLabel() + " Pid Exists. Must be an Update");
             }
             // create, update or ignore
             if (doCreate) {
