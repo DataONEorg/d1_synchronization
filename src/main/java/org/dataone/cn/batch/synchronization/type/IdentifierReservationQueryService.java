@@ -12,6 +12,6 @@ import org.dataone.service.types.v1.Subject;
 public interface IdentifierReservationQueryService {
 
     public boolean hasReservation(Session session, Subject subject, Identifier id) 
-            throws NotAuthorized, NotFound, IdentifierNotUnique, InvalidRequest;
+            throws NotAuthorized, NotFound, InvalidRequest;
 
 }

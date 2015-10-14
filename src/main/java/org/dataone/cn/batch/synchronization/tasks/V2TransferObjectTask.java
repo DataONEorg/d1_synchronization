@@ -555,9 +555,6 @@ public class V2TransferObjectTask implements Callable<Void> {
                 logger.error(task.taskLabel() + message, e);
                 throw new UnrecoverableException(message, e);
             }
-            catch (IdentifierNotUnique e1) {
-                ;  // this will go away
-            }
         }
     }
 

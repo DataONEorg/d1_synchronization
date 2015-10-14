@@ -699,7 +699,7 @@ public class InMemoryCNReadCore implements CNode {
     @Override
     public boolean hasReservation(Session session, Subject subject,
             Identifier id) throws InvalidToken, ServiceFailure, NotFound,
-            NotAuthorized, NotImplemented, InvalidRequest, IdentifierNotUnique
+            NotAuthorized, NotImplemented, InvalidRequest
     {
         throw new NotImplemented("zzz","InMemoryCNReadCore doesn't implement this method, see MockReserverIdService");
     }

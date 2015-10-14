@@ -189,7 +189,7 @@ public class MockCNCore implements CNCore {
     }
 
     @Override
-    public boolean hasReservation(Session session, Subject subject, Identifier pid) throws InvalidToken, ServiceFailure, NotFound, NotAuthorized, NotImplemented, InvalidRequest, IdentifierNotUnique {
+    public boolean hasReservation(Session session, Subject subject, Identifier pid) throws InvalidToken, ServiceFailure, NotFound, NotAuthorized, NotImplemented, InvalidRequest {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
