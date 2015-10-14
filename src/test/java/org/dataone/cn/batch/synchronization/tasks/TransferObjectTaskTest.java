@@ -28,6 +28,7 @@ import org.dataone.cn.batch.harvest.mock.MockNodeRegistryService;
 import org.dataone.cn.batch.harvest.mock.MockReserveIdentifierService;
 import org.dataone.cn.batch.synchronization.type.IdentifierReservationQueryService;
 import org.dataone.cn.batch.synchronization.type.NodeComm;
+import org.dataone.cn.hazelcast.HazelcastClientFactory;
 import org.dataone.cn.synchronization.types.SyncObject;
 import org.dataone.configuration.Settings;
 import org.dataone.service.cn.impl.v2.NodeRegistryService;
@@ -121,6 +122,7 @@ public class TransferObjectTaskTest {
 
         System.out.println();
         hzMember = Hazelcast.newHazelcastInstance(hzConfig);
+//        hzMember = HazelcastClientFactory.getStorageClient();
         System.out.println("Hazelcast member hzMember name: " + hzMember.getName());
 
 

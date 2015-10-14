@@ -68,6 +68,7 @@ import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.NodeReference;
 import org.dataone.service.types.v1.NodeType;
 import org.dataone.service.types.v1.ObjectFormatIdentifier;
+import org.dataone.service.types.v1.ObjectLocationList;
 import org.dataone.service.types.v1.Permission;
 import org.dataone.service.types.v1.Replica;
 import org.dataone.service.types.v1.ReplicationStatus;
@@ -366,22 +367,20 @@ public class V2TransferObjectTask implements Callable<Void> {
         logger.debug(task.taskLabel() + " entering processTask...");
         try {
             // this may be redundant, but it's good to start 
-            // off with an explicit check
-            // that we got the systemMetadata
+            // off with an explicit check that we got the systemMetadata
             if (mnSystemMetadata == null) {
                 throw new ServiceFailure("434343", "the retrieved SystemMetadata passed into processTask was null!");
             }
 
             validateSeriesId(mnSystemMetadata);
-            if (alreadyExists(mnSystemMetadata)) {
+            if (resolvable(mnSystemMetadata.getIdentifier(), "PID")) {
                 processUpdates(mnSystemMetadata);
             } else {
+                // not resolvable, so process as new object
                 processNewObject(mnSystemMetadata);
             }
         } catch (NotAuthorized ex) {
-            // from validateSeriesId and alreadyExists, this catches problems
-            // when the submitter doesn't have rights on the pid or sid 
-            logger.warn(task.taskLabel() + "\n" + ex.serialize(BaseException.FMT_XML));
+            logger.warn(task.taskLabel() + "\n" + ex.getDescription());
             throw SyncFailedTask.createSynchronizationFailed(mnSystemMetadata.getIdentifier().getValue(), ex);
         } catch (VersionMismatch ex) {
             logger.warn(task.taskLabel() + "\n" + ex.serialize(BaseException.FMT_XML));
@@ -390,7 +389,6 @@ public class V2TransferObjectTask implements Callable<Void> {
             logger.error(task.taskLabel() + "\n" + be.serialize(BaseException.FMT_XML));
             throw SyncFailedTask.createSynchronizationFailed(mnSystemMetadata.getIdentifier().getValue(), be);
         } catch (Exception ex) {
-//            ex.printStackTrace();
             logger.error(task.taskLabel() + "\n" + ex.getMessage(), ex);
             throw SyncFailedTask.createSynchronizationFailed(mnSystemMetadata.getIdentifier().getValue(), ex);
         }
@@ -409,13 +407,28 @@ public class V2TransferObjectTask implements Callable<Void> {
         // as per V1 logic (TransferObjectTask), this class currently does not check
         // the authoritativeMN field and allows the object to sync.
         logger.debug(task.taskLabel() + " entering processNewObject...");
+       
+        try {
+
+            // make sure the pid is not reserved by anyone else
+            // not going through TLS, so need to build a Session, and will use the submitter
+            // in the systemMetadata, since they should have access to their own reservation(?)
+            Session verifySubmitter = new Session();
+            verifySubmitter.setSubject(mnSystemMetadata.getSubmitter());
+            identifierReservationService.hasReservation(verifySubmitter, mnSystemMetadata.getSubmitter(), mnSystemMetadata.getIdentifier());
+            logger.info(task.taskLabel() + " Pid is reserved by this object's submitter.");
+
+        } catch (NotFound e) {
+            logger.info(task.taskLabel() + " Pid is not reserved by anyone.");
+        }
+
         mnSystemMetadata = populateInitialReplicaList(mnSystemMetadata);
         mnSystemMetadata.setSerialVersion(BigInteger.ONE);
         SystemMetadataValidator.validateCNRequiredNonNullFields(mnSystemMetadata);
-        if (mnSystemMetadata != null) {
-            createObject(mnSystemMetadata);
-        }
+
+        createObject(mnSystemMetadata);
     }
+
 
     /**
      * overwrites existing ReplicaList with a list consisting of the source Node and the CN (if not a DATA object)
@@ -484,8 +497,8 @@ public class V2TransferObjectTask implements Callable<Void> {
     }
 
     /**
-     * For any sync task, (update or newObject) the sysmeta.submitter needs to have control over the seriesId, so it
-     * makes sense to filter out seriesId problems first. Problems are filtered by throwing exceptions.
+     * For any sync task, (update or newObject) the sysmeta.submitter needs to have control over the seriesId.
+     * This is true only if the seriesId is new, or in use by the person 
      *
      * @param sysMeta - requires non-null systemMetadata object
      * @throws NotAuthorized - the seriesId is new and reserved by someone else OR is in use by another rightsHolder
@@ -500,98 +513,95 @@ public class V2TransferObjectTask implements Callable<Void> {
             return;
         }
 
-        try {
-            Session verifySubmitter = new Session();
-            verifySubmitter.setSubject(sysMeta.getSubmitter());
-            if (!identifierReservationService.hasReservation(verifySubmitter, sysMeta.getSubmitter(), sid)) {
-                throw new NotAuthorized("0000", "someone else (other than submitter) holds the reservation on the seriesId! " + sid.getValue());
-            }
-            logger.info(task.taskLabel() + " SeriesId is reserved by sysmeta.submitter");
-            return;  // ok
-        } catch (NotFound ex) {
-            // assume if identifierReservationService has thrown NotFound exception, SystemMetadata does not exist
-            logger.info(task.taskLabel() + " SeriesId (" + sid.getValue() + ") doesn't exist as reservation or object on the CN...");
-            return; // ok
-        } catch (IdentifierNotUnique ex) {
-            logger.info(task.taskLabel() + " SeriesId is in use....");
-            // attempt to give information on the pid that is the current head of the chain
-            try {
-                SystemMetadata sidSysMeta = getSystemMetadataHandleRetry(nodeCommunications.getCnRead(), sid);
-                if (!AuthUtils.isAuthorized(
-                        Collections.singletonList(sysMeta.getSubmitter()),
-                        Permission.CHANGE_PERMISSION,
-                        sidSysMeta)) {
-                    throw new NotAuthorized("0000", "Submitter does not have CHANGE rights on the SeriesId as determined by"
-                            + " the current head of the Sid collection, whose pid is: "
-                            + sidSysMeta.getIdentifier().getValue());
-                }
-            } catch (InvalidToken | NotImplemented | ServiceFailure e) {
-                String message = " couldn't access the CN /meta endpoint to check seriesId!! Reason: " + e.toString();
-                logger.error(task.taskLabel() + message);
-                e.printStackTrace();
-                throw new UnrecoverableException(message, e);
-            } catch (NotFound e) {
-                logger.info(task.taskLabel() + " SeriesId (" + sid.getValue() + ") doesn't exist for any object on the CN...");
-                return; //ok
-            }
-        } catch (InvalidRequest e) {
-            // an invalid request is thrown when the pid or subject is null. 
-            // if we get here something went seriously wrong, and ID service 
-            // issues get swallowed and logged.
-            throw new UnrecoverableException("Unexpected InvalidRequest!! " + e.getDescription(), e);
+        try { // resolving the SID
 
+            Identifier pid = resolve(sysMeta.getIdentifier(),"SID");
+
+            logger.info(task.taskLabel() + " SeriesId is in use by " + pid.getValue());
+
+            // checking that the new object's submitter is authorized via SID head's accessPolicy
+            SystemMetadata sidHeadSysMeta = getSystemMetadataHandleRetry(nodeCommunications.getCnRead(), sid);
+            if (!AuthUtils.isAuthorized(
+                    Collections.singletonList(sysMeta.getSubmitter()),
+                    Permission.CHANGE_PERMISSION,
+                    sidHeadSysMeta)) {
+                throw new NotAuthorized("0000", "Submitter does not have CHANGE rights on the SeriesId as determined by"
+                        + " the current head of the Sid collection, whose pid is: " + pid);
+            }
+        
+        } catch (InvalidToken | NotImplemented | ServiceFailure e) {
+            String message = " couldn't access the CN /meta endpoint to check seriesId!! Reason: " + e.toString();
+            logger.error(task.taskLabel() + message, e);
+            throw new UnrecoverableException(message, e);
+        
+        } catch (NotFound e) {
+            logger.info(task.taskLabel() + String.format(
+                    " SeriesId (%s) doesn't exist for any object on the CN, checking reservation service...", 
+                    sid.getValue()));
+            
+            try { 
+                Session verifySubmitter = new Session();
+                verifySubmitter.setSubject(sysMeta.getSubmitter());
+                if (!identifierReservationService.hasReservation(verifySubmitter, sysMeta.getSubmitter(), sid)) {
+                    throw new NotAuthorized("0000", "someone else (other than submitter) holds the reservation on the seriesId! " 
+                            + sid.getValue());
+                }
+                logger.info(task.taskLabel() + " OK. SeriesId is reserved by this object's submitter or equivalent ID");
+                return;
+            } catch (NotFound e1) {
+                logger.info(task.taskLabel() + " OK. SeriesId is not reserved.");
+            } catch (InvalidRequest e1) {
+                String message = " Identifier Reservation Service threw unexpected InvalidRequest!! Reason: " + e.toString();
+                logger.error(task.taskLabel() + message, e);
+                throw new UnrecoverableException(message, e);
+            }
+            catch (IdentifierNotUnique e1) {
+                ;  // this will go away
+            }
         }
     }
 
     /**
-     * Uses the reservation service (CNCore.hasReservation) to determine if the object exists or not. The intentional
-     * side-effect of using hasReservation to determine this is that the call validates the legitimacy of the
-     * registration by ensuring that submitter either matches the reservation or there is no reservation.
-     *
-     * @param sysMeta - expects non-null systemMetadata object
-     * @return - true if the object is already registered, false otherwise
-     * @throws NotAuthorized - when the sysmeta.submitter or associated equivalent identities do not match the owner of
-     * the identifier reservation.
-     * @throws UnrecoverableException
+     * determines whether or not the identifier already exists, either as a 
+     * persistent or series ID (PID or SID).
+     * @param id - the Identifier
+     * @param field - either PID or SID, used in logging statements for adding clarity
+     * @return - true if the Identifier resolves, false otherwise
+     * @throws UnrecoverableException - for configuration issues of various types
      */
-    private boolean alreadyExists(SystemMetadata sysMeta) throws NotAuthorized, UnrecoverableException {
-        // use the identity manager to determine if the PID already exists or is previously
-        // reserved. 
-        // If the PID is already created, hasReservation throws an IdentifierNotUnique
-        // this means we should go through the update logic
-        // If the PID has been reserved, then either NotAuthorized will be thrown
-        // indicating that the PID was reserved by another user
-        // or true is returned, indicating that the subject indeed has the reservation
-        //
-        logger.debug(task.taskLabel() + " entering alreadyExists...");
-        Boolean exists = null;
+    private boolean resolvable(Identifier id, String field) throws UnrecoverableException {
         try {
-            // not going through TLS, so need to build a Session, and will use the submitter
-            // in the systemMetadata, since they should have access to their own reservation(?)
-            Session verifySubmitter = new Session();
-            verifySubmitter.setSubject(sysMeta.getSubmitter());
-            // use hasReservation to dissect no-reservation from reserved by others from already created
-            if (identifierReservationService.hasReservation(verifySubmitter, sysMeta.getSubmitter(), sysMeta.getIdentifier())) {
-                logger.info(task.taskLabel() + " Pid is reserved by sysmeta.submitter");
-            } else {
-                // throw new NotAuthorized("0000","someone else (other than submitter) holds the reservation on the pid!");
-                logger.info(task.taskLabel() + " Pid is not reserved by anyone");
-            }
-            exists = false;
+            resolve(id,field);
+            return true;
+        } catch (NotFound e) {
+            return false;
+        }
+    }
+    
+    /**
+     * resolve the identifier and return the Head pid
+     * @param id - the Identifier
+     * @param field - either PID or SID, used in logging statements for added clarity
+     * @return - the head pid if the Identifier is a SID, the same PID otherwise
+     * @throws NotFound - if the Identifier could not be resolved
+     * @throws UnrecoverableException - for configuration issues for various types
+     */
+    private Identifier resolve(Identifier id, String field) throws NotFound, UnrecoverableException {
+        
+        logger.debug(task.taskLabel() + " entering resolve...");
+        try {
+            ObjectLocationList oll = ((CNRead)nodeCommunications.getCnRead()).resolve(session, id);
+            logger.info(task.taskLabel() + String.format(" %s %s exists on the CN.", field, id.getValue()));
+            return oll.getIdentifier();
+
         } catch (NotFound ex) {
             // assume if identifierReservationService has thrown NotFound exception SystemMetadata does not exist
-            logger.info(task.taskLabel() + " Pid doesn't exist as reservation or object.");
-            exists = false;
-        } catch (IdentifierNotUnique ex) {
-            logger.info(task.taskLabel() + " Pid Exists. Must be a systemMetadata update.");
-            exists = true;
-        } catch (InvalidRequest e) {
-            // an invalid request is thrown when the pid or subject is null. 
-            // if we get here something went seriously wrong, and ID service 
-            // issues get swallowed and logged.
-            throw new UnrecoverableException("Unexpected InvalidRequest!! " + e.getDescription(), e);
+            logger.info(task.taskLabel() + String.format(" %s %s does not exist on the CN.", field, id.getValue()));
+            throw ex;
+            
+        } catch (ServiceFailure | NotImplemented | InvalidToken | NotAuthorized e) {
+            throw new UnrecoverableException("Unexpected Exception!! " + e.getDescription(), e);
         }
-        return exists;
     }
 
     /**

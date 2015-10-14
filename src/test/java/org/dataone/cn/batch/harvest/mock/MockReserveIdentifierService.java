@@ -89,7 +89,7 @@ public class MockReserveIdentifierService implements IdentifierReservationQueryS
      * @throws IdentifierNotUnique - the id belongs to an existing object
      */
     public boolean hasReservation(Session session, Subject subject, Identifier id)
-            throws NotAuthorized, NotFound, IdentifierNotUnique, InvalidRequest {
+            throws NotAuthorized, NotFound, InvalidRequest {
 
         logger.info("entering hasReservation...");
         authorize();
@@ -101,14 +101,14 @@ public class MockReserveIdentifierService implements IdentifierReservationQueryS
             throw new InvalidRequest("4926", "pid parameter cannot be null");
         }
         
-        try {
-            ObjectLocationList oll = this.cnRead.resolve(session, id);
-            throw new IdentifierNotUnique("zzz","The identifier is in use in an existing object");
-        } catch (InvalidToken | ServiceFailure | NotImplemented e) {
-            logger.error("could not properly check object list in hasReservation", e);
-        } catch (NotFound e) {
-            ; // this is good
-        }
+//        try {
+//            ObjectLocationList oll = this.cnRead.resolve(session, id);
+//            throw new IdentifierNotUnique("zzz","The identifier is in use in an existing object");
+//        } catch (InvalidToken | ServiceFailure | NotImplemented e) {
+//            logger.error("could not properly check object list in hasReservation", e);
+//        } catch (NotFound e) {
+//            ; // this is good
+//        }
         
         if (reservationMap.containsKey(id)) {
             Subject resHolder = reservationMap.get(id);
