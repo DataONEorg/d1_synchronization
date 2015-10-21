@@ -97,18 +97,40 @@ public class NodeCommObjectListHarvestFactory implements NodeCommFactory {
                 }
             };
             Node node = null;
+            boolean hasCore = false;
+            boolean hasRead = false;
+            boolean hasV2 = false;
             try {
                 node = nodeRegistryService.getNode(mnNodeId);
+                if  (node.getServices() == null || node.getServices().getServiceList() == null) {
+                    throw new NodeCommUnavailable(mnNodeId + " does not have any services");
+                }
                 for (Service service : node.getServices().getServiceList()) {
                     if (service.getVersion().equals("v2")) {
-                        mNode = org.dataone.client.v2.itk.D1Client.getMN(mnNodeId);
+                        hasV2 = true;
+                    }
+                    if (service.getName().equals("MNCore")) {
+                        hasCore = true;
+                    }
+                    if (service.getName().equals("MNRead")) {
+                        hasRead = true;
+                    }
+                    if (hasV2 && hasCore && hasRead) {
                         break;
                     }
                 }
             } catch (NotFound ex) {
                 throw new NodeCommUnavailable(ex.getDescription());
             }
-
+            if (!hasRead) {
+                throw new NodeCommUnavailable(mnNodeId + " does not have MNRead Service");
+            }
+            if (!hasCore) {
+                throw new NodeCommUnavailable(mnNodeId + " does not have MNCore Service");
+            }
+            if (hasV2) {
+                mNode = org.dataone.client.v2.itk.D1Client.getMN(mnNodeId);
+            }
             NodeComm nodeComm = new NodeComm(mNode, nodeRegistryService);
             initializedMemberNodes.putIfAbsent(mnNodeId, nodeComm);
             return nodeComm;
