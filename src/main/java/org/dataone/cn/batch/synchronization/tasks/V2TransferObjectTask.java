@@ -17,7 +17,6 @@
  */
 package org.dataone.cn.batch.synchronization.tasks;
 
-import com.hazelcast.client.HazelcastClient;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -45,6 +44,7 @@ import org.dataone.cn.batch.synchronization.NodeCommSyncObjectFactory;
 import org.dataone.cn.batch.synchronization.type.IdentifierReservationQueryService;
 import org.dataone.cn.batch.synchronization.type.NodeComm;
 import org.dataone.cn.batch.synchronization.type.SystemMetadataValidator;
+import org.dataone.cn.hazelcast.HazelcastClientFactory;
 import org.dataone.cn.synchronization.types.SyncObject;
 import org.dataone.configuration.Settings;
 import org.dataone.ore.ResourceMapFactory;
@@ -74,19 +74,18 @@ import org.dataone.service.types.v1.Replica;
 import org.dataone.service.types.v1.ReplicationStatus;
 import org.dataone.service.types.v1.Service;
 import org.dataone.service.types.v1.Session;
-import org.dataone.service.types.v2.util.AuthUtils;
 import org.dataone.service.types.v1.util.ChecksumUtil;
 import org.dataone.service.types.v2.Node;
 import org.dataone.service.types.v2.NodeList;
 import org.dataone.service.types.v2.ObjectFormat;
 import org.dataone.service.types.v2.SystemMetadata;
 import org.dataone.service.types.v2.TypeFactory;
+import org.dataone.service.types.v2.util.AuthUtils;
 import org.dspace.foresite.OREException;
 import org.dspace.foresite.OREParserException;
 
+import com.hazelcast.client.HazelcastClient;
 import com.hazelcast.core.IMap;
-import org.dataone.cn.batch.synchronization.type.NodeRegistryQueryService;
-import org.dataone.cn.hazelcast.HazelcastClientFactory;
 
 /**
  * Transfer an object from a MemberNode(MN) to a CoordinatingNode(CN). Executes as a thread that is executed by the
@@ -1083,9 +1082,10 @@ public class V2TransferObjectTask implements Callable<Void> {
                 // persist the new systemMetadata
                 nodeCommunications.getCnCore().updateSystemMetadata(session, pid, mnSystemMetadata);
 
+                logger.info(task.taskLabel() + " Updated CN with new SystemMetadata");
                 // propagate the changes
                 notifyReplicaNodes(pid, false);
-                logger.info(task.taskLabel() + " Updated with new SystemMetadata");
+                
             } else {
                 logger.info(task.taskLabel() + " No changes to update.");
             }
@@ -1170,14 +1170,19 @@ public class V2TransferObjectTask implements Callable<Void> {
 
             for (Replica replica : prevReplicaList) {
                 NodeReference replicaNodeId = replica.getReplicaMemberNode();
+
                 if (notifyAuthNode) {
+                    // notify all nodes
                     notifyReplicaNode(cnSystemMetadata, replicaNodeId);
-                } else if (!replicaNodeId.equals(task.getNodeId())) {
-                    notifyReplicaNode(cnSystemMetadata, replicaNodeId);
+                } else {
+                    // only notify MNs that are not the AuthMN
+                    if (!replicaNodeId.equals(task.getNodeId())) {
+                        notifyReplicaNode(cnSystemMetadata, replicaNodeId);
+                    }
                 }
             }
         } else {
-            logger.error(task.taskLabel() + " is null when get called from Hazelcast "
+            logger.error(task.taskLabel() + " null returned from Hazelcast "
                     + hzSystemMetaMapString + " Map");
         }
     }
@@ -1199,48 +1204,62 @@ public class V2TransferObjectTask implements Callable<Void> {
     private void notifyReplicaNode(SystemMetadata cnSystemMetadata, NodeReference nodeId)
             throws InvalidToken, NotAuthorized, NotImplemented, ServiceFailure, NotFound, InvalidRequest {
 
-        Node node = nodeCommunications.getNodeRegistryService().getNode(nodeId);
-        if (node.getType().equals(NodeType.MN)) {
-            boolean isTier3 = false;
-            // Find out if a tier 3 node, if not then do not callback since it is not implemented
-            for (Service service : node.getServices().getServiceList()) {
-                if (service.getName().equals("MNStorage") && service.getAvailable()) {
-                    isTier3 = true;
-                    break;
-                }
+        Node replicaNode = nodeCommunications.getNodeRegistryService().getNode(nodeId);
+        if (!replicaNode.getType().equals(NodeType.MN)) 
+            return;
+        
+        
+        boolean isTier3 = false;
+        // Find out if a tier 3 node, if not then do not callback since it is not implemented
+        for (Service service : replicaNode.getServices().getServiceList()) 
+            if (service.getName().equals("MNStorage") && service.getAvailable()) {
+                isTier3 = true;
+                break;
             }
-            if (isTier3) {
-                NodeComm nodeComm = null;
-                try {
-                    nodeComm = NodeCommSyncObjectFactory.getInstance().getNodeComm(
-                            node.getIdentifier());
-                } catch (NodeCommUnavailable e) {
-                    throw new ServiceFailure("0000", e.getMessage());
-                }
+        if (! isTier3) 
+            return; 
+        
+        
+        try {
+            NodeComm replicaNodeComm = NodeCommSyncObjectFactory.getInstance().getNodeComm(
+                    replicaNode.getIdentifier());
 
-                Object mNode = nodeComm.getMnRead();
-                if (mNode instanceof MNRead) {
-                    SystemMetadata mnSystemMetadata = ((MNRead) mNode).getSystemMetadata(
-                            session, cnSystemMetadata.getIdentifier());
-                    if (mnSystemMetadata.getSerialVersion() != cnSystemMetadata.getSerialVersion()) {
-                        ((MNRead) mNode)
-                                .systemMetadataChanged(session, cnSystemMetadata
-                                        .getIdentifier(), cnSystemMetadata
-                                        .getSerialVersion().longValue(), cnSystemMetadata
-                                        .getDateSysMetadataModified());
-                    }
-                } else if (mNode instanceof org.dataone.client.v1.MNode) {
-                    org.dataone.service.types.v1.SystemMetadata mnSystemMetadata = ((org.dataone.client.v1.MNode) mNode)
-                            .getSystemMetadata(session, cnSystemMetadata.getIdentifier());
-                    if (mnSystemMetadata.getSerialVersion() != cnSystemMetadata.getSerialVersion()) {
-                        ((org.dataone.client.v1.MNode) mNode).systemMetadataChanged(session,
-                                cnSystemMetadata.getIdentifier(),
-                                cnSystemMetadata.getSerialVersion().longValue(),
-                                cnSystemMetadata.getDateSysMetadataModified());
-                    }
-                }
-                logger.info(task.taskLabel() + " Notified " + nodeId.getValue());
+            Object replicaMNRead = replicaNodeComm.getMnRead();
+            
+            if (replicaMNRead instanceof MNRead) {
+
+              // removing the sanity checks on notification - there isn't a clear reason for them, 
+              // and more likely to fail for trivial reasons (NPEs, IOExceptions) and cause some trouble.  
+              // (was added 11/11/2011, part of #1979, today is 10/22/2015)
+                
+//                SystemMetadata mnSystemMetadata = ((MNRead) replicaMNRead).getSystemMetadata(
+//                        session, cnSystemMetadata.getIdentifier());
+//                if (mnSystemMetadata.getDateSysMetadataModified().getTime() != cnSystemMetadata.getDateSysMetadataModified().getTime()) {
+                    ((MNRead) replicaMNRead)
+                    .systemMetadataChanged(session, cnSystemMetadata
+                            .getIdentifier(), cnSystemMetadata
+                            .getSerialVersion().longValue(), cnSystemMetadata
+                            .getDateSysMetadataModified());
+                    logger.info(task.taskLabel() + " Notified (v2) " + nodeId.getValue());
+//                }
+            
+            } else if (replicaMNRead instanceof org.dataone.service.mn.tier1.v1.MNRead) {
+                
+//                org.dataone.service.types.v1.SystemMetadata mnSystemMetadata = ((org.dataone.service.mn.tier1.v1.MNRead) replicaMNRead)
+//                        .getSystemMetadata(session, cnSystemMetadata.getIdentifier());
+//                if (mnSystemMetadata.getDateSysMetadataModified().getTime() != cnSystemMetadata.getDateSysMetadataModified().getTime()) {
+                    ((org.dataone.client.v1.MNode) replicaMNRead).systemMetadataChanged(session,
+                            cnSystemMetadata.getIdentifier(),
+                            cnSystemMetadata.getSerialVersion().longValue(),
+                            cnSystemMetadata.getDateSysMetadataModified());
+                    logger.info(task.taskLabel() + " Notified (v1) " + nodeId.getValue());
+//                }
+            } else {
+                logger.error("Unexpected Error: NodeComm for replicaMN not a v1 or v2 MNRead!");
+                throw new ServiceFailure("0000", "Unexpected error: NodeComm for replicaMN not a v1 or v2 MNRead!"); 
             }
+        } catch (NodeCommUnavailable e) {
+            throw new ServiceFailure("0000", e.getMessage());
         }
     }
 }
