@@ -274,8 +274,10 @@ public class SystemMetadataValidator {
 
         // archived - can only go from false/null to true 
         if (!ObjectUtils.equals(cnSysMeta.getArchived(), newSysMeta.getArchived())) {
-            if ((Boolean) ObjectUtils.defaultIfNull(newSysMeta.getArchived(), Boolean.FALSE)) {
-                // can't go from true to false or null
+            // values are different: null, true, or false
+            if ((Boolean) ObjectUtils.defaultIfNull(cnSysMeta.getArchived(), Boolean.FALSE)) {
+                // since not equal, newSysMeta must be either false or null,
+                // which is disallowed
                 illegalChangeFields.add("archived");
             } else {
                 changes++;
