@@ -43,6 +43,7 @@ import org.dataone.cn.batch.synchronization.D1TypeUtils;
 import org.dataone.cn.batch.synchronization.NodeCommSyncObjectFactory;
 import org.dataone.cn.batch.synchronization.type.IdentifierReservationQueryService;
 import org.dataone.cn.batch.synchronization.type.NodeComm;
+import org.dataone.cn.batch.synchronization.type.NodeCommState;
 import org.dataone.cn.batch.synchronization.type.SystemMetadataValidator;
 import org.dataone.cn.hazelcast.HazelcastClientFactory;
 import org.dataone.cn.synchronization.types.SyncObject;
@@ -1176,7 +1177,7 @@ public class V2TransferObjectTask implements Callable<Void> {
                     notifyReplicaNode(cnSystemMetadata, replicaNodeId);
                 } else {
                     // only notify MNs that are not the AuthMN
-                    if (!replicaNodeId.equals(task.getNodeId())) {
+                    if (!replicaNodeId.getValue().equals(task.getNodeId())) {
                         notifyReplicaNode(cnSystemMetadata, replicaNodeId);
                     }
                 }
@@ -1204,62 +1205,51 @@ public class V2TransferObjectTask implements Callable<Void> {
     private void notifyReplicaNode(SystemMetadata cnSystemMetadata, NodeReference nodeId)
             throws InvalidToken, NotAuthorized, NotImplemented, ServiceFailure, NotFound, InvalidRequest {
 
+        // Characterize the replica MemberNode
         Node replicaNode = nodeCommunications.getNodeRegistryService().getNode(nodeId);
         if (!replicaNode.getType().equals(NodeType.MN)) 
             return;
         
         
-        boolean isTier3 = false;
+        boolean isV1Tier3 = false;
+        boolean isV2Tier3 = false;
+        boolean hasTier3 = false;
         // Find out if a tier 3 node, if not then do not callback since it is not implemented
-        for (Service service : replicaNode.getServices().getServiceList()) 
+        for (Service service : replicaNode.getServices().getServiceList()) {
             if (service.getName().equals("MNStorage") && service.getAvailable()) {
-                isTier3 = true;
-                break;
+                if (service.getVersion().equalsIgnoreCase("V1")) {
+                    isV1Tier3 = true;
+                    hasTier3 = true;
+                } else if (service.getVersion().equalsIgnoreCase("V2")) {
+                    isV2Tier3 = true;
+                    hasTier3 = true;
+                }
             }
-        if (! isTier3) 
+        }
+        if (!hasTier3)
             return; 
         
+        // If this far, notify the replicaNode
         
-        try {
-            NodeComm replicaNodeComm = NodeCommSyncObjectFactory.getInstance().getNodeComm(
-                    replicaNode.getIdentifier());
-
-            Object replicaMNRead = replicaNodeComm.getMnRead();
-            
-            if (replicaMNRead instanceof MNRead) {
-
-              // removing the sanity checks on notification - there isn't a clear reason for them, 
-              // and more likely to fail for trivial reasons (NPEs, IOExceptions) and cause some trouble.  
-              // (was added 11/11/2011, part of #1979, today is 10/22/2015)
-                
-//                SystemMetadata mnSystemMetadata = ((MNRead) replicaMNRead).getSystemMetadata(
-//                        session, cnSystemMetadata.getIdentifier());
-//                if (mnSystemMetadata.getDateSysMetadataModified().getTime() != cnSystemMetadata.getDateSysMetadataModified().getTime()) {
-                    ((MNRead) replicaMNRead)
-                    .systemMetadataChanged(session, cnSystemMetadata
-                            .getIdentifier(), cnSystemMetadata
-                            .getSerialVersion().longValue(), cnSystemMetadata
-                            .getDateSysMetadataModified());
-                    logger.info(task.taskLabel() + " Notified (v2) " + nodeId.getValue());
-//                }
-            
-            } else if (replicaMNRead instanceof org.dataone.service.mn.tier1.v1.MNRead) {
-                
-//                org.dataone.service.types.v1.SystemMetadata mnSystemMetadata = ((org.dataone.service.mn.tier1.v1.MNRead) replicaMNRead)
-//                        .getSystemMetadata(session, cnSystemMetadata.getIdentifier());
-//                if (mnSystemMetadata.getDateSysMetadataModified().getTime() != cnSystemMetadata.getDateSysMetadataModified().getTime()) {
-                    ((org.dataone.client.v1.MNode) replicaMNRead).systemMetadataChanged(session,
-                            cnSystemMetadata.getIdentifier(),
-                            cnSystemMetadata.getSerialVersion().longValue(),
-                            cnSystemMetadata.getDateSysMetadataModified());
-                    logger.info(task.taskLabel() + " Notified (v1) " + nodeId.getValue());
-//                }
-            } else {
-                logger.error("Unexpected Error: NodeComm for replicaMN not a v1 or v2 MNRead!");
-                throw new ServiceFailure("0000", "Unexpected error: NodeComm for replicaMN not a v1 or v2 MNRead!"); 
-            }
-        } catch (NodeCommUnavailable e) {
-            throw new ServiceFailure("0000", e.getMessage());
+        // removed the sanity checks on notification - there isn't a clear reason for them, 
+        // and more likely to fail for trivial reasons (NPEs, IOExceptions) and cause some trouble.  
+        // (was added 11/11/2011, part of #1979, today is 10/22/2015)
+        // (the code used to retrieve the systemMetadata from the replica node
+        //  and make sure the modified time was different)
+        if (isV2Tier3) {
+            org.dataone.client.v2.itk.D1Client.getMN(replicaNode.getIdentifier())
+            .systemMetadataChanged(session, 
+                    cnSystemMetadata.getIdentifier(),
+                    cnSystemMetadata.getSerialVersion().longValue(), 
+                    cnSystemMetadata.getDateSysMetadataModified());
+            logger.info(task.taskLabel() + " Notified (v2) " + nodeId.getValue());
+        } else if(isV1Tier3) {
+            org.dataone.client.v1.itk.D1Client.getMN(replicaNode.getIdentifier())
+            .systemMetadataChanged(session, 
+                    cnSystemMetadata.getIdentifier(),
+                    cnSystemMetadata.getSerialVersion().longValue(), 
+                    cnSystemMetadata.getDateSysMetadataModified());
+            logger.info(task.taskLabel() + " Notified (v1) " + nodeId.getValue());
         }
     }
 }
