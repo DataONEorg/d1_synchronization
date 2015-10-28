@@ -66,7 +66,7 @@ public class NodeCommSyncObjectFactory implements NodeCommFactory {
             + File.separator + Settings.getConfiguration().getString("D1Client.certificate.filename");
 
     private Integer maxNumberOfClientsPerMemberNode = Settings.getConfiguration().getInteger("Synchronization.SyncObjectTask.maxMemberNodeCommThreads", 5);
-            // maintain a List of NodeComms for each membernode that will not
+    // maintain a List of NodeComms for each membernode that will not
     // exceed the maxNumberOfClientsPerMemberNode
     // each NodeComm will have a state, NodeCommState, that
     // will indicate if it is available for use by a future task
@@ -102,7 +102,7 @@ public class NodeCommSyncObjectFactory implements NodeCommFactory {
                 }
             }
             if (nodeCommunications == null) {
-                // no node Communications is available, see if we can create a new one
+                // no node Communication is available, see if we can create a new one
                 if (nodeCommList.size() <= maxNumberOfClientsPerMemberNode) {
                     // create and add a new one
                     nodeCommunications = createNodeComm(mnNodeId);
@@ -113,7 +113,8 @@ public class NodeCommSyncObjectFactory implements NodeCommFactory {
                     nodeCommList.add(nodeCommunications);
 
                 } else {
-                    throw new NodeCommUnavailable("No Comm Nodes Available");
+                    throw new NodeCommUnavailable("No Comm Nodes Available: only allow maximum of " 
+                            + maxNumberOfClientsPerMemberNode);
                 }
             }
         } else {
@@ -140,6 +141,7 @@ public class NodeCommSyncObjectFactory implements NodeCommFactory {
             throw new ServiceFailure("0000", e.getMessage());
         }
 
+        // create an IdentifierReservationQueryService comm object
         IdentifierReservationQueryService reserveIdentifierService
                 = new IdentifierReservationQueryService() {
 
@@ -154,9 +156,7 @@ public class NodeCommSyncObjectFactory implements NodeCommFactory {
                     }
                 };
 
-        // TODO: figure out what client impl to use for this node, default to v1
-        Object mNode = org.dataone.client.v1.itk.D1Client.getMN(mnNodeId);
-
+        // create a NodeRegistryQueryService comm object
         NodeRegistryQueryService nodeRegistryService = new NodeRegistryQueryService() {
             private NodeRegistryService serviceImpl
                     = new NodeRegistryService();
@@ -179,9 +179,13 @@ public class NodeCommSyncObjectFactory implements NodeCommFactory {
                 return serviceImpl.getNodeAccess();
             }
         };
-        Node node = null;
+        
+        // create the MemberNode comm object
+        // figure out what client impl to use for this node.  Try V2, and if CN
+        // doesn't have V2 services registered, fallback to V1
+        Object mNode = null;
         try {
-            node = nodeRegistryService.getNode(mnNodeId);
+            Node node = nodeRegistryService.getNode(mnNodeId);
             for (Service service : node.getServices().getServiceList()) {
                 if (service.getVersion().equals("v2")) {
                     mNode = org.dataone.client.v2.itk.D1Client.getMN(mnNodeId);
@@ -190,6 +194,9 @@ public class NodeCommSyncObjectFactory implements NodeCommFactory {
             }
         } catch (NotFound ex) {
             throw new ServiceFailure("0000", ex.getDescription());
+        }
+        if (mNode == null) {
+            mNode = org.dataone.client.v1.itk.D1Client.getMN(mnNodeId);
         }
 
         NodeComm nodeComm = new NodeComm(mNode, cNode, nodeRegistryService, cNode, cNode, reserveIdentifierService);
