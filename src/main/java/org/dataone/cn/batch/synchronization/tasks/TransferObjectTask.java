@@ -39,6 +39,7 @@ import org.dataone.cn.batch.exceptions.NodeCommUnavailable;
 import org.dataone.cn.batch.synchronization.NodeCommSyncObjectFactory;
 import org.dataone.cn.batch.synchronization.type.IdentifierReservationQueryService;
 import org.dataone.cn.batch.synchronization.type.NodeComm;
+import org.dataone.cn.batch.synchronization.type.NodeCommState;
 import org.dataone.cn.hazelcast.HazelcastClientFactory;
 import org.dataone.cn.synchronization.types.SyncObject;
 import org.dataone.configuration.Settings;
@@ -983,32 +984,36 @@ public class TransferObjectTask implements Callable<Void> {
                         try {
                             nodeComm = NodeCommSyncObjectFactory.getInstance().getNodeComm(
                                     node.getIdentifier());
+
+
+                            Object mNode = nodeComm.getMnRead();
+                            if (mNode instanceof MNRead) {
+                                SystemMetadata mnSystemMetadata = ((MNRead) mNode).getSystemMetadata(
+                                        session, cnSystemMetadata.getIdentifier());
+                                if (mnSystemMetadata.getSerialVersion() != cnSystemMetadata
+                                        .getSerialVersion()) {
+                                    ((MNRead) mNode)
+                                    .systemMetadataChanged(session, cnSystemMetadata
+                                            .getIdentifier(), cnSystemMetadata
+                                            .getSerialVersion().longValue(), cnSystemMetadata
+                                            .getDateSysMetadataModified());
+                                }
+                            } else if (mNode instanceof org.dataone.client.v1.MNode) {
+                                org.dataone.service.types.v1.SystemMetadata mnSystemMetadata = ((org.dataone.client.v1.MNode) mNode)
+                                        .getSystemMetadata(session, cnSystemMetadata.getIdentifier());
+                                if (mnSystemMetadata.getSerialVersion() != cnSystemMetadata
+                                        .getSerialVersion()) {
+                                    ((org.dataone.client.v1.MNode) mNode).systemMetadataChanged(
+                                            session, cnSystemMetadata.getIdentifier(), cnSystemMetadata
+                                            .getSerialVersion().longValue(), cnSystemMetadata
+                                            .getDateSysMetadataModified());
+                                }
+                            }
                         } catch (NodeCommUnavailable e) {
                             throw new ServiceFailure("0000", e.getMessage());
-                        }
-
-                        Object mNode = nodeComm.getMnRead();
-                        if (mNode instanceof MNRead) {
-                            SystemMetadata mnSystemMetadata = ((MNRead) mNode).getSystemMetadata(
-                                    session, cnSystemMetadata.getIdentifier());
-                            if (mnSystemMetadata.getSerialVersion() != cnSystemMetadata
-                                    .getSerialVersion()) {
-                                ((MNRead) mNode)
-                                        .systemMetadataChanged(session, cnSystemMetadata
-                                                .getIdentifier(), cnSystemMetadata
-                                                .getSerialVersion().longValue(), cnSystemMetadata
-                                                .getDateSysMetadataModified());
-                            }
-                        } else if (mNode instanceof org.dataone.client.v1.MNode) {
-                            org.dataone.service.types.v1.SystemMetadata mnSystemMetadata = ((org.dataone.client.v1.MNode) mNode)
-                                    .getSystemMetadata(session, cnSystemMetadata.getIdentifier());
-                            if (mnSystemMetadata.getSerialVersion() != cnSystemMetadata
-                                    .getSerialVersion()) {
-                                ((org.dataone.client.v1.MNode) mNode).systemMetadataChanged(
-                                        session, cnSystemMetadata.getIdentifier(), cnSystemMetadata
-                                        .getSerialVersion().longValue(), cnSystemMetadata
-                                        .getDateSysMetadataModified());
-                            }
+                        } finally {
+                            if (nodeComm != null)
+                                nodeComm.setState(NodeCommState.AVAILABLE);
                         }
                     }
                 }
