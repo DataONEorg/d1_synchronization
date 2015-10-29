@@ -682,6 +682,52 @@ public class TransferObjectTaskTest {
         }
     }
 
+    
+    @Test
+    public void testSyncUpdate_archived() throws Exception
+    {
+        //create, sync from authNode
+        Subject submitter = D1TypeBuilder.buildSubject("groucho");
+        Session submitterSession = new Session();
+        submitterSession.setSubject(submitter);
+        D1Object d1o = createTestObjectOnMN(submitter, authMN, true);
+        
+        Date sync1Date = new Date();
+        syncTheObject(this.createMockReserveIdService(null, null, false, true),
+                d1o.getIdentifier(), authMN);
+        
+        SystemMetadata newSysmeta = TypeFactory.clone(d1o.getSystemMetadata());
+        newSysmeta.setArchived(Boolean.TRUE);
+        
+        //update the sysmeta on the authNode
+        // (changed access policy)
+        Boolean success = ((MNStorage)nodeLoc.getNode(authMN)).updateSystemMetadata(
+                submitterSession, d1o.getIdentifier(), newSysmeta);
+        
+        //sync again from the authNode
+        // this is manual for the test, because we don't have cn.synchronize set up
+        // or a queueing service for SyncObjectTasks
+        Date sync2Date = new Date();
+        syncTheObject(this.createMockReserveIdService(null, null, true /* already exists */, true),
+                d1o.getIdentifier(), authMN);
+        
+        // shouldn't be any errors
+        Log events = ((org.dataone.client.v2.MNode)nodeLoc.getNode(otherMN)).getLogRecords(
+                cnClientSession, sync2Date, null, Event.SYNCHRONIZATION_FAILED.toString(), d1o.getIdentifier().getValue(), null, null);
+        outputLogEntries(events);
+        assertEquals("Second Sync should NOT generate a synchronizationFailed", 0, events.getLogEntryList().size());
+
+        // should reflect new sysmeta from the authMN
+        // (should find newAllowed subject)
+        CNRead cnRead = (CNRead)nodeLoc.getNode(theCN);
+        try {
+            SystemMetadata cnSysmeta = cnRead.getSystemMetadata(cnClientSession, d1o.getIdentifier());
+            assertTrue("Synced sysmeta should have archived set to true",
+                    cnSysmeta.getArchived());
+        } catch (NotFound e) {
+            fail("Should be able to retrieve sysmeta from CN after first synchronization.");;  //
+        }
+    }
 
     @Test
     public void testSyncUpdate_NonAuthoritativeNode() throws Exception
