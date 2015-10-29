@@ -278,6 +278,8 @@ public class SystemMetadataValidator {
             if ((Boolean) ObjectUtils.defaultIfNull(cnSysMeta.getArchived(), Boolean.FALSE)) {
                 // since not equal, newSysMeta must be either false or null,
                 // which is disallowed
+                logger.debug(String.format("starting archived value: '%s', new value '%s'", 
+                        cnSysMeta.getArchived(), newSysMeta.getArchived() ));
                 illegalChangeFields.add("archived");
             } else {
                 changes++;

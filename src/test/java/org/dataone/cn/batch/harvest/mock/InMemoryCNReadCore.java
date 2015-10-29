@@ -553,8 +553,13 @@ public class InMemoryCNReadCore implements CNode {
             SystemMetadata sysmeta) throws NotImplemented, NotAuthorized,
             ServiceFailure, InvalidRequest, InvalidSystemMetadata,
             InvalidToken {
-        // TODO implement
-        throw new NotImplemented("000","updateSystemMetadata is not implemented.");
+        try {
+            SystemMetadata smd = checkAvailableAndAuthorized(session, pid, Permission.CHANGE_PERMISSION);
+        } catch (NotFound e) {
+            ;
+        }
+        this.metaStore.put(pid,sysmeta);
+        return true;
     }
 
 
