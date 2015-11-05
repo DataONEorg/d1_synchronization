@@ -150,7 +150,7 @@ public class NodeCommSyncObjectFactory implements NodeCommFactory {
 
                     @Override
                     public boolean hasReservation(Session session, Subject subject, Identifier pid)
-                    throws NotAuthorized, NotFound, InvalidRequest {
+                    throws NotAuthorized, NotFound, InvalidRequest, ServiceFailure {
 
                         return serviceImpl.hasReservation(session, subject, pid);
                     }

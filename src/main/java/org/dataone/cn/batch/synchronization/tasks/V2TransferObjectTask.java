@@ -551,9 +551,13 @@ public class V2TransferObjectTask implements Callable<Void> {
             } catch (NotFound e1) {
                 logger.info(task.taskLabel() + " OK. SeriesId is not reserved.");
             } catch (InvalidRequest e1) {
-                String message = " Identifier Reservation Service threw unexpected InvalidRequest!! Reason: " + e.toString();
-                logger.error(task.taskLabel() + message, e);
-                throw new UnrecoverableException(message, e);
+                String message = " Identifier Reservation Service threw unexpected InvalidRequest!! Reason: " + e1.getDescription();
+                logger.error(task.taskLabel() + message, e1);
+                throw new UnrecoverableException(message, e1);
+            } catch (ServiceFailure e1) {
+                String message = " Identifier Reservation Service threw unexpected ServiceFailure!! Reason: " + e1.getDescription();
+                logger.error(task.taskLabel() + message, e1);
+                throw new UnrecoverableException(message, e1);
             }
         }
     }
@@ -1216,7 +1220,7 @@ public class V2TransferObjectTask implements Callable<Void> {
         boolean hasTier3 = false;
         // Find out if a tier 3 node, if not then do not callback since it is not implemented
         for (Service service : replicaNode.getServices().getServiceList()) {
-            if (service.getName().equals("MNStorage") && service.getAvailable()) {
+            if (service.getName() != null && service.getName().equals("MNStorage") && service.getAvailable()) {
                 if (service.getVersion().equalsIgnoreCase("V1")) {
                     isV1Tier3 = true;
                     hasTier3 = true;
