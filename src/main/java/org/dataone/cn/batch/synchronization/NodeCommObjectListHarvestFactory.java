@@ -72,7 +72,7 @@ public class NodeCommObjectListHarvestFactory implements NodeCommFactory {
         } else {
 
             // figure out what client impl to use for this node, default to v1
-            Object mNode = org.dataone.client.v1.itk.D1Client.getMN(mnNodeId);
+            Object mNode = null;
             NodeRegistryQueryService nodeRegistryService = new NodeRegistryQueryService() {
 
                 private NodeRegistryService serviceImpl
@@ -128,8 +128,13 @@ public class NodeCommObjectListHarvestFactory implements NodeCommFactory {
             if (!hasCore) {
                 throw new NodeCommUnavailable(mnNodeId + " does not have MNCore Service");
             }
+            // passing the baseUrl in to avoid possible stale NodeLists in D1Client
+            // (we've experienced D1Client not being able to instantiate an MNode for a new MemberNode
+            // because the NodeList for D1Client is static, see ticket 7515)
             if (hasV2) {
-                mNode = org.dataone.client.v2.itk.D1Client.getMN(mnNodeId);
+                mNode = org.dataone.client.v2.itk.D1Client.getMN(node.getBaseURL());
+            } else {
+                mNode = org.dataone.client.v1.itk.D1Client.getMN(node.getBaseURL());
             }
             NodeComm nodeComm = new NodeComm(mNode, nodeRegistryService);
             initializedMemberNodes.putIfAbsent(mnNodeId, nodeComm);

@@ -1241,14 +1241,14 @@ public class V2TransferObjectTask implements Callable<Void> {
         // (the code used to retrieve the systemMetadata from the replica node
         //  and make sure the modified time was different)
         if (isV2Tier3) {
-            org.dataone.client.v2.itk.D1Client.getMN(replicaNode.getIdentifier())
+            org.dataone.client.v2.itk.D1Client.getMN(replicaNode.getBaseURL())
             .systemMetadataChanged(session, 
                     cnSystemMetadata.getIdentifier(),
                     cnSystemMetadata.getSerialVersion().longValue(), 
                     cnSystemMetadata.getDateSysMetadataModified());
             logger.info(task.taskLabel() + " Notified (v2) " + nodeId.getValue());
         } else if(isV1Tier3) {
-            org.dataone.client.v1.itk.D1Client.getMN(replicaNode.getIdentifier())
+            org.dataone.client.v1.itk.D1Client.getMN(replicaNode.getBaseURL())
             .systemMetadataChanged(session, 
                     cnSystemMetadata.getIdentifier(),
                     cnSystemMetadata.getSerialVersion().longValue(), 

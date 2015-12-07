@@ -188,16 +188,18 @@ public class NodeCommSyncObjectFactory implements NodeCommFactory {
             Node node = nodeRegistryService.getNode(mnNodeId);
             for (Service service : node.getServices().getServiceList()) {
                 if (service.getVersion().equals("v2")) {
-                    mNode = org.dataone.client.v2.itk.D1Client.getMN(mnNodeId);
+                    mNode = org.dataone.client.v2.itk.D1Client.getMN(node.getBaseURL());
                     break;
                 }
             }
+            if (mNode == null) {
+                mNode = org.dataone.client.v1.itk.D1Client.getMN(node.getBaseURL());
+            }
+            
         } catch (NotFound ex) {
             throw new ServiceFailure("0000", ex.getDescription());
         }
-        if (mNode == null) {
-            mNode = org.dataone.client.v1.itk.D1Client.getMN(mnNodeId);
-        }
+        
 
         NodeComm nodeComm = new NodeComm(mNode, cNode, nodeRegistryService, cNode, cNode, reserveIdentifierService);
         return nodeComm;
