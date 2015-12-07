@@ -196,7 +196,7 @@ public class SystemMetadataValidator {
      * </br>
      * It throws InvalidRequest if there are any disallowed changes introduced.
      * <br/>
-     * @see http://mule1.dataone.org/ArchitectureDocs-current/design/SystemMetadata.html
+     * @see https://jenkins-ucsb-1.dataone.org/job/API%20Documentation%20-%20trunk/ws/api-documentation/build/htmldesign/SystemMetadata.html
      * for specification on ownership and editability of properties.
      * 
      * @param proposedSystemMetadata - the systemMetadata to validate
