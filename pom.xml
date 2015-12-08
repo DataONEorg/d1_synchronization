@@ -13,9 +13,9 @@
         <quartz.version>2.1.6</quartz.version>
         <hazelcast.version>2.4.1</hazelcast.version>
         <d1_libclient_version>2.0.0</d1_libclient_version>
-        <d1_cn_common_version>2.0.0</d1_cn_common_version>
-        <d1_cn_noderegistry_version>2.0.0</d1_cn_noderegistry_version>
-        <d1_identity_manager_version>2.0.0</d1_identity_manager_version>
+        <d1_cn_common_version>2.0.1</d1_cn_common_version>
+        <d1_cn_noderegistry_version>2.0.1</d1_cn_noderegistry_version>
+        <d1_identity_manager_version>2.0.1</d1_identity_manager_version>
     </properties>
     <build>
         <plugins>
