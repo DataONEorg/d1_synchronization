@@ -73,13 +73,23 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
     int backoffSeconds = 10;
     Log logger = LogFactory.getLog(MemberNodeHarvestJob.class);
 
+    
+    
+    /**
+     * Define the ObjectList Harvest task for a Member Node.
+     * @param d1NodeReference
+     * @param batchSize
+     */
     public ObjectListHarvestTask(NodeReference d1NodeReference, Integer batchSize) {
         this.d1NodeReference = d1NodeReference;
         this.batchSize = batchSize;
     }
 
     /**
-     *
+     * Calls listObjects on the Member Node and manages putting SyncObjects onto 
+     * the SynchronizationObjectQueue (one per object) for asynchronous processing.
+     * Also controls the lastHarvestedDate field in the NodeRegistry.
+     * 
      * Method to be called in a separately executing thread.
      *
      * @return Date

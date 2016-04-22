@@ -9,6 +9,11 @@ package org.dataone.cn.batch.exceptions;
  *
  */
 public class UnrecoverableException extends Exception {
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 4982558294924192452L;
+    
     public UnrecoverableException(String message) {
         super(message);
     }

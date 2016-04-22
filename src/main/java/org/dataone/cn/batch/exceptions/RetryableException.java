@@ -9,6 +9,11 @@ package org.dataone.cn.batch.exceptions;
  *
  */
 public class RetryableException extends Exception {
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 5115935521722185220L;
+    
     public RetryableException(String message) {
         super(message);
     }

@@ -37,13 +37,14 @@ import org.dataone.service.types.v1.Service;
 
 /**
  *
- * Creates a NodeComm (node communications) pool for use by the ObjectListHarvestTask. A NodeComm object is memberNode
- * specific
+ * Creates a NodeComm (node communications) bundle for use by the ObjectListHarvestTask. 
+ * A NodeComm object is memberNode specific
  *
- * Sets up instances that should be reused by the ObjectListHarvestTask Assume that most of the pooled instances
- * (mNode/nodeRegistry) are not thread-safe, in other words the instances created by this factory will be re-used by
- * threads, but no two concurrent threads should access the same instances (with the exception of hazelcast client
- * instance)
+ * Sets up instances that should be reused by the ObjectListHarvestTask. Assume 
+ * that most of the bundled instances (mNode/nodeRegistry) are not thread-safe, 
+ * in other words the instances created by this factory will be re-used by
+ * threads, but no two concurrent threads should access the same instances 
+ * (with the exception of hazelcast client instance)
  *
  * @author waltz
  */
@@ -51,7 +52,8 @@ public class NodeCommObjectListHarvestFactory implements NodeCommFactory {
 
     public final static Log logger = LogFactory.getLog(NodeCommObjectListHarvestFactory.class);
 
-    private static ConcurrentMap<NodeReference, NodeComm> initializedMemberNodes = new ConcurrentHashMap<NodeReference, NodeComm>();
+    private static ConcurrentMap<NodeReference, NodeComm> initializedMemberNodes = 
+            new ConcurrentHashMap<NodeReference, NodeComm>();
     private static NodeCommFactory nodeCommFactory = null;
 
     private NodeCommObjectListHarvestFactory() {
