@@ -68,7 +68,7 @@ public class SyncFailedTask implements Callable<String> {
                 "-1", 
                 "Connection failure. Connection timed out on service call."
                 );
-        submitSynchronizationFailed(task.getPid(), serviceFailure);
+        submitSynchronizationFailed(task.getPid(), null, serviceFailure);
         return "done";
     }
 
@@ -81,16 +81,17 @@ public class SyncFailedTask implements Callable<String> {
      * @param exception
      * @return
      */
-    public static SynchronizationFailed createSynchronizationFailed(String pid, Exception exception) {
+    public static SynchronizationFailed createSynchronizationFailed(String pid, String additionalContext, Exception exception) {
         String nodeId = Settings.getConfiguration().getString("cn.nodeId");
         BaseException be = null;
         if (exception instanceof BaseException) {
                 be = (BaseException)exception;
         } else {
             be = new ServiceFailure("-1", 
-                    String.format("%s - %s", 
+                    String.format("%s - %s. %s", 
                             exception.getClass().getCanonicalName(),
-                            exception.getMessage()));
+                            exception.getMessage(),
+                            additionalContext));
             be.initCause(exception);
         }
         SynchronizationFailed syncFailed = new SynchronizationFailed(
@@ -103,8 +104,8 @@ public class SyncFailedTask implements Callable<String> {
     }
 
 
-    public void submitSynchronizationFailed(String pid, BaseException exception) {
-        SynchronizationFailed syncFailed = createSynchronizationFailed(pid, exception);
+    public void submitSynchronizationFailed(String pid, String additionalContext, BaseException exception) {
+        SynchronizationFailed syncFailed = createSynchronizationFailed(pid, additionalContext, exception);
         submitSynchronizationFailed(syncFailed);
     }
         
