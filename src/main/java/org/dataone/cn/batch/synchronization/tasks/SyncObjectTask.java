@@ -17,9 +17,6 @@
  */
 package org.dataone.cn.batch.synchronization.tasks;
 
-import com.hazelcast.client.HazelcastClient;
-import com.hazelcast.core.HazelcastInstance;
-import com.hazelcast.core.IMap;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -31,6 +28,8 @@ import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+
+import org.apache.commons.collections4.queue.CircularFifoQueue;
 import org.apache.log4j.Logger;
 import org.dataone.cn.batch.exceptions.ExecutionDisabledException;
 import org.dataone.cn.batch.exceptions.NodeCommUnavailable;
@@ -38,15 +37,17 @@ import org.dataone.cn.batch.synchronization.NodeCommFactory;
 import org.dataone.cn.batch.synchronization.NodeCommSyncObjectFactory;
 import org.dataone.cn.batch.synchronization.type.NodeComm;
 import org.dataone.cn.batch.synchronization.type.NodeCommState;
+import org.dataone.cn.batch.synchronization.type.SyncObjectState;
 import org.dataone.cn.hazelcast.HazelcastClientFactory;
 import org.dataone.cn.synchronization.types.SyncObject;
 import org.dataone.configuration.Settings;
 import org.dataone.service.exceptions.ServiceFailure;
-import org.dataone.service.types.v2.Node;
 import org.dataone.service.types.v1.NodeReference;
 import org.dataone.service.util.DateTimeMarshaller;
 import org.springframework.core.task.TaskRejectedException;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+
+import com.hazelcast.client.HazelcastClient;
 
 /**
  * Regulates the processing of the hzSyncObjectQueue by assigning SyncObjects
@@ -60,6 +61,9 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
  * Instances of this class that are call()'ed run as a daemon thread by the 
  * SyncObjectTaskManager, and the call() method uses an infinite loop that gracefully
  * exits upon exception.
+ * 
+ * It is also designed/needs to inter-operate with other SyncObjectTasks from other
+ * CN cluster members.
  *
  * @author waltz
  */
@@ -75,25 +79,25 @@ public class SyncObjectTask implements Callable<String> {
     private static final long threadTimeout = Settings.getConfiguration()
             .getLong("Synchronization.SyncObjectTask.threadTimeout", 900000L); //900000L represents fifteen minutes
 
+    private static CircularFifoQueue<SyncObjectState> latestResults = new CircularFifoQueue<>(50);
+    private static long delayUntil = -1;
     /**
      * 
      * Method to be called in a separately executing thread.
      *
      * @return String
+     * @throws ExecutionDisabledException 
      * @throws Exception
      */
     @Override
-    public String call() throws Exception {
+    public String call() throws ExecutionDisabledException {
         HazelcastClient hazelcast = HazelcastClientFactory.getProcessingClient();
         logger.info("Starting SyncObjectTask");
 
         String syncObjectQueue = Settings.getConfiguration().getString("dataone.hazelcast.synchronizationObjectQueue");
         BlockingQueue<SyncObject> hzSyncObjectQueue = hazelcast.getQueue(syncObjectQueue);
 
-        
-        NodeCommFactory nodeCommFactory = NodeCommSyncObjectFactory.getInstance();
-
-        HashMap<FutureTask, HashMap<String, Object>> futuresMap = new HashMap<FutureTask, HashMap<String, Object>>();
+        HashMap<FutureTask<SyncObjectState>, HashMap<String, Object>> futuresMap = new HashMap<>();
         // the futures map is helpful in tracking the state of a TransferObjectTask
         // submitted to the task executor as a FutureTask
         // The HashMap contains the NodeComm and the SyncObject 
@@ -109,85 +113,52 @@ public class SyncObjectTask implements Callable<String> {
         SyncObject task = null;
         try {
             do {  // forever, (unless exception thrown)
-                
+
                 // Settings gets refreshed periodically 
                 boolean activateJob = Boolean.parseBoolean(Settings.getConfiguration().getString("Synchronization.active"));
                 if (activateJob) {
-                    task = hzSyncObjectQueue.poll(90L, TimeUnit.SECONDS);
+                    // get next item off the SyncObject queue
+                    Long nowTime = (new Date()).getTime();
+                    if (nowTime > delayUntil) {
+                        task = hzSyncObjectQueue.poll(90L, TimeUnit.SECONDS);
+                    } 
+                    else if (nowTime + 500 > delayUntil) {
+                        // sleep instead of requeue
+                        interruptableSleep(delayUntil-nowTime);
+                        task = hzSyncObjectQueue.poll(90L, TimeUnit.SECONDS);
+                    } 
+                    else {
+                        // let the task be null and allow a requeue
+                    }
                 } else {
-                    // do not listen to Sync Object queue, just finish up with any active tasks
-                    // clearing out the futures map
-                    // to allow for eventual shutdown
+                    // see if we can shutdown
                     if (futuresMap.isEmpty()) {
                         // ok futures Map is empty, no need to keep spinning here, shut this thread down
                         logger.info("All Tasks are complete. Shutting down\n");
                         throw new ExecutionDisabledException();
                     }
-                    Thread.sleep(10000L); // ten seconds
-                    task = null;
+                    // slow down the rate of future-reaping while sync is not active
+                    interruptableSleep(10000L);
                 }
                 
                 reapFutures(futuresMap);
-                
-                
-                // If task does need to be processed
-                // Try to get a communications object for it
-                // if no comm objects are in the comm object buffer, then stick
-                // the task back on the queue
+
                 if (task != null) {
-                    try {
-                        // Found a task now see if there is a comm object available
-                        // if so, then run it
-                        logger.info(task.taskLabel() + " received");
-                        // investigate the task for membernode
-                        NodeReference nodeReference = new NodeReference();
-                        nodeReference.setValue(task.getNodeId());
-                        
-                        NodeComm nodeCommunications = nodeCommFactory.getNodeComm(nodeReference);
-
-                        // finally, execute the new task!
-                        try {
-                            V2TransferObjectTask transferObject = new V2TransferObjectTask(nodeCommunications, task);
-                            FutureTask futureTask = new FutureTask(transferObject);
-                            taskExecutor.execute(futureTask);
-
-                            HashMap<String, Object> futureHash = new HashMap<String, Object>();
-                            futureHash.put(nodecommName, nodeCommunications);
-                            futureHash.put(taskName, task);
-                            futuresMap.put(futureTask, futureHash);
-                            logger.info(task.taskLabel() + " submitted for execution");
-                        } catch (TaskRejectedException ex) {
-                            // Tasks maybe rejected because of the pool has filled up 
-                            // and no more tasks may be executed.
-                            // TODO: Q. Is it the responsibility of this class to avoid this situation?
-                            // This situation is dire since it should never be allowed to occur!
-                            logger.error(task.taskLabel() + " Rejected");
-                            logger.error("ActiveCount: " + taskExecutor.getActiveCount() + " Pool size " 
-                                    + taskExecutor.getPoolSize() + " Max Pool Size " + taskExecutor.getMaxPoolSize());
-                            nodeCommunications.setState(NodeCommState.AVAILABLE);
-                            hzSyncObjectQueue.put(task);
-                            try {
-                                Thread.sleep(5000L); // millisecs
-                            } catch (InterruptedException iex) {
-                                logger.debug("sleep interrupted");
-                            }
-                        }
-                    } catch (NodeCommUnavailable ex) {
-                        // Communication object is unavailable.  place the task back on the queue
-                        // and sleep for 10 seconds
-                        // maybe another node will have
-                        // capacity to pick it up
-                        logger.warn("No MN communication threads available at this time");
+                    boolean success = executeTransferObjectTask(task, futuresMap);
+                    if (!success) {
+                        logger.info(task.taskLabel() + " - requeueing task.");
                         hzSyncObjectQueue.put(task);
-                        try {
-                            Thread.sleep(5000L); // ten seconds
-                        } catch (InterruptedException ex1) {
-                            logger.debug("sleep interrupted");
+                        // if queue is short, try to pass off this task to another
+                        // CN by sleeping a bit
+                        if (hzSyncObjectQueue.size() < 3) {
+                            interruptableSleep(5000L);
                         }
                     }
                 }
+                
                 logger.debug("ActiveCount: " + taskExecutor.getActiveCount() + " Pool size " 
                         + taskExecutor.getPoolSize() + " Max Pool Size " + taskExecutor.getMaxPoolSize());
+                
                 if ((taskExecutor.getActiveCount()) >= taskExecutor.getPoolSize()) {
                     if ((taskExecutor.getPoolSize() == taskExecutor.getMaxPoolSize()) && futuresMap.isEmpty()) {
                         BlockingQueue<Runnable> blockingTaskQueue = taskExecutor.getThreadPoolExecutor().getQueue();
@@ -197,19 +168,83 @@ public class SyncObjectTask implements Callable<String> {
                             taskExecutor.getThreadPoolExecutor().remove(taskArray[j]);
                         }
                     }
+                    // try to remove cancelled tasks from the work queue
                     taskExecutor.getThreadPoolExecutor().purge();
                 }
             } while (true);
-        } catch (InterruptedException ex) {
-            // XXX
-            // determine which exceptions are acceptable for
-            // restart and which ones are truly fatal
-            // otherwise could cause an infinite loop of continuous failures
+        } 
+        catch (InterruptedException ex) {
+            // XXX determine which exceptions are acceptable for restart and which ones 
+            // are truly fatal. otherwise could cause an infinite loop of continuous failures
             //
             ex.printStackTrace();
             logger.error("Interrupted! by something " + ex.getMessage() + "\n");
             return "Interrupted";
         }
+    }
+    
+    /**
+     * sleeps but wakes upon interruption (without failing)
+     * @param millis
+     */
+    private void interruptableSleep(Long millis) {
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException iex) {
+            logger.debug("sleep interrupted");
+        }
+    }
+
+    /**
+     * Gathers resources for the task, if available, and gives it to the taskExecutor
+     * to run. If accepted, adds the Future to the futuresMap.
+     * @param task
+     * @param futuresMap
+     * @return true if a future is created and added to the map.
+     */
+    private boolean executeTransferObjectTask(SyncObject task, HashMap<FutureTask<SyncObjectState>, HashMap<String, Object>> futuresMap ) {
+        
+        if (task == null) {
+            return true;
+        }
+        
+        boolean isSuccess = false;
+        try {
+            // Found a task now see if there is a comm object available
+            // if so, then run it
+            logger.info(task.taskLabel() + " received");
+            // investigate the task for membernode
+            NodeReference nodeReference = new NodeReference();
+            nodeReference.setValue(task.getNodeId());
+            
+            NodeComm nodeCommunications = NodeCommSyncObjectFactory.getInstance().getNodeComm(nodeReference);
+
+            // finally, execute the new task!
+            try {
+                V2TransferObjectTask transferObject = new V2TransferObjectTask(nodeCommunications, task);
+                FutureTask<SyncObjectState> futureTask = new FutureTask<SyncObjectState>(transferObject);
+                taskExecutor.execute(futureTask);
+
+                HashMap<String, Object> futureHash = new HashMap<String, Object>();
+                futureHash.put(nodecommName, nodeCommunications);
+                futureHash.put(taskName, task);
+                futuresMap.put(futureTask, futureHash);
+                logger.info(task.taskLabel() + " submitted for execution");
+                isSuccess = true;
+            } catch (TaskRejectedException ex) {
+                // Tasks maybe rejected because of the pool has filled up 
+                // and no more tasks may be executed.
+                // TODO: Q. Is it the responsibility of this class to avoid this situation?
+                // This situation is dire since it should never be allowed to occur!
+                logger.error(task.taskLabel() + " Executor rejected the task");
+                logger.error("ActiveCount: " + taskExecutor.getActiveCount() + " Pool size " 
+                        + taskExecutor.getPoolSize() + " Max Pool Size " + taskExecutor.getMaxPoolSize());
+                nodeCommunications.setState(NodeCommState.AVAILABLE);
+            }
+        } catch (NodeCommUnavailable | ServiceFailure ex) {
+            logger.warn("No MN communication threads available at this time");
+        }
+        return isSuccess;
     }
     
     
@@ -226,7 +261,7 @@ public class SyncObjectTask implements Callable<String> {
      * @param futuresMap
      * @throws InterruptedException
      */
-    private void reapFutures(HashMap<FutureTask, HashMap<String, Object>> futuresMap) throws InterruptedException {
+    private void reapFutures(HashMap<FutureTask<SyncObjectState>, HashMap<String, Object>> futuresMap) throws InterruptedException {
 
         // first check all the futures of past tasks to see if any have finished
         // XXX is this code doing anything useful?
@@ -236,16 +271,20 @@ public class SyncObjectTask implements Callable<String> {
             logger.debug("Polling empty hzSyncObjectQueue");
         }
         if (!futuresMap.isEmpty()) {
-            ArrayList<Future> removalList = new ArrayList<Future>();
+            // XXX why make a list to do individual removes later, instead of removing them directly?
+            ArrayList<Future<SyncObjectState>> removalList = new ArrayList<>();
 
-            for (FutureTask future : futuresMap.keySet()) {
+            for (FutureTask<SyncObjectState> future : futuresMap.keySet()) {
                 HashMap<String, Object> futureHash = futuresMap.get(future);
                 SyncObject futureTask = (SyncObject) futureHash.get(taskName);
                 NodeComm futureNodeComm = (NodeComm) futureHash.get(nodecommName);
                 logger.debug("trying future " + futureTask.taskLabel());
                 try {
                     
-                    future.get(250L, TimeUnit.MILLISECONDS);
+                    SyncObjectState futureOutcome = future.get(250L, TimeUnit.MILLISECONDS);
+                    logger.info(futureTask.taskLabel() + " SyncObjectState: " + futureOutcome);
+                    // retries are already requeued in (V2)TransferObjectTask, so nothing to do here
+                    latestResults.add(futureOutcome);
                     // the future is now, reset the state of the NodeCommunication object
                     // so that it will be re-used
                     logger.debug("futureMap is done? " + future.isDone());
@@ -255,9 +294,11 @@ public class SyncObjectTask implements Callable<String> {
                     futureNodeComm.setState(NodeCommState.AVAILABLE);
                     removalList.add(future);
                     
-                } catch (CancellationException ex) {
                     
-                    logger.debug(futureTask.taskLabel() + " The Future has been cancelled "
+                } catch (CancellationException ex) {
+                    // XXX does canceling the future interrupt the processing task, and 
+                    // do we need to requeue the task?
+                    logger.debug(futureTask.taskLabel() + " The Future has been canceled "
                             + ":(" + futureNodeComm.getNumber() + "):");
                     
                     futureNodeComm.setState(NodeCommState.AVAILABLE);

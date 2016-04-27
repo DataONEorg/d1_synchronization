@@ -1033,6 +1033,6 @@ public class TransferObjectTask implements Callable<Void> {
      */
     private void submitSynchronizationFailed(String pid, BaseException exception) {
         SyncFailedTask syncFailedTask = new SyncFailedTask(nodeCommunications, task);
-        syncFailedTask.submitSynchronizationFailed(pid, exception);
+        syncFailedTask.submitSynchronizationFailed(pid, null, exception);
     }
 }

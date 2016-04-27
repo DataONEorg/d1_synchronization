@@ -784,7 +784,7 @@ public class TransferObjectTaskTest {
         
         outputLogEntries(events);
         
-        assertEquals("Sync from non-auth node should  generate a synchronizationFailed", 1, events.getLogEntryList().size());
+        assertEquals("Sync from non-auth node should not cause a failure ", 0, events.getLogEntryList().size());
     }
     
     
@@ -851,7 +851,7 @@ public class TransferObjectTaskTest {
         outputLogEntries(events);
         
         assertEquals("Sync from non-auth node with no differences should not generate a synchronizationFailed", 
-                1, events.getLogEntryList().size());
+                0, events.getLogEntryList().size());
         
         CNRead cnRead = (CNRead)nodeLoc.getNode(theCN);
         boolean foundReplica = false;
@@ -986,6 +986,7 @@ public class TransferObjectTaskTest {
     
     
     private void outputLogEntries(Log entries) {
+        
         for (LogEntry le : entries.getLogEntryList()) {
             System.out.print("eventDate=" + le.getDateLogged());
             System.out.print(" : type=" + le.getEvent());

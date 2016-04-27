@@ -2,8 +2,8 @@ package org.dataone.cn.batch.exceptions;
 
 /**
  * An exception to capture cases where an internal failure in synchronization
- * happens.  It is distinguished from SynchronizationFailed in that the failure
- * is not reported back to the Member Node via MN.synchronizationFailed
+ * happens that was not due to issues with Member Node content.  It is a wrapper 
+ * exception whose use is primarily within (V2)TransferObjectTask.
  * 
  * @author rnahf
  *
