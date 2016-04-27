@@ -17,9 +17,12 @@
  */
 package org.dataone.cn.batch.synchronization;
 
-import com.hazelcast.core.HazelcastInstance;
-import java.io.File;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.dataone.client.v2.CNode;
@@ -33,7 +36,6 @@ import org.dataone.cn.ldap.NodeAccess;
 import org.dataone.configuration.Settings;
 import org.dataone.service.cn.impl.v2.NodeRegistryService;
 import org.dataone.service.cn.impl.v2.ReserveIdentifierService;
-import org.dataone.service.exceptions.IdentifierNotUnique;
 import org.dataone.service.exceptions.InvalidRequest;
 import org.dataone.service.exceptions.NotAuthorized;
 import org.dataone.service.exceptions.NotFound;
@@ -48,11 +50,12 @@ import org.dataone.service.types.v2.Node;
 import org.dataone.service.types.v2.NodeList;
 
 /**
- * Creates/maintains a NodeComm (node communications) pool for use by the TransferObjectTask A NodeComm is memberNode
- * specific
- *
- * Sets up instances that should be reused by the TransferObjectTask Assume that most of the instances are not
- * thread-safe, in other words the instances created by this factory will be re-used by threads, but no two concurrent
+ * Creates/maintains NodeComm pools (per MN NodeReference) for use by the TransferObjectTask.
+ * Pool size is determined by the property "Synchronization.SyncObjectTask.maxMemberNodeCommThreads"
+ * 
+ * 
+ * Assume that most of the instances are not thread-safe, in other words the instances 
+ * created by this factory will be re-used by threads, but no two concurrent
  * threads should access the same instances (with the exception of hazelcast client instance)
  *
  * @author waltz
@@ -60,12 +63,16 @@ import org.dataone.service.types.v2.NodeList;
 public class NodeCommSyncObjectFactory implements NodeCommFactory {
 
     public final static Log logger = LogFactory.getLog(NodeCommSyncObjectFactory.class);
-    private static HazelcastInstance hzclient;
-    private String clientCertificateLocation
-            = Settings.getConfiguration().getString("D1Client.certificate.directory")
-            + File.separator + Settings.getConfiguration().getString("D1Client.certificate.filename");
 
-    private Integer maxNumberOfClientsPerMemberNode = Settings.getConfiguration().getInteger("Synchronization.SyncObjectTask.maxMemberNodeCommThreads", 5);
+    /**
+     * The default max number of NodeComms available for a given Member Node 
+     */
+    public final static int DEFAULT_MAX_NODE_COMM_PER_MN = 5;
+    
+    private Integer maxNumberOfClientsPerMemberNode = 
+            Settings.getConfiguration().getInteger("Synchronization.SyncObjectTask.maxMemberNodeCommThreads", 
+                    DEFAULT_MAX_NODE_COMM_PER_MN);
+
     // maintain a List of NodeComms for each membernode that will not
     // exceed the maxNumberOfClientsPerMemberNode
     // each NodeComm will have a state, NodeCommState, that
@@ -84,6 +91,13 @@ public class NodeCommSyncObjectFactory implements NodeCommFactory {
         return nodeCommFactory;
     }
 
+    /**
+     * returns a NodeComm set to the RUNNING state.  When done, the user needs to
+     * set it to the AVAILABLE state.  (nodeComm.setState(NodeCommState.AVAILABLE)
+     * 
+     * @throws NodeCommUnavailable if the maximum size of the pool has been reached
+     * and none are AVAILABLE.
+     */
     @Override
     public NodeComm getNodeComm(NodeReference mnNodeId) throws ServiceFailure, NodeCommUnavailable {
 
@@ -103,7 +117,7 @@ public class NodeCommSyncObjectFactory implements NodeCommFactory {
             }
             if (nodeCommunications == null) {
                 // no node Communication is available, see if we can create a new one
-                if (nodeCommList.size() <= maxNumberOfClientsPerMemberNode) {
+                if (nodeCommList.size() < maxNumberOfClientsPerMemberNode) {
                     // create and add a new one
                     nodeCommunications = createNodeComm(mnNodeId);
 
