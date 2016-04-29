@@ -17,16 +17,18 @@
  */
 package org.dataone.cn.batch.synchronization;
 
+import java.util.Date;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.dataone.cn.batch.exceptions.NodeCommUnavailable;
+import org.dataone.cn.batch.service.v2.NodeRegistrySyncService;
 import org.dataone.cn.batch.synchronization.type.NodeComm;
-import org.dataone.cn.batch.synchronization.type.NodeRegistryQueryService;
 
 import org.dataone.cn.ldap.NodeAccess;
-import org.dataone.service.cn.impl.v2.NodeRegistryService;
+import org.dataone.cn.ldap.NodeRegistrySyncFacade;
+import org.dataone.service.cn.v2.impl.NodeRegistryServiceImpl;
 import org.dataone.service.exceptions.NotFound;
 import org.dataone.service.exceptions.NotImplemented;
 import org.dataone.service.exceptions.ServiceFailure;
@@ -75,16 +77,16 @@ public class NodeCommObjectListHarvestFactory implements NodeCommFactory {
 
             // figure out what client impl to use for this node, default to v1
             Object mNode = null;
-            NodeRegistryQueryService nodeRegistryService = new NodeRegistryQueryService() {
+            NodeRegistrySyncService nodeRegistryService = new NodeRegistrySyncService() {
 
-                private NodeRegistryService serviceImpl
-                        = new NodeRegistryService();
+            private NodeRegistrySyncFacade serviceImpl
+                    = new NodeRegistrySyncFacade();
 
                 @Override
                 public NodeList listNodes()
                         throws ServiceFailure, NotImplemented {
 
-                    return serviceImpl.listNodes();
+                    return serviceImpl.getApprovedNodeList();
                 }
 
                 @Override
@@ -94,8 +96,13 @@ public class NodeCommObjectListHarvestFactory implements NodeCommFactory {
                 }
 
                 @Override
-                public NodeAccess getNodeAccess() {
-                    return serviceImpl.getNodeAccess();
+                public void setDateLastHarvested(NodeReference nodeIdentifier, Date lastDateNodeHarvested) throws ServiceFailure {
+                    serviceImpl.setDateLastHarvested(nodeIdentifier, lastDateNodeHarvested);
+                }
+
+                @Override
+                public Date getDateLastHarvested(NodeReference nodeIdentifier) throws ServiceFailure {
+                    return serviceImpl.getDateLastHarvested(nodeIdentifier);
                 }
             };
             Node node = null;

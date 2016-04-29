@@ -28,13 +28,12 @@ import org.apache.commons.logging.LogFactory;
 import org.dataone.client.v2.CNode;
 import org.dataone.client.v2.itk.D1Client;
 import org.dataone.cn.batch.exceptions.NodeCommUnavailable;
-import org.dataone.cn.batch.synchronization.type.IdentifierReservationQueryService;
+import org.dataone.cn.batch.service.v2.IdentifierReservationQueryService;
+import org.dataone.cn.batch.service.v2.NodeRegistrySyncService;
 import org.dataone.cn.batch.synchronization.type.NodeComm;
 import org.dataone.cn.batch.synchronization.type.NodeCommState;
-import org.dataone.cn.batch.synchronization.type.NodeRegistryQueryService;
-import org.dataone.cn.ldap.NodeAccess;
+import org.dataone.cn.ldap.NodeRegistrySyncFacade;
 import org.dataone.configuration.Settings;
-import org.dataone.service.cn.impl.v2.NodeRegistryService;
 import org.dataone.service.cn.impl.v2.ReserveIdentifierService;
 import org.dataone.service.exceptions.InvalidRequest;
 import org.dataone.service.exceptions.NotAuthorized;
@@ -171,15 +170,15 @@ public class NodeCommSyncObjectFactory implements NodeCommFactory {
                 };
 
         // create a NodeRegistryQueryService comm object
-        NodeRegistryQueryService nodeRegistryService = new NodeRegistryQueryService() {
-            private NodeRegistryService serviceImpl
-                    = new NodeRegistryService();
+        NodeRegistrySyncService nodeRegistryService = new NodeRegistrySyncService() {
+            private NodeRegistrySyncFacade serviceImpl
+                    = new NodeRegistrySyncFacade();
 
             @Override
             public NodeList listNodes()
                     throws ServiceFailure, NotImplemented {
 
-                return serviceImpl.listNodes();
+                return serviceImpl.getApprovedNodeList();
             }
 
             @Override
@@ -188,10 +187,17 @@ public class NodeCommSyncObjectFactory implements NodeCommFactory {
                 return serviceImpl.getNode(nodeId);
             }
 
+
             @Override
-            public NodeAccess getNodeAccess() {
-                return serviceImpl.getNodeAccess();
+            public void setDateLastHarvested(NodeReference nodeIdentifier, Date lastDateNodeHarvested) throws ServiceFailure {
+                serviceImpl.setDateLastHarvested(nodeIdentifier, lastDateNodeHarvested);
             }
+
+            @Override
+            public Date getDateLastHarvested(NodeReference nodeIdentifier) throws ServiceFailure {
+                 return serviceImpl.getDateLastHarvested(nodeIdentifier);
+            }
+
         };
         
         // create the MemberNode comm object

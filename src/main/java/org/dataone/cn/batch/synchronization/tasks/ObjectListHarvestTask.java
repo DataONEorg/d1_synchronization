@@ -29,11 +29,11 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.log4j.Logger;
 import org.dataone.cn.batch.exceptions.ExecutionDisabledException;
+import org.dataone.cn.batch.service.v2.NodeRegistrySyncService;
 import org.dataone.cn.batch.synchronization.NodeCommFactory;
 import org.dataone.cn.batch.synchronization.NodeCommObjectListHarvestFactory;
 import org.dataone.cn.batch.synchronization.jobs.MemberNodeHarvestJob;
 import org.dataone.cn.batch.synchronization.type.NodeComm;
-import org.dataone.cn.batch.synchronization.type.NodeRegistryQueryService;
 import org.dataone.cn.hazelcast.HazelcastClientFactory;
 
 import org.dataone.cn.synchronization.types.SyncObject;
@@ -116,7 +116,7 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
         // the harvester
         NodeCommFactory nodeCommFactory = NodeCommObjectListHarvestFactory.getInstance();
         NodeComm mnNodeComm = nodeCommFactory.getNodeComm(d1NodeReference);
-        NodeRegistryQueryService nodeRegistryService = mnNodeComm.getNodeRegistryService();
+        NodeRegistrySyncService nodeRegistryService = mnNodeComm.getNodeRegistryService();
         // logger is not  be serializable, but no need to make it transient imo
         Logger logger = Logger.getLogger(ObjectListHarvestTask.class.getName());
         HazelcastClient hazelcast = HazelcastClientFactory.getProcessingClient();
@@ -184,7 +184,7 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
                         //Sleep is 5 secs, looping 1440 should be 2 hrs of waiting..
                         // I'd say something has gone horribly wrong and so dying would be
                         // appropriate
-                        nodeRegistryService.getNodeAccess().setDateLastHarvested(d1NodeReference, lastMofidiedDate);
+                        nodeRegistryService.setDateLastHarvested(d1NodeReference, lastMofidiedDate);
                         throw new Exception("hzSyncObjectQueue has not had more than " + hzSyncObjectQueue.remainingCapacity() + " remaining capacity for 2 hrs.");
                     }
                     for (ObjectInfo objectInfo : readQueue) {
@@ -211,7 +211,7 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
 
             if (lastMofidiedDate.after(d1Node.getSynchronization().getLastHarvested())) {
                 // use nodeAccess directly to avoid hazelcast broadcasting the event
-                nodeRegistryService.getNodeAccess().setDateLastHarvested(d1NodeReference, lastMofidiedDate);
+                nodeRegistryService.setDateLastHarvested(d1NodeReference, lastMofidiedDate);
             }
         } else {
             logger.warn(d1NodeReference.getValue() + "- Difference between Node's LastHarvested Date and Current Date time was less than 10 seconds");

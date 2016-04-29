@@ -23,8 +23,10 @@
 package org.dataone.cn.batch.synchronization.type;
 
 
+import org.dataone.cn.batch.service.v2.IdentifierReservationQueryService;
 import com.hazelcast.client.HazelcastClient;
 import java.util.Date;
+import org.dataone.cn.batch.service.v2.NodeRegistrySyncService;
 import org.dataone.service.cn.v2.CNCore;
 import org.dataone.service.cn.v2.CNReplication;
 
@@ -41,7 +43,7 @@ public class NodeComm {
     private CNCore cnCore;
     private CNReplication cnReplication;
     private IdentifierReservationQueryService reserveIdentifierService;
-    private NodeRegistryQueryService nodeRegistryService;
+    private NodeRegistrySyncService nodeRegistryService;
     // helpful for debugging
     private Integer number;
 
@@ -50,14 +52,14 @@ public class NodeComm {
     // help to determine if thread is blocking, used as timeout
     private Date runningStartDate;
     
-    public NodeComm(Object mnRead, NodeRegistryQueryService nodeRegistryService) {
+    public NodeComm(Object mnRead, NodeRegistrySyncService nodeRegistryService) {
         this.mnRead = mnRead;
         this.reserveIdentifierService = null;
         this.nodeRegistryService = nodeRegistryService;
         this.cnRead = null;
     }
 
-    public NodeComm(Object mnRead, Object cnRead, NodeRegistryQueryService nodeRegistryService, 
+    public NodeComm(Object mnRead, Object cnRead, NodeRegistrySyncService nodeRegistryService, 
             CNCore cnCore, CNReplication cnReplication, IdentifierReservationQueryService reserveIdentifierService) {
         this.mnRead = mnRead;
         this.cnRead = cnRead;
@@ -132,11 +134,11 @@ public class NodeComm {
         this.reserveIdentifierService = reserveIdentifierService;
     }
 
-    public NodeRegistryQueryService getNodeRegistryService() {
+    public NodeRegistrySyncService getNodeRegistryService() {
         return nodeRegistryService;
     }
 
-    public void setNodeRegistryService(NodeRegistryQueryService nodeRegistryService) {
+    public void setNodeRegistryService(NodeRegistrySyncService nodeRegistryService) {
         this.nodeRegistryService = nodeRegistryService;
     }
 

@@ -47,7 +47,7 @@ import org.dataone.cn.batch.exceptions.RetryableException;
 import org.dataone.cn.batch.exceptions.UnrecoverableException;
 import org.dataone.cn.batch.synchronization.D1TypeUtils;
 import org.dataone.cn.batch.synchronization.NodeCommSyncObjectFactory;
-import org.dataone.cn.batch.synchronization.type.IdentifierReservationQueryService;
+import org.dataone.cn.batch.service.v2.IdentifierReservationQueryService;
 import org.dataone.cn.batch.synchronization.type.NodeComm;
 import org.dataone.cn.batch.synchronization.type.NodeCommState;
 import org.dataone.cn.batch.synchronization.type.SyncObjectState;

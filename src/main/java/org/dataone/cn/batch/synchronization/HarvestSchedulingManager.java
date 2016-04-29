@@ -53,7 +53,7 @@ import java.io.File;
 
 import org.dataone.client.auth.CertificateManager;
 import org.dataone.cn.hazelcast.HazelcastClientFactory;
-import org.dataone.service.cn.impl.v2.NodeRegistryService;
+import org.dataone.service.cn.v2.impl.NodeRegistryServiceImpl;
 import org.dataone.service.exceptions.NotImplemented;
 import org.dataone.service.exceptions.ServiceFailure;
 import org.dataone.service.types.v2.NodeList;
@@ -77,8 +77,8 @@ public class HarvestSchedulingManager implements ApplicationContextAware {
 
     private Scheduler scheduler;
     ApplicationContext applicationContext;
-    private NodeRegistryService nodeRegistryService
-            = new NodeRegistryService();
+    private NodeRegistryServiceImpl nodeRegistryService
+            = new NodeRegistryServiceImpl();
     private static String clientCertificateLocation
             = Settings.getConfiguration().getString("D1Client.certificate.directory")
             + File.separator + Settings.getConfiguration().getString("D1Client.certificate.filename");

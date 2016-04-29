@@ -1,6 +1,5 @@
-package org.dataone.cn.batch.synchronization.type;
+package org.dataone.cn.batch.service.v2;
 
-import org.dataone.service.exceptions.IdentifierNotUnique;
 import org.dataone.service.exceptions.InvalidRequest;
 import org.dataone.service.exceptions.NotAuthorized;
 import org.dataone.service.exceptions.NotFound;
