@@ -26,12 +26,11 @@ import org.dataone.client.v2.types.D1TypeBuilder;
 import org.dataone.cn.batch.harvest.mock.InMemoryCNReadCore;
 import org.dataone.cn.batch.harvest.mock.MockNodeRegistryService;
 import org.dataone.cn.batch.harvest.mock.MockReserveIdentifierService;
-import org.dataone.cn.batch.synchronization.type.IdentifierReservationQueryService;
 import org.dataone.cn.batch.synchronization.type.NodeComm;
 import org.dataone.cn.hazelcast.HazelcastClientFactory;
 import org.dataone.cn.synchronization.types.SyncObject;
 import org.dataone.configuration.Settings;
-import org.dataone.service.cn.impl.v2.NodeRegistryService;
+import org.dataone.service.cn.v2.impl.NodeRegistryServiceImpl;
 import org.dataone.service.cn.v2.CNCore;
 import org.dataone.service.cn.v2.CNRead;
 import org.dataone.service.cn.v2.CNReplication;
@@ -71,6 +70,7 @@ import com.hazelcast.config.Config;
 import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.IMap;
+import org.dataone.cn.batch.service.v2.IdentifierReservationQueryService;
 
 public class TransferObjectTaskTest {
 

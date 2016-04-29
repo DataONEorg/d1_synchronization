@@ -9,7 +9,7 @@ import javax.naming.NamingException;
 
 import org.apache.log4j.Logger;
 import org.dataone.cn.batch.synchronization.tasks.V2TransferObjectTask;
-import org.dataone.cn.batch.synchronization.type.IdentifierReservationQueryService;
+import org.dataone.cn.batch.service.v2.IdentifierReservationQueryService;
 import org.dataone.service.cn.impl.v2.ReserveIdentifierService;
 import org.dataone.service.cn.v2.CNRead;
 import org.dataone.service.exceptions.*;
