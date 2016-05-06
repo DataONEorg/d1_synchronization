@@ -8,15 +8,35 @@ package org.dataone.cn.batch.exceptions;
  *
  */
 public class RetryableException extends Exception {
+    
+    private long delay = 0;
     /**
      * 
      */
     private static final long serialVersionUID = 5115935521722185220L;
     
+    public RetryableException() {
+        super();
+    }
+    
     public RetryableException(String message) {
         super(message);
     }
+    
     public RetryableException(String message, Throwable t) {
         super(message,t);
+    }
+    
+    public RetryableException(String message, Throwable t, long retryDelay) {
+        this(message,t);
+        this.delay = retryDelay;
+    }
+    
+    public void setDelay(long milliseconds) {
+        this.delay = milliseconds;
+    }
+    
+    public long getDelay() {
+        return this.delay;
     }
 }

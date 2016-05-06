@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 import java.math.BigInteger;
-import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -36,11 +35,7 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.Logger;
-import org.dataone.client.D1Node;
-import org.dataone.client.D1NodeFactory;
 import org.dataone.client.exception.ClientSideException;
-import org.dataone.client.rest.DefaultHttpMultipartRestClient;
-import org.dataone.client.utils.HttpUtils;
 import org.dataone.client.v1.types.D1TypeBuilder;
 import org.dataone.cn.batch.exceptions.NodeCommUnavailable;
 import org.dataone.cn.batch.exceptions.RetryableException;
@@ -422,21 +417,10 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
             logger.warn(task.taskLabel() + " - NotAuthorized to claim the seriesId: " + ex.getDescription());
             throw SyncFailedTask.createSynchronizationFailed(mnSystemMetadata.getIdentifier().getValue(),
                     "NotAuthorized to claim the seriesId", ex);
-//        } catch (VersionMismatch ex) {
-//            logger.warn(task.taskLabel() + " - VersionMismatch:  " + ex.getDescription());
-//            throw ex;
+
         } catch (RetryableException ex) {
             logger.warn(task.taskLabel() + " - RetryableException: " + ex.getMessage());
             throw ex;
-//        } catch (BaseException be) {
-//            logger.error(String.format("%s - %s -%s", 
-//                    task.taskLabel(), 
-//                    be.getClass().getSimpleName(), 
-//                    be.getDescription()));
-//            throw SyncFailedTask.createSynchronizationFailed(mnSystemMetadata.getIdentifier().getValue(), be);
-//        } catch (Exception ex) {
-//            logger.error(task.taskLabel() + " - " + ex.getMessage(), ex);
-//            throw SyncFailedTask.createSynchronizationFailed(mnSystemMetadata.getIdentifier().getValue(), null, ex);
         }
     }
 
@@ -1127,8 +1111,21 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
         catch (InvalidRequest e) {
             throw SyncFailedTask.createSynchronizationFailed(task.getPid(),
                     "From processV1AuthoritativeUpdate: Could not update cn with new valid SystemMetadata!", e);
-        } 
-        catch ( NotFound | NotImplemented | NotAuthorized | InvalidToken | VersionMismatch e) {
+        }
+        catch (VersionMismatch e) {
+            if (task.getAttempt() == 1) {
+                try {
+                    notifyReplicaNode(cnSystemMetadata, TypeFactory.buildNodeReference(task.getNodeId()));
+                } catch (InvalidToken | NotAuthorized | NotImplemented
+                        | ServiceFailure | NotFound | InvalidRequest e1) {
+                    throw new UnrecoverableException("Could not notify the source MN to update their SystemMetadata in response to " +
+                            "encountering a VersionMismatch during V1-style system metadata update", e1);
+                }
+            }
+            throw new RetryableException("Cannot update systemMetadata due to VersionMismatch", e, 5000L);
+        }
+        
+        catch ( NotFound | NotImplemented | NotAuthorized | InvalidToken e) {
             throw new UnrecoverableException("Unexpected failure when trying to update v1-permitted fields (archived, obsoletedBy).", e);
 
         }
