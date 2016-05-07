@@ -7,10 +7,17 @@ import java.util.Map.Entry;
 import java.util.Queue;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
+import org.dataone.cn.batch.exceptions.RetryableException;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
@@ -24,23 +31,12 @@ import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 @ContextConfiguration(locations = { "/org/dataone/configuration/applicationContext.xml" })
 public class QueueProcessorCallableTest {
 
-    static Queue<String> queue;
+    Queue<MockQueueItem> queue5 = new ArrayBlockingQueue<>(5);
     static String queueItemPrefix = "item";
     static int queueItemSequence = 0;
     
-    class QueueTask implements Callable<String> {
-
-        String queueItemName;
-        
-        QueueTask(String queueItemName) {
-            this.queueItemName = queueItemName;
-        }
-        
-        @Override
-        public String call() throws Exception {
-            return String.format("%s: ", this.queueItemName);
-        }
-    }
+    MockQueueProcessor qProcessor;
+    
     
     @BeforeClass
     public static void setUpBeforeClass() throws Exception {
@@ -48,24 +44,27 @@ public class QueueProcessorCallableTest {
 
     @Before
     public void setUp() throws Exception {
-        queue = new ArrayBlockingQueue<String>(5);
-        queue.add(queueItemPrefix + queueItemSequence++);
-        queue.add(queueItemPrefix + queueItemSequence++);
-        queue.add(queueItemPrefix + queueItemSequence++);
-        queue.add(queueItemPrefix + queueItemSequence++);
-        queue.add(queueItemPrefix + queueItemSequence++);
+        qProcessor = new MockQueueProcessor();
     }
 
+    private MockQueueItem buildQueueItem(long duration, Exception ex) {
+        return new MockQueueItem(queueItemPrefix + queueItemSequence++, duration, ex);
+    }
+    
     @Test
     public void shouldExecuteCallables() throws InterruptedException {
         
-        Executor x = Executors.newSingleThreadExecutor();
-        MockQueueProcessor qp = new MockQueueProcessor();
-        qp.setQueue(queue);
+        ExecutorService x = Executors.newSingleThreadExecutor();
+        qProcessor.setQueue(queue5);
+        queue5.add(buildQueueItem(0, null));
+        queue5.add(buildQueueItem(0, null));
+        queue5.add(buildQueueItem(0, null));
+        queue5.add(buildQueueItem(0, null));
+        queue5.add(buildQueueItem(0, null));
         
         FutureTask<String> futureTask = null;
         try {
-            futureTask = new FutureTask<>(qp);
+            futureTask = new FutureTask<>(qProcessor);
             x.execute(futureTask);
             if (futureTask != null) {
                 Thread.sleep(10000);
@@ -74,43 +73,108 @@ public class QueueProcessorCallableTest {
         } catch (Exception e) {
             e.printStackTrace();
         }
-        
-        for (Entry<Object,List<String>> n : qp.getProcessingLog().entrySet()) {
-            for (String message : n.getValue()) {
-                System.out.printf("%s  : %s\n", n.getKey(), message);
+        finally {
+            System.out.println("Remaining on the queue: "+ queue5.size());
+            for (Entry<MockQueueItem,List<String>> n : qProcessor.getProcessingLog().entrySet()) {
+                for (String le: n.getValue()) {
+                    System.out.printf("%s : %s\n", n.getKey().name, le);
+                }
+                assertEquals("Should be 2 log entries per queueItem",2,n.getValue().size());
             }
-            assertEquals("Should be 2 log entries per queueItem",2,n.getValue().size());
+            
+            x.shutdownNow();
         }
+        assertEquals("The processor should clear the queue",0, queue5.size());
     }
 
     @Test 
     public void shouldBeInactivatable() {
-        Executor x = Executors.newSingleThreadExecutor();
-        MockQueueProcessor qp = new MockQueueProcessor();
-        qp.setQueue(queue);
+        ExecutorService x = Executors.newSingleThreadExecutor();
+        qProcessor.setQueue(queue5);
+        queue5.add(buildQueueItem(1000, null));
+        queue5.add(buildQueueItem(2000, null));
+        queue5.add(buildQueueItem(3000, null));
+        queue5.add(buildQueueItem(4000, null));
+        queue5.add(buildQueueItem(5000, null));
         
-        FutureTask<String> futureTask = null;
-        String nextAdditionalItem = null;
+        FutureTask<String> processorTask = null;
+        MockQueueItem itemAfterInactivation = null;
         try {
-            futureTask = new FutureTask<>(qp);
-            x.execute(futureTask);
+            processorTask = new FutureTask<>(qProcessor);
+            x.execute(processorTask);
             Thread.sleep(3000L);
             // the key statement to this test
-            qp.setIsInactivated(true);
-            
-            nextAdditionalItem = queueItemPrefix + queueItemSequence++;
-            queue.add(nextAdditionalItem);
-            if (futureTask != null) {
+            qProcessor.setIsInactivated(true);
+            Thread.sleep(100L);
+            itemAfterInactivation = buildQueueItem(1000, null);
+            System.out.println(itemAfterInactivation.name);
+            queue5.add(itemAfterInactivation);
+            if (processorTask != null) {
                 Thread.sleep(10000);
-                futureTask.cancel(true);
+                processorTask.cancel(true);
             }
         } catch (Exception e) {
             e.printStackTrace();
         }
+        finally {
+            System.out.println("Remaining on the queue: "+ queue5.size());
+            for (Entry<MockQueueItem,List<String>> n : qProcessor.getProcessingLog().entrySet()) {
+                for (String le: n.getValue()) {
+                    System.out.printf("%s : %s\n", n.getKey().name, le);
+                }
+            }
+            x.shutdownNow();
+        }
         // look at all of the queue processor tasks
         assertFalse("Should not have any logging of the item added after inactivation",
-                qp.getProcessingLog().containsKey(nextAdditionalItem));
+                qProcessor.getProcessingLog().containsKey(itemAfterInactivation));
     }
+ 
+    
+    @Test
+    public void shouldDelayRetryableTasks() {
+        ExecutorService x = Executors.newSingleThreadExecutor();
+        queue5.add(buildQueueItem(4000, new RetryableException("oops1",null,1000)));
+        queue5.add(buildQueueItem(4000, new RetryableException("oops2",null,1000)));
+        queue5.add(buildQueueItem(4000, new RetryableException("oops3",null,1000)));
+        queue5.add(buildQueueItem(4000, new RetryableException("oops4",null,1000)));
+        queue5.add(buildQueueItem(4000, new RetryableException("oops5",null,1000)));
+        qProcessor.setQueue(queue5);
+        
+        FutureTask<String> processorTask = null;
+        MockQueueItem nextAdditionalItem = null;
+        try {
+            processorTask = new FutureTask<>(qProcessor);
+            x.execute(processorTask);
+            Thread.sleep(1000L);
+            qProcessor.setIsInactivated(true);
+            Thread.sleep(10000L);
+
+        } catch (InterruptedException e) {
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            fail("Threw some other exception:");
+            
+        }
+        finally {
+            System.out.println("Remaining on the queue: "+ queue5.size());
+            for (Entry<MockQueueItem,List<String>> n : qProcessor.getProcessingLog().entrySet()) {
+                for (String le: n.getValue()) {
+                    System.out.printf("%s : %s\n", n.getKey().name, le);
+                }
+            }
+            x.shutdownNow();
+        }
+
+    }
+    
+    @Ignore("TO DO")
+    @Test
+    public void shouldRequeueCanceledTasks() {
+        
+    }
+
 
     @Ignore("TO DO")
     @Test 
