@@ -22,8 +22,10 @@ public class MockQueueTask implements Callable<String> {
     @Override
     public String call() throws Exception {
         Thread.sleep(this.executeTime);
-        if (this.e != null)
+        if (this.e != null) {
+            System.out.println("throwing exception: " + this.e.getClass().getCanonicalName());
             throw this.e;
+        }
         return String.format("%s: done", name);
     }
 

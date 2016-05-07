@@ -4,11 +4,11 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.Queue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
+import java.util.concurrent.DelayQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
@@ -18,15 +18,19 @@ import java.util.concurrent.TimeoutException;
 import org.apache.commons.collections4.queue.CircularFifoQueue;
 import org.apache.log4j.Logger;
 import org.dataone.cn.batch.exceptions.ExecutionDisabledException;
+import org.dataone.cn.batch.exceptions.RetryableException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.task.TaskRejectedException;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 /**
  * A Callable for executing a Queue processing loop using a ThreadPoolTaskExecutor.
- * It is designed to run continuously until interrupted.  The class is responsible
- * for smooth execution of tasks associated with the object Queue, including handling
- * Queue size limits and ThreadPool capacity.
+ * It is designed to run continuously until interrupted or is inactivated.  The 
+ * class is responsible for smooth execution of tasks associated with the object 
+ * Queue, including handling Queue size limits and ThreadPool capacity.
+ * <p/>
+ * Assumptions: - read-only Queue, other QueueProcessors, task failures, try-agains (w/ delay),
+ * limited thread pool.
 
  * @author rnahf
  *
@@ -39,11 +43,11 @@ public abstract class QueueProcessorCallable<E,V> implements Callable<String> {
     
     protected boolean inactivate = false;
     protected Queue<E> queue;
-    protected LinkedList<E> pendingQueueItem = new LinkedList<>();
+    protected DelayQueue<DelayWrapper<E>> pendingQueueItem = new DelayQueue<>();
     protected CircularFifoQueue<V> latestResults = new CircularFifoQueue<>(50);
 
     
-    @Autowired
+//    @Autowired
     private static ThreadPoolTaskExecutor taskExecutor;
     
     private static final long EXECUTION_THREAD_TIMEOUT = 900000L; 
@@ -85,10 +89,11 @@ public abstract class QueueProcessorCallable<E,V> implements Callable<String> {
 
 
                 // look for new queue items to execute
-                E queueItem = pollQueue();
+                E queueItem = getNextItem();
                 if (queueItem == null)
                     continue;
             
+                // map the queue item to a Callable task
                 Callable<V> callable = prepareTask(queueItem);
 
                 // try to execute the callable (task)
@@ -103,7 +108,7 @@ public abstract class QueueProcessorCallable<E,V> implements Callable<String> {
                 } catch (TaskRejectedException e)  {
                     // executor pool is full
                     // hold onto it for next loop-through
-                    pendingQueueItem.add(queueItem);
+                    pendingQueueItem.add(new DelayWrapper(queueItem));
 
                     // sleep a bit because the thread pool is busy
                     interruptableSleep(2000L);
@@ -125,12 +130,22 @@ public abstract class QueueProcessorCallable<E,V> implements Callable<String> {
     }
 
 
-    private E pollQueue() throws InterruptedException {
+    /**
+     * retrieves the next item available to process, prioritizing available pending
+     * items first.  Can return null.
+     * @return
+     * @throws InterruptedException
+     */
+    private E getNextItem() throws InterruptedException {
 
-        if (!pendingQueueItem.isEmpty()) {
-            return pendingQueueItem.removeFirst();
+        // 
+        DelayWrapper<E> delayWrapper =  pendingQueueItem.poll();
+        if (delayWrapper != null) {
+            // there's an item whose delay is over
+            return (E) delayWrapper.getWrappedObject();
+        }
         
-        } else if (isInactivated()) {
+        if (isInactivated()) {
             return null;
         
         } else if (queue instanceof BlockingQueue<?>) {
@@ -169,7 +184,7 @@ public abstract class QueueProcessorCallable<E,V> implements Callable<String> {
     }
     
     private void cancelStuckTasks(HashMap<FutureTask<V>,FutureStat> activeFutures) {
-        // this comparison
+
         if ((taskExecutor.getActiveCount()) >= taskExecutor.getPoolSize()) {
             if ((taskExecutor.getPoolSize() == taskExecutor.getMaxPoolSize()) && activeFutures.isEmpty()) {
                 BlockingQueue<Runnable> blockingTaskQueue = taskExecutor.getThreadPoolExecutor().getQueue();
@@ -177,10 +192,12 @@ public abstract class QueueProcessorCallable<E,V> implements Callable<String> {
                 taskArray = blockingTaskQueue.toArray(taskArray);
                 for (int j = 0; j < taskArray.length; ++j) {
                     taskExecutor.getThreadPoolExecutor().remove(taskArray[j]);
+                    // XXX: should these be requeued?
                 }
             }
             // try to remove cancelled tasks from the work queue
             taskExecutor.getThreadPoolExecutor().purge();
+
         }
         
     }
@@ -189,9 +206,9 @@ public abstract class QueueProcessorCallable<E,V> implements Callable<String> {
     /**
      * builds the repeatable task
      */
-    protected abstract Callable<V> prepareTask(Object queueItem); 
+    protected abstract Callable<V> prepareTask(E queueItem); 
     
-    protected abstract void cleanupTask(Object queueItem);
+    protected abstract void cleanupTask(E queueItem);
 
 
 
@@ -237,32 +254,41 @@ public abstract class QueueProcessorCallable<E,V> implements Callable<String> {
                     cleanupTask(activeFutures.get(future).queueItem);
                     removalList.add(future);
                     
-                } catch (CancellationException ex) {
-                    // XXX does canceling the future interrupt the processing task, and 
-                    // do we need to requeue the task?
+                }
+                // handle situations where the task was canceled
+                catch (CancellationException ex) {
                     cleanupTask(activeFutures.get(future).queueItem);
-                    removalList.add(future);
-
-                } catch (ExecutionException ex) {
-                    logger.error("An Exception is reported from the Future " + ex.getMessage());
-                    ex.printStackTrace();
-                    
-                    cleanupTask(activeFutures.get(future).queueItem);
+                    pendingQueueItem.add(new DelayWrapper<E>(activeFutures.get(future).queueItem, 0));
                     removalList.add(future);
                     
-                } catch (TimeoutException ex) {
+                } 
+                // handle exceptions thrown from the Callable call method
+                catch (ExecutionException ex) {
+                    if (ex.getCause() != null && ex.getCause() instanceof RetryableException) {
+                        logger.debug("Adding item to pendingQueue...");
+                        pendingQueueItem.add(new DelayWrapper<E>(
+                                activeFutures.get(future).queueItem,
+                                ((RetryableException)ex.getCause()).getDelay()));
+                    }
+                    cleanupTask(activeFutures.get(future).queueItem);
+                    removalList.add(future);
+                    // XXX what else to do if there's an exception?  Do we want to support special exception handling
+                }
+                catch (TimeoutException ex) {
                     // no value returned from the Future
                     // this is ok, unless it's been processing for too long of a time
                     if ((new Date()).getTime() - activeFutures.get(future).start.getTime() > EXECUTION_THREAD_TIMEOUT) {
                         // cancel the future
                         if (future.cancel(true /* may interrupt */)) {
-                            cleanupTask(activeFutures.get(future));
+                            cleanupTask(activeFutures.get(future).queueItem);
                             removalList.add(future);
                         } else {
                             logger.warn("unable to cancel this future task!");
                         }
                         //force removal from the thread pool. 
-                        taskExecutor.getThreadPoolExecutor().remove(future);
+                        if (taskExecutor.getThreadPoolExecutor().remove(future) ) {
+                            // XXX:  do we need to do anything here?  Is this the same as future.cancel?
+                        }
                     }
                 }
             }
