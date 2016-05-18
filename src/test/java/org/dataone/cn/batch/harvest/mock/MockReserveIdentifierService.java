@@ -1,26 +1,22 @@
 package org.dataone.cn.batch.harvest.mock;
 
-import java.util.AbstractMap;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Map.Entry;
 
 import javax.naming.NamingException;
 
 import org.apache.log4j.Logger;
-import org.dataone.cn.batch.synchronization.tasks.V2TransferObjectTask;
 import org.dataone.cn.batch.service.v2.IdentifierReservationQueryService;
 import org.dataone.service.cn.impl.v2.ReserveIdentifierService;
 import org.dataone.service.cn.v2.CNRead;
 import org.dataone.service.exceptions.*;
 import org.dataone.service.types.v1.Identifier;
-import org.dataone.service.types.v1.ObjectLocationList;
 import org.dataone.service.types.v1.Session;
 import org.dataone.service.types.v1.Subject;
 
 public class MockReserveIdentifierService implements IdentifierReservationQueryService {
 
-    Logger logger = Logger.getLogger(MockReserveIdentifierService.class.getName());
+    static final Logger logger = Logger.getLogger(MockReserveIdentifierService.class);
     
     private boolean acceptSession;
     private Map<Identifier, Subject> reservationMap;

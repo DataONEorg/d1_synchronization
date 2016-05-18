@@ -21,9 +21,10 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import org.apache.log4j.Logger;
+import org.dataone.cn.ComponentActivationUtility;
 import org.dataone.cn.batch.exceptions.ExecutionDisabledException;
 import org.dataone.cn.batch.synchronization.tasks.SyncObjectTask;
-import org.dataone.configuration.Settings;
+import org.quartz.SchedulerException;
 import org.springframework.core.task.SimpleAsyncTaskExecutor;
 
 /**
@@ -39,13 +40,14 @@ import org.springframework.core.task.SimpleAsyncTaskExecutor;
  */
 public class SyncObjectTaskManager implements Runnable {
 
-    Logger logger = Logger.getLogger(SyncObjectTaskManager.class.getName());
+    static final Logger logger = Logger.getLogger(SyncObjectTaskManager.class);
     SyncObjectTask syncObjectTask;
     private SimpleAsyncTaskExecutor taskExecutor;
     // syncObjectTaskManagerFuture future probabaly is not needed,
     // but maybe it will force the executor to remove the thread (???)
     Future syncObjectTaskManagerFuture = null;
-
+    HarvestSchedulingManager harvestSchedulingManager;
+    
     public void init() {
         syncObjectTaskManagerFuture = taskExecutor.submit(this);
     }
@@ -64,10 +66,9 @@ public class SyncObjectTaskManager implements Runnable {
         // task
        
         do {
-             boolean activateJob = Boolean.parseBoolean(Settings.getConfiguration().getString("Synchronization.active"));
-            if (activateJob) {
+            if (ComponentActivationUtility.synchronizationIsActive()) {
                 
-                logger.debug("Starting SyncObjectTaskManager");
+                logger.info("SyncObjectTaskManager Start");
                 FutureTask futureTask = new FutureTask(syncObjectTask);
                 taskExecutor.execute(futureTask);
 
@@ -80,11 +81,11 @@ public class SyncObjectTaskManager implements Runnable {
                     logger.warn("Excecution Disabled continue polling until shutdown");
                     shouldContinueRunning = true; 
                     } else {
-                    ex.printStackTrace();
+                    logger.error(ex,ex);
                     shouldContinueRunning = false;
                     }
                 } catch (Exception ex) {
-                    ex.printStackTrace();
+                    logger.error(ex,ex);
                     shouldContinueRunning = false;
                 }
                 if (futureTask.isCancelled()) {
@@ -106,7 +107,15 @@ public class SyncObjectTaskManager implements Runnable {
                 }
             }
         } while (shouldContinueRunning);
+        logger.info("SyncObjectTaskManager Complete");
         syncObjectTaskManagerFuture.cancel(true);
+        
+        ComponentActivationUtility.disableSynchronization();
+        try {
+            harvestSchedulingManager.halt();
+        } catch (SchedulerException ex) {
+            logger.error("Unable to halt Scheduled Tasks after failure: " + ex, ex);
+        }
     }
 
     public SyncObjectTask getSyncObjectTask() {
@@ -124,4 +133,13 @@ public class SyncObjectTaskManager implements Runnable {
     public void setTaskExecutor(SimpleAsyncTaskExecutor taskExecutor) {
         this.taskExecutor = taskExecutor;
     }
+
+    public HarvestSchedulingManager getHarvestSchedulingManager() {
+        return harvestSchedulingManager;
+    }
+
+    public void setHarvestSchedulingManager(HarvestSchedulingManager harvestSchedulingManager) {
+        this.harvestSchedulingManager = harvestSchedulingManager;
+    }
+    
 }

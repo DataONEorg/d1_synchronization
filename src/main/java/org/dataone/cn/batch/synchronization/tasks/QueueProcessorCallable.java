@@ -39,7 +39,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
  */
 public abstract class QueueProcessorCallable<E,V> implements Callable<String> {
 
-    Logger logger = Logger.getLogger(QueueProcessorCallable.class.getName());
+    static final Logger logger = Logger.getLogger(QueueProcessorCallable.class);
     
     protected boolean inactivate = false;
     protected Queue<E> queue;

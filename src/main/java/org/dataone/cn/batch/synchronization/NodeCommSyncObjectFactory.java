@@ -23,8 +23,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.apache.log4j.Logger;
 import org.dataone.client.v2.CNode;
 import org.dataone.client.v2.itk.D1Client;
 import org.dataone.cn.batch.exceptions.NodeCommUnavailable;
@@ -61,7 +60,7 @@ import org.dataone.service.types.v2.NodeList;
  */
 public class NodeCommSyncObjectFactory implements NodeCommFactory {
 
-    public final static Log logger = LogFactory.getLog(NodeCommSyncObjectFactory.class);
+    static final Logger logger = Logger.getLogger(NodeCommSyncObjectFactory.class);
 
     /**
      * The default max number of NodeComms available for a given Member Node 

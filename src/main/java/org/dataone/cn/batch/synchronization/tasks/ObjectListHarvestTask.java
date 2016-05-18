@@ -25,9 +25,8 @@ import java.util.Date;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.log4j.Logger;
+import org.dataone.cn.ComponentActivationUtility;
 import org.dataone.cn.batch.exceptions.ExecutionDisabledException;
 import org.dataone.cn.batch.service.v2.NodeRegistrySyncService;
 import org.dataone.cn.batch.synchronization.NodeCommFactory;
@@ -71,7 +70,7 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
     MutableDateTime currentDateTime = new MutableDateTime(new Date());
     Date endHarvestInterval;
     int backoffSeconds = 10;
-    Log logger = LogFactory.getLog(MemberNodeHarvestJob.class);
+    static final Logger logger = Logger.getLogger(ObjectListHarvestTask.class);
 
     
     
@@ -98,9 +97,9 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
     @Override
     public Date call() throws Exception {
         String synchronizationObjectQueue = Settings.getConfiguration().getString("dataone.hazelcast.synchronizationObjectQueue");
-        boolean activateJob = Boolean.parseBoolean(Settings.getConfiguration().getString("Synchronization.active"));
+        
         Integer maxSyncObjectQueueSize = Settings.getConfiguration().getInt("Synchronization.max_syncobjectqueue_size");
-        if (!activateJob) {
+        if (!ComponentActivationUtility.synchronizationIsActive()) {
             ExecutionDisabledException ex = new ExecutionDisabledException(d1NodeReference.getValue() + "- Disabled");
             throw ex;
         }
@@ -117,8 +116,7 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
         NodeCommFactory nodeCommFactory = NodeCommObjectListHarvestFactory.getInstance();
         NodeComm mnNodeComm = nodeCommFactory.getNodeComm(d1NodeReference);
         NodeRegistrySyncService nodeRegistryService = mnNodeComm.getNodeRegistryService();
-        // logger is not  be serializable, but no need to make it transient imo
-        Logger logger = Logger.getLogger(ObjectListHarvestTask.class.getName());
+
         HazelcastClient hazelcast = HazelcastClientFactory.getProcessingClient();
         BlockingQueue<SyncObject> hzSyncObjectQueue = hazelcast.getQueue(synchronizationObjectQueue);
         // Need the LinkedHashMap to preserve insertion order
@@ -145,8 +143,8 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
                     + " with startDate of " + DateTimeMarshaller.serializeDateToUTC(startHarvestDate) 
                     + " and endDate of " + DateTimeMarshaller.serializeDateToUTC(endHarvestInterval));
             do {
-                activateJob = Boolean.parseBoolean(Settings.getConfiguration().getString("Synchronization.active"));
-                if (!activateJob) {
+                
+                if (!ComponentActivationUtility.synchronizationIsActive()) {
                     // throwing this exception will not update
                     // last harvested date on the node, causing
                     // a reharvesting of all records
@@ -163,8 +161,8 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
                     readQueue = this.retrieve(mnNodeComm, startHarvestDate, endHarvestInterval);
                     int loopCount = 0;
                     while (((hzSyncObjectQueue.size() + readQueue.size()) > maxSyncObjectQueueSize) && (loopCount < 1440)) {
-                        activateJob = Boolean.parseBoolean(Settings.getConfiguration().getString("Synchronization.active"));
-                        if (!activateJob) {
+                        
+                        if (!ComponentActivationUtility.synchronizationIsActive()) {
                             // throwing this exception will not update
                             // last harvested date on the node, causing
                             // a reharvesting of all records
@@ -214,7 +212,7 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
                 nodeRegistryService.setDateLastHarvested(d1NodeReference, lastMofidiedDate);
             }
         } else {
-            logger.warn(d1NodeReference.getValue() + "- Difference between Node's LastHarvested Date and Current Date time was less than 10 seconds");
+            logger.info(d1NodeReference.getValue() + "- Difference between Node's LastHarvested Date and Current Date time was less than 10 seconds");
         }
         logger.info(d1NodeReference.getValue() + "- ObjectListHarvestTask End");
         // return the date of completion of the task
@@ -231,8 +229,6 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
      * @return List<ObjectInfo>
      */
     private List<ObjectInfo> retrieve(NodeComm nodeComm, Date fromDate, Date toDate) {
-        // logger is not  be serializable, but no need to make it transient imo
-        Logger logger = Logger.getLogger(ObjectListHarvestTask.class.getName());
 
         List<ObjectInfo> writeQueue = new ArrayList<ObjectInfo>();
 

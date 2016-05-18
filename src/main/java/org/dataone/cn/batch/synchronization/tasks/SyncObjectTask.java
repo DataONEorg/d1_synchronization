@@ -48,6 +48,7 @@ import org.springframework.core.task.TaskRejectedException;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import com.hazelcast.client.HazelcastClient;
+import org.dataone.cn.ComponentActivationUtility;
 
 /**
  * Regulates the processing of the hzSyncObjectQueue by assigning SyncObjects
@@ -69,7 +70,7 @@ import com.hazelcast.client.HazelcastClient;
  */
 public class SyncObjectTask implements Callable<String> {
 
-    Logger logger = Logger.getLogger(V2TransferObjectTask.class.getName());
+    static final Logger logger = Logger.getLogger(SyncObjectTask.class);
     private ThreadPoolTaskExecutor taskExecutor;
 
     private Integer maxNumberOfClientsPerMemberNode;
@@ -114,9 +115,8 @@ public class SyncObjectTask implements Callable<String> {
         try {
             do {  // forever, (unless exception thrown)
 
-                // Settings gets refreshed periodically 
-                boolean activateJob = Boolean.parseBoolean(Settings.getConfiguration().getString("Synchronization.active"));
-                if (activateJob) {
+                // Settings gets refreshed periodically           
+                if (ComponentActivationUtility.synchronizationIsActive()) {
                     // get next item off the SyncObject queue
                     Long nowTime = (new Date()).getTime();
                     if (nowTime > delayUntil) {
@@ -177,8 +177,7 @@ public class SyncObjectTask implements Callable<String> {
             // XXX determine which exceptions are acceptable for restart and which ones 
             // are truly fatal. otherwise could cause an infinite loop of continuous failures
             //
-            ex.printStackTrace();
-            logger.error("Interrupted! by something " + ex.getMessage() + "\n");
+            logger.error("Interrupted! by something " + ex.getMessage() + "\n", ex);
             return "Interrupted";
         }
     }

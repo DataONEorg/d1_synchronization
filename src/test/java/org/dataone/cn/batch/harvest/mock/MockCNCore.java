@@ -72,7 +72,7 @@ public class MockCNCore implements CNCore {
     @Autowired
     @Qualifier("testTmpCacheDirectory")
     private String dataoneCacheDirectory;
-    Logger logger = Logger.getLogger(MockCNCore.class.getName());
+    static final Logger logger = Logger.getLogger(MockCNCore.class);
     final static int SIZE = 16384;
     private URLCodec urlCodec = new URLCodec();
 

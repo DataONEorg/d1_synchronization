@@ -11,7 +11,6 @@ import org.apache.commons.lang.ObjectUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.Logger;
 import org.dataone.cn.batch.synchronization.D1TypeUtils;
-import org.dataone.service.exceptions.BaseException;
 import org.dataone.service.exceptions.IdentifierNotUnique;
 import org.dataone.service.exceptions.InvalidRequest;
 import org.dataone.service.exceptions.InvalidSystemMetadata;
@@ -36,7 +35,7 @@ import org.jibx.runtime.JiBXException;
  */
 public class SystemMetadataValidator {
 
-    static Logger logger = Logger.getLogger(SystemMetadataValidator.class.getName());
+    static final Logger logger = Logger.getLogger(SystemMetadataValidator.class);
     
     private SystemMetadata referenceSysMeta;
  

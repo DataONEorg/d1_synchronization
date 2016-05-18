@@ -20,15 +20,12 @@ package org.dataone.cn.batch.synchronization;
 import java.util.Date;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.apache.log4j.Logger;
 import org.dataone.cn.batch.exceptions.NodeCommUnavailable;
 import org.dataone.cn.batch.service.v2.NodeRegistrySyncService;
 import org.dataone.cn.batch.synchronization.type.NodeComm;
 
-import org.dataone.cn.ldap.NodeAccess;
 import org.dataone.cn.ldap.NodeRegistrySyncFacade;
-import org.dataone.service.cn.v2.impl.NodeRegistryServiceImpl;
 import org.dataone.service.exceptions.NotFound;
 import org.dataone.service.exceptions.NotImplemented;
 import org.dataone.service.exceptions.ServiceFailure;
@@ -52,7 +49,7 @@ import org.dataone.service.types.v1.Service;
  */
 public class NodeCommObjectListHarvestFactory implements NodeCommFactory {
 
-    public final static Log logger = LogFactory.getLog(NodeCommObjectListHarvestFactory.class);
+    static final Logger logger = Logger.getLogger(NodeCommObjectListHarvestFactory.class);
 
     private static ConcurrentMap<NodeReference, NodeComm> initializedMemberNodes = 
             new ConcurrentHashMap<NodeReference, NodeComm>();

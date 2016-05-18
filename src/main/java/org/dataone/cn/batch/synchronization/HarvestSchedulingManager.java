@@ -26,8 +26,7 @@ import java.io.IOException;
 import java.util.Properties;
 import java.util.Set;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.apache.log4j.Logger;
 import org.dataone.cn.batch.synchronization.jobs.MemberNodeHarvestJob;
 import org.dataone.configuration.Settings;
 import org.dataone.service.types.v1.Node;
@@ -46,9 +45,6 @@ import org.springframework.beans.BeansException;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
 
-import com.hazelcast.core.EntryEvent;
-import com.hazelcast.core.EntryListener;
-import com.hazelcast.core.IMap;
 import java.io.File;
 
 import org.dataone.client.auth.CertificateManager;
@@ -71,7 +67,7 @@ import org.dataone.service.types.v2.NodeList;
  */
 public class HarvestSchedulingManager implements ApplicationContextAware {
 
-    public static Log logger = LogFactory.getLog(HarvestSchedulingManager.class);
+    static final Logger logger = Logger.getLogger(HarvestSchedulingManager.class);
     // Quartz GroupName for Jobs and Triggers, should be unique for a set of jobs that are related
     private static String groupName = "MemberNodeHarvesting";
 
@@ -97,7 +93,6 @@ public class HarvestSchedulingManager implements ApplicationContextAware {
      *
      *
      */
-
     public void init() {
         try {
             HazelcastClient hazelcast = HazelcastClientFactory.getProcessingClient();
@@ -118,6 +113,10 @@ public class HarvestSchedulingManager implements ApplicationContextAware {
         }
     }
 
+    public void halt() throws SchedulerException {
+        scheduler.shutdown(true);
+    }
+
     /**
      * will perform the recalculation of the scheduler. if scheduler is running, it will be disabled All jobs will be
      * deleted for this node All nodes that are considered 'local' by hazelcast will be scheduled with synchronization
@@ -126,50 +125,51 @@ public class HarvestSchedulingManager implements ApplicationContextAware {
      * Seems that the listeners could call this in parallel, and it should be an atomic operation, so it is synchronized
      */
     public synchronized void manageHarvest() throws SchedulerException {
-        try {
-            // halt all operations
-            if (scheduler.isStarted()) {
-                scheduler.standby();
-                while (!(scheduler.getCurrentlyExecutingJobs().isEmpty())) {
-                    try {
-                        Thread.sleep(2000L);
-                    } catch (InterruptedException ex) {
-                        logger.warn("Sleep interrupted. check again!");
+        if (!scheduler.isShutdown()) {
+            try {
+
+                // halt all operations
+                if (scheduler.isStarted()) {
+                    scheduler.standby();
+                    while (!(scheduler.getCurrentlyExecutingJobs().isEmpty())) {
+                        try {
+                            Thread.sleep(2000L);
+                        } catch (InterruptedException ex) {
+                            logger.warn("Sleep interrupted. check again!");
+                        }
+                    }
+                    // remove any existing jobs
+                    GroupMatcher<JobKey> groupMatcher = GroupMatcher.groupEquals(groupName);
+                    Set<JobKey> jobsInGroup = scheduler.getJobKeys(groupMatcher);
+
+                    for (JobKey jobKey : jobsInGroup) {
+                        logger.info("deleting job " + jobKey.getGroup() + " " + jobKey.getName());
+                        scheduler.deleteJob(jobKey);
                     }
                 }
-                // remove any existing jobs
-                GroupMatcher<JobKey> groupMatcher = GroupMatcher.groupEquals(groupName);
-                Set<JobKey> jobsInGroup = scheduler.getJobKeys(groupMatcher);
+                // populate the nodeList
 
-                for (JobKey jobKey : jobsInGroup) {
-                    logger.info("deleting job " + jobKey.getGroup() + " " + jobKey.getName());
-                    scheduler.deleteJob(jobKey);
+                NodeList nodeList = nodeRegistryService.listNodes();
+                logger.info("Node map has " + nodeList.sizeNodeList() + " entries");
+                // construct new jobs and triggers based on ownership of nodes in the nodeList
+                for (Node node : nodeList.getNodeList()) {
+                    // exclude from the set any CNs or membernodes that are down or do not
+                    // want to be synchronized
+
+                    addHarvest(node.getIdentifier(), node);
                 }
-            }
-            // populate the nodeList
+                scheduler.start();
 
-            NodeList nodeList = nodeRegistryService.listNodes();
-            logger.info("Node map has " + nodeList.sizeNodeList() + " entries");
-            // construct new jobs and triggers based on ownership of nodes in the nodeList
-            for (Node node : nodeList.getNodeList()) {
-                // exclude from the set any CNs or membernodes that are down or do not
-                // want to be synchronized
-
-                addHarvest(node.getIdentifier(), node);
+                if (scheduler.isStarted()) {
+                    logger.info("Scheduler is started");
+                }
+            } catch (NotImplemented | ServiceFailure ex) {
+                logger.error(ex, ex);
+                throw new IllegalStateException("Unable to initialize jobs for scheduling: " + ex.getMessage());
             }
-            scheduler.start();
-
-            if (scheduler.isStarted()) {
-                logger.info("Scheduler is started");
-            }
-        } catch (NotImplemented ex) {
-            ex.printStackTrace();
-            throw new IllegalStateException("Unable to initialize jobs for scheduling: " + ex.getMessage());
-        } catch (ServiceFailure ex) {
-            ex.printStackTrace();
-            throw new IllegalStateException("Unable to initialize jobs for scheduling: " + ex.getMessage());
+        } else {
+            logger.warn("Scheduler has been shutdown. Synchronization is not running");
         }
-
     }
 
     /*
