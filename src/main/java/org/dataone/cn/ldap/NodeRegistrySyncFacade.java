@@ -8,8 +8,7 @@ package org.dataone.cn.ldap;
 import java.util.Date;
 import java.util.Map;
 import javax.naming.directory.DirContext;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.apache.log4j.Logger;
 import org.dataone.service.exceptions.ServiceFailure;
 import org.dataone.service.types.v1.NodeReference;
 
@@ -25,7 +24,7 @@ import org.dataone.service.types.v1.NodeReference;
  */
 public class NodeRegistrySyncFacade extends NodeFacade {
 
-    public static Log log = LogFactory.getLog(NodeRegistrySyncFacade.class);
+    static final Logger logger = Logger.getLogger(NodeRegistrySyncFacade.class);
 
 
     /*

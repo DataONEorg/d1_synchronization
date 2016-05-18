@@ -20,8 +20,8 @@ package org.dataone.cn.batch.synchronization.jobs;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.apache.log4j.Logger;
+import org.dataone.cn.ComponentActivationUtility;
 import org.dataone.cn.batch.synchronization.tasks.ObjectListHarvestTask;
 import org.dataone.configuration.Settings;
 import org.dataone.service.types.v1.NodeReference;
@@ -40,20 +40,20 @@ import org.quartz.JobExecutionException;
 @DisallowConcurrentExecution
 public class MemberNodeHarvestJob implements Job {
 
+    static final Logger logger = Logger.getLogger(MemberNodeHarvestJob.class);
     @Override
     public void execute(JobExecutionContext jobContext) throws JobExecutionException {
 
-        Log logger = LogFactory.getLog(MemberNodeHarvestJob.class);
+        
         JobExecutionException jex = null;
         NodeReference nodeReference = new NodeReference();
         SimpleDateFormat format = new SimpleDateFormat("EEE MMM dd yyyy HH:mm:ss zzz");
 
         String mnIdentifier = null;
         try {
-            boolean activateJob = Boolean.parseBoolean(Settings.getConfiguration().getString("Synchronization.active"));
-            if (activateJob) {
+            if (ComponentActivationUtility.synchronizationIsActive()) {
                 mnIdentifier = jobContext.getMergedJobDataMap().getString("mnIdentifier");
-                logger.info(mnIdentifier + " - Execute Service ObjectListHarvestTask Start");
+                logger.info(mnIdentifier + " - ObjectListHarvestTask Start");
 
                 nodeReference.setValue(mnIdentifier);
 
@@ -66,11 +66,13 @@ public class MemberNodeHarvestJob implements Job {
                     // if the lastProcessingCompletedDate has changed then it should be persisted, but where?
                 // Does not need to be stored, maybe just printed?
                 if (lastProcessingCompletedDate == null) {
-                    logger.info(mnIdentifier + " - Execute Service ObjectListHarvestTask did not finish.");
+                    logger.info(mnIdentifier + " - ObjectListHarvestTask did not finish.");
                 } else {
-                    logger.info(mnIdentifier + " - Execute Service ObjectListHarvestTask End at "
+                    logger.info(mnIdentifier + " - ObjectListHarvestTask Completed at "
                             + format.format(lastProcessingCompletedDate));
                 }
+            } else {
+                logger.warn(mnIdentifier + "-  ObjectListHarvestTask Disabled");
             }
 
         } catch (Exception ex) {

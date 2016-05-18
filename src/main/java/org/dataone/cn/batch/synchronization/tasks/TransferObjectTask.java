@@ -44,7 +44,6 @@ import org.dataone.cn.hazelcast.HazelcastClientFactory;
 import org.dataone.cn.synchronization.types.SyncObject;
 import org.dataone.configuration.Settings;
 import org.dataone.ore.ResourceMapFactory;
-import org.dataone.service.cn.v2.impl.NodeRegistryServiceImpl;
 import org.dataone.service.exceptions.BaseException;
 import org.dataone.service.exceptions.IdentifierNotUnique;
 import org.dataone.service.exceptions.InsufficientResources;
@@ -100,7 +99,7 @@ public class TransferObjectTask implements Callable<Void> {
                     "Synchronization.checksum.verify.size.bypass.threshold",
                     BigInteger.valueOf(10000000));
 
-    Logger logger = Logger.getLogger(TransferObjectTask.class.getName());
+    static final Logger logger = Logger.getLogger(TransferObjectTask.class);
     private NodeComm nodeCommunications;
     private SyncObject task;
     private Session session = null;

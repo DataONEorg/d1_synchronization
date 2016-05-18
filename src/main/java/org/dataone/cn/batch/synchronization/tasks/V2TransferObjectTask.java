@@ -118,7 +118,7 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
         "http://www.openarchives.org/ore/terms"
     };
 
-    Logger logger = Logger.getLogger(V2TransferObjectTask.class.getName());
+    static final Logger logger = Logger.getLogger(V2TransferObjectTask.class);
     private NodeComm nodeCommunications;
     private SyncObject task;
     private Session session = null;  // null defaults to configured certificate

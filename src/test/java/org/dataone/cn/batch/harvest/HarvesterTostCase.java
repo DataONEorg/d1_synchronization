@@ -47,7 +47,7 @@ import org.springframework.test.context.ContextConfiguration;
 @ContextConfiguration(locations = {"classpath:/org/dataone/cn/batch/harvest/config/harvesterTest-context.xml"})
 public class HarvesterTostCase implements ApplicationContextAware {
 
-    Logger logger = Logger.getLogger(HarvesterTostCase.class.getName());
+    static final Logger logger = Logger.getLogger(HarvesterTostCase.class);
     ApplicationContext ac;
     static final String testListIds1 = "MD_ORNLDAAC_787_03032010095920:MD_ORNLDAAC_122_03032010095920:MD_ORNLDAAC_781_03032010095920";
     static final String testListFmt1 = "FGDC-STD-001.1-1999";

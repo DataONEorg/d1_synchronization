@@ -44,7 +44,7 @@ import org.dataone.service.types.v1.Session;
  */
 public class SyncFailedTask implements Callable<String> {
 
-    Logger logger = Logger.getLogger(TransferObjectTask.class.getName());
+    static final Logger logger = Logger.getLogger(SyncFailedTask.class);
     private NodeComm nodeCommunications;
     private SyncObject task;
     private Session session = null;

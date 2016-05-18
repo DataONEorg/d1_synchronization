@@ -34,7 +34,6 @@ import org.dataone.service.mn.tier1.v1.MNRead;
 import org.dataone.service.types.v1.Checksum;
 import org.dataone.service.types.v1.DescribeResponse;
 import org.dataone.service.types.v1.Identifier;
-import org.dataone.service.types.v1.ObjectFormat;
 import org.dataone.service.types.v1.ObjectFormatIdentifier;
 import org.dataone.service.types.v1.ObjectList;
 import org.dataone.service.types.v1.Session;
@@ -57,7 +56,7 @@ public class MockMNRead implements MNRead {
     @Autowired
     @Qualifier("testSamplesDirectory")
     private String dataoneCacheDirectory;
-    Logger logger = Logger.getLogger(MockMNRead.class.getName());
+    static final Logger logger = Logger.getLogger(MockMNRead.class);
     final static int SIZE = 16384;
     File objectListFile;
 
