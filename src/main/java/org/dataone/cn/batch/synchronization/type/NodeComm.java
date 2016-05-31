@@ -24,7 +24,6 @@ package org.dataone.cn.batch.synchronization.type;
 
 
 import org.dataone.cn.batch.service.v2.IdentifierReservationQueryService;
-import com.hazelcast.client.HazelcastClient;
 import java.util.Date;
 import org.dataone.cn.batch.service.v2.NodeRegistrySyncService;
 import org.dataone.service.cn.v2.CNCore;

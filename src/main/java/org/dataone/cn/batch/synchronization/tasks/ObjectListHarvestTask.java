@@ -34,6 +34,10 @@ import org.dataone.cn.batch.synchronization.NodeCommObjectListHarvestFactory;
 import org.dataone.cn.batch.synchronization.jobs.MemberNodeHarvestJob;
 import org.dataone.cn.batch.synchronization.type.NodeComm;
 import org.dataone.cn.hazelcast.HazelcastClientFactory;
+import org.dataone.cn.log.MetricEvent;
+import org.dataone.cn.log.MetricLogClient;
+import org.dataone.cn.log.MetricLogClientFactory;
+import org.dataone.cn.log.MetricLogEntry;
 
 import org.dataone.cn.synchronization.types.SyncObject;
 import org.dataone.configuration.Settings;
@@ -71,11 +75,13 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
     Date endHarvestInterval;
     int backoffSeconds = 10;
     static final Logger logger = Logger.getLogger(ObjectListHarvestTask.class);
+    static final MetricLogClient metricLogger = MetricLogClientFactory.getMetricLogClient();
+    private int syncMetricTotalSubmitted;
+    private int syncMetricTotalRetrieved;
 
-    
-    
     /**
      * Define the ObjectList Harvest task for a Member Node.
+     *
      * @param d1NodeReference
      * @param batchSize
      */
@@ -85,10 +91,9 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
     }
 
     /**
-     * Calls listObjects on the Member Node and manages putting SyncObjects onto 
-     * the SynchronizationObjectQueue (one per object) for asynchronous processing.
-     * Also controls the lastHarvestedDate field in the NodeRegistry.
-     * 
+     * Calls listObjects on the Member Node and manages putting SyncObjects onto the SynchronizationObjectQueue (one per
+     * object) for asynchronous processing. Also controls the lastHarvestedDate field in the NodeRegistry.
+     *
      * Method to be called in a separately executing thread.
      *
      * @return Date
@@ -96,8 +101,10 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
      */
     @Override
     public Date call() throws Exception {
+        syncMetricTotalSubmitted = 0;
+        syncMetricTotalRetrieved = 0;
         String synchronizationObjectQueue = Settings.getConfiguration().getString("dataone.hazelcast.synchronizationObjectQueue");
-        
+
         Integer maxSyncObjectQueueSize = Settings.getConfiguration().getInt("Synchronization.max_syncobjectqueue_size");
         if (!ComponentActivationUtility.synchronizationIsActive()) {
             ExecutionDisabledException ex = new ExecutionDisabledException(d1NodeReference.getValue() + "- Disabled");
@@ -105,19 +112,26 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
         }
         logger.info(d1NodeReference.getValue() + "- Calling ObjectListHarvestTask");
         // we are going to write directly to ldap for the updateLastHarvested
-        // because we do not want hazelcast to spam us about
-        // all of these updates since we have a listener in HarvestSchedulingManager
-        // that determines when updates/additions have occurred and 
-        // re-adjusts scheduling
-        
+        // Because we do not have an DataONE API method, Sync has its own
+        // NodeRegistrySyncService and its own NodeRegistrySyncFacade.
+        // The implementation is an anonymous class in the NodeCommObjectListHarvestFactory
+
         // Assuming that only one MN harvesting job is executing at at time
         // therefore, only one mnNodeComm per MemberNode is needed for all the runs of
         // the harvester
+        //  The above is no longer a valid assumption since it assumed the dependent
+        // d1 components were not thread-safe. Now Both d1_libclient_java
+        // and the new NodeRegistrySyncFacade are thread-safe. 
+        // the issue is that MNode requires a base_url for instantiation
+        // -rpw 05/25/2016
+        
         NodeCommFactory nodeCommFactory = NodeCommObjectListHarvestFactory.getInstance();
         NodeComm mnNodeComm = nodeCommFactory.getNodeComm(d1NodeReference);
         NodeRegistrySyncService nodeRegistryService = mnNodeComm.getNodeRegistryService();
 
         HazelcastClient hazelcast = HazelcastClientFactory.getProcessingClient();
+        
+        // the hzSyncObjectQueue communicates 
         BlockingQueue<SyncObject> hzSyncObjectQueue = hazelcast.getQueue(synchronizationObjectQueue);
         // Need the LinkedHashMap to preserve insertion order
         Node d1Node = nodeRegistryService.getNode(d1NodeReference);
@@ -129,21 +143,28 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
 
         List<ObjectInfo> readQueue = null;
         // subtract 10 seconds from the current date time 
+        // the reasoning behind using a backoff
+        // is due to the fact that a member node may be 
+        // using the same date for a batch of objects
+        // that may take a few seconds to upload
+        // the backoff time will allow for the completion
+        // of an upload and not result in a loss of objects
+        // retrieved
         currentDateTime.addSeconds(-backoffSeconds);
         endHarvestInterval = currentDateTime.toDate();
         if ((hzSyncObjectQueue.size() + batchSize) > maxSyncObjectQueueSize) {
             // if we don't have much capacity to process a single batch then 
             // make a smaller batch size for now
-            batchSize = batchSize/2;
+            batchSize = batchSize / 2;
         }
         // make certain it is still after the lastModified date
         if (startHarvestDate.before(endHarvestInterval)) {
             // if not then do not run (we should be running this less than every ten seconds for a membernode
-            logger.debug(d1NodeReference.getValue() + "- starting retrieval " + d1Node.getBaseURL() 
-                    + " with startDate of " + DateTimeMarshaller.serializeDateToUTC(startHarvestDate) 
+            logger.debug(d1NodeReference.getValue() + "- starting retrieval " + d1Node.getBaseURL()
+                    + " with startDate of " + DateTimeMarshaller.serializeDateToUTC(startHarvestDate)
                     + " and endDate of " + DateTimeMarshaller.serializeDateToUTC(endHarvestInterval));
             do {
-                
+
                 if (!ComponentActivationUtility.synchronizationIsActive()) {
                     // throwing this exception will not update
                     // last harvested date on the node, causing
@@ -159,9 +180,10 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
                 // from ListObjects and process before retrieving more
                 if (start == 0 || (start < total)) {
                     readQueue = this.retrieve(mnNodeComm, startHarvestDate, endHarvestInterval);
+                    syncMetricTotalRetrieved += readQueue.size();
                     int loopCount = 0;
                     while (((hzSyncObjectQueue.size() + readQueue.size()) > maxSyncObjectQueueSize) && (loopCount < 1440)) {
-                        
+
                         if (!ComponentActivationUtility.synchronizationIsActive()) {
                             // throwing this exception will not update
                             // last harvested date on the node, causing
@@ -196,12 +218,13 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
                             lastMofidiedDate = objectInfo.getDateSysMetadataModified();
                         }
                         // process the unexpected update, the next time synchronization is run
-                        if (!objectInfo.getDateSysMetadataModified().after(endHarvestInterval))
-                                {
-                                hzSyncObjectQueue.put(syncObject);
-                                logger.debug("placed on hzSyncObjectQueue- " + syncObject.taskLabel());
-                                }
+                        if (!objectInfo.getDateSysMetadataModified().after(endHarvestInterval)) {
+                            ++syncMetricTotalSubmitted;
+                            hzSyncObjectQueue.put(syncObject);
+                            logger.debug("placed on hzSyncObjectQueue- " + syncObject.taskLabel());
+                        }
                     }
+
                 } else {
                     readQueue = null;
                 }
@@ -215,6 +238,15 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
             logger.info(d1NodeReference.getValue() + "- Difference between Node's LastHarvested Date and Current Date time was less than 10 seconds");
         }
         logger.info(d1NodeReference.getValue() + "- ObjectListHarvestTask End");
+        
+        MetricLogEntry metricHarvestRetrievedLogEvent = new MetricLogEntry(
+                MetricEvent.SYNCHRONIZATION_HARVEST_RETRIEVED,
+                d1NodeReference, null, Integer.toString(syncMetricTotalRetrieved));
+        metricLogger.logMetricEvent(metricHarvestRetrievedLogEvent);
+        MetricLogEntry metricHarvestSubmittedLogEvent = new MetricLogEntry(
+                MetricEvent.SYNCHRONIZATION_HARVEST_SUBMITTED,
+                d1NodeReference, null, Integer.toString(syncMetricTotalSubmitted));
+        metricLogger.logMetricEvent(metricHarvestSubmittedLogEvent);
         // return the date of completion of the task
         return new Date();
     }
@@ -256,7 +288,7 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
                 start += objectList.getCount();
                 writeQueue.addAll(objectList.getObjectInfoList());
                 total = objectList.getTotal();
-
+               
             }
         } catch (NotAuthorized ex) {
             logger.error(d1NodeReference.getValue() + "- " + ex.serialize(ex.FMT_XML));
@@ -268,7 +300,7 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
             logger.error(d1NodeReference.getValue() + "- " + ex.serialize(ex.FMT_XML));
         } catch (InvalidToken ex) {
             logger.error(d1NodeReference.getValue() + "- " + ex.serialize(ex.FMT_XML));
-        } 
+        }
 
         return writeQueue;
     }

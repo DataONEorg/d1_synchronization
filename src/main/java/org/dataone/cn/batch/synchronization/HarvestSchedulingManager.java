@@ -48,11 +48,18 @@ import org.springframework.context.ApplicationContextAware;
 import java.io.File;
 
 import org.dataone.client.auth.CertificateManager;
+import org.dataone.cn.batch.synchronization.jobs.SyncMetricLogJob;
+import org.dataone.cn.batch.synchronization.listener.SyncMetricLogJobTriggerListener;
 import org.dataone.cn.hazelcast.HazelcastClientFactory;
 import org.dataone.service.cn.v2.impl.NodeRegistryServiceImpl;
 import org.dataone.service.exceptions.NotImplemented;
 import org.dataone.service.exceptions.ServiceFailure;
 import org.dataone.service.types.v2.NodeList;
+import org.joda.time.DateTime;
+import static org.quartz.SimpleScheduleBuilder.simpleSchedule;
+import org.quartz.TriggerListener;
+import org.quartz.impl.matchers.KeyMatcher;
+import org.quartz.impl.matchers.NameMatcher;
 
 /**
  * this bean must be managed by Spring upon startup of spring it will execute via init method
@@ -70,6 +77,9 @@ public class HarvestSchedulingManager implements ApplicationContextAware {
     static final Logger logger = Logger.getLogger(HarvestSchedulingManager.class);
     // Quartz GroupName for Jobs and Triggers, should be unique for a set of jobs that are related
     private static String groupName = "MemberNodeHarvesting";
+    private static String metricLogGroupName = "MetricLogJobReporting";
+    private static String metricLogTriggerName = "MetricLogJobTrigger";
+    private static String metricLogJobName = "job-MetricLog";
 
     private Scheduler scheduler;
     ApplicationContext applicationContext;
@@ -105,7 +115,7 @@ public class HarvestSchedulingManager implements ApplicationContextAware {
             scheduler = schedulerFactory.getScheduler();
 
             this.manageHarvest();
-
+            this.scheduleSyncMetricLogJob();
         } catch (IOException ex) {
             throw new IllegalStateException("Loading properties file failedUnable to initialize jobs for scheduling: " + ex.getMessage());
         } catch (SchedulerException ex) {
@@ -244,6 +254,35 @@ public class HarvestSchedulingManager implements ApplicationContextAware {
                 logger.error("Unable to initialize job key " + key.getValue() + " with schedule " + crontabEntry + "for scheduling: ", ex);
             }
 
+        }
+    }
+
+    private void scheduleSyncMetricLogJob() {
+        JobKey jobKey = new JobKey(metricLogJobName, metricLogGroupName);
+        try {
+            if (!scheduler.checkExists(jobKey)) {
+                DateTime startTime = new DateTime().plusSeconds(30);
+                JobDetail job = newJob(SyncMetricLogJob.class).withIdentity(jobKey).build();
+                TriggerKey triggerKey = new TriggerKey(metricLogTriggerName, metricLogGroupName);
+
+               
+                Trigger trigger = newTrigger().withIdentity(triggerKey)
+                        .startAt(startTime.toDate()) // if a start time is not given (if this line were omitted), "now" is implied
+                        .withSchedule(simpleSchedule()
+                                .withIntervalInSeconds(60)
+                                .repeatForever()
+                                .withMisfireHandlingInstructionIgnoreMisfires()) // note that 10 repeats will give a total of 11 firings
+                        .forJob(job) // identify job with handle to its JobDetail itself                   
+                        .build();
+                logger.info("scheduling  key " + jobKey + " with schedule ");
+                scheduler.scheduleJob(job, trigger);
+                TriggerListener triggerListener = new SyncMetricLogJobTriggerListener();
+                scheduler.getListenerManager().addTriggerListener(triggerListener, KeyMatcher.keyEquals(triggerKey));
+            } else {
+                logger.error(metricLogJobName + " exists!");
+            }
+        } catch (SchedulerException ex) {
+            logger.error("Unable to initialize job " + metricLogJobName + " for scheduling: ", ex);
         }
     }
 
