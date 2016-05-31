@@ -76,8 +76,7 @@ public class MemberNodeHarvestJob implements Job {
             }
 
         } catch (Exception ex) {
-            ex.printStackTrace();
-            logger.error(mnIdentifier + " - " + jobContext.getJobDetail().getKey().getName() + " died: " + ex.getMessage());
+            logger.error(mnIdentifier + " - " + jobContext.getJobDetail().getKey().getName() + " died: " + ex.getMessage(), ex);
             // log this message, someone else has the lock (and they probably shouldn't)
             jex = new JobExecutionException();
             jex.unscheduleFiringTrigger();

@@ -129,6 +129,7 @@ public class SyncObjectTask implements Callable<String> {
                     } 
                     else {
                         // let the task be null and allow a requeue
+                        task = null;
                     }
                 } else {
                     // see if we can shutdown
@@ -138,7 +139,11 @@ public class SyncObjectTask implements Callable<String> {
                         throw new ExecutionDisabledException();
                     }
                     // slow down the rate of future-reaping while sync is not active
-                    interruptableSleep(10000L);
+                    //
+                    // we really don't want to slow down things when sync becomes 
+                    // inactive, because it means that we wish to top the process
+                    // fairly quickly. -rpw
+                    //interruptableSleep(10000L);
                 }
                 
                 reapFutures(futuresMap);
@@ -264,6 +269,7 @@ public class SyncObjectTask implements Callable<String> {
 
         // first check all the futures of past tasks to see if any have finished
         // XXX is this code doing anything useful?
+        // the if statement below is to provide debugging messages to the log file
         if (futuresMap.size() > 0) {
             logger.info("waiting on " + futuresMap.size() + " futures");
         } else {
@@ -271,6 +277,13 @@ public class SyncObjectTask implements Callable<String> {
         }
         if (!futuresMap.isEmpty()) {
             // XXX why make a list to do individual removes later, instead of removing them directly?
+            // removing an object from the hash will cause an exception ConcurrentModificationException
+            // to be thrown during  the for loop iteration
+            // So, keep track of the items to remove, and remove them after iteration
+            //
+            // to remove in a loop, an listIterator could be used
+            // http://stackoverflow.com/questions/10431981/remove-elements-from-collection-while-iterating
+            //
             ArrayList<Future<SyncObjectState>> removalList = new ArrayList<>();
 
             for (FutureTask<SyncObjectState> future : futuresMap.keySet()) {
@@ -310,8 +323,8 @@ public class SyncObjectTask implements Callable<String> {
                     
                     logger.error(futureTask.taskLabel() + "An Exception is reported FROM the Future "
                             + ":(" + futureNodeComm.getNumber() + "):");
-                    logger.error(futureTask.taskLabel() + ex.getMessage());
-                    ex.printStackTrace();
+                    logger.error(futureTask.taskLabel() + ex.getMessage(), ex);
+
                     
                     futureNodeComm.setState(NodeCommState.AVAILABLE);
                     removalList.add(future);
