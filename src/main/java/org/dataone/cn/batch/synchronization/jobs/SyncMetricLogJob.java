@@ -9,7 +9,6 @@ import com.hazelcast.client.HazelcastClient;
 import java.util.concurrent.BlockingQueue;
 import org.apache.log4j.Logger;
 import org.dataone.cn.ComponentActivationUtility;
-import org.dataone.cn.batch.synchronization.listener.SyncMetricLogJobTriggerListener;
 import org.dataone.cn.batch.synchronization.tasks.SyncMetricLogReport;
 import org.dataone.cn.hazelcast.HazelcastClientFactory;
 import org.dataone.cn.synchronization.types.SyncObject;
@@ -55,14 +54,7 @@ logger.debug("end");
             jex.unscheduleFiringTrigger();
             jex.setStackTrace(ex.getStackTrace());
         }
-        // The trigger will create a lock when evaluating if 
-        // the job should be vetoed useing vetoJobExecution
-        // vetoJobExecution will return true if it can obtain
-        // the lock or false if lock is already held
-        // This thread releases the lock so that other
-        // trigger threads might obtain the lock again so
-        // as to call this job.
-        SyncMetricLogJobTriggerListener.releaseJob();
+
         if (jex != null) {
             throw jex;
         }
