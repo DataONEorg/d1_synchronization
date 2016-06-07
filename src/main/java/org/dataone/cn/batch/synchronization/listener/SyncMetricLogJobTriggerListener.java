@@ -84,7 +84,9 @@ public class SyncMetricLogJobTriggerListener implements TriggerListener{
         //
         // if the job is not locked, then try to lock it
         logger.debug("vetoJobExecution");
-        return lockJob();
+        // lockJob will return true if lock is successful,
+        // therefore the veto is false if lock is true
+        return !lockJob();
     }
 
         
