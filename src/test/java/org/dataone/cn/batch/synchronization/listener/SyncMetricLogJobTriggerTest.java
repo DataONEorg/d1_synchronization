@@ -17,6 +17,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import org.junit.Test;
+import org.quartz.Trigger;
 
 /**
  *
@@ -31,7 +32,7 @@ public class SyncMetricLogJobTriggerTest {
         SyncMetricLogJobTriggerListener syncMetricLogJobTrigger = new SyncMetricLogJobTriggerListener();
         assertTrue(syncMetricLogJobTrigger.vetoJobExecution(null, null));
         boolean locked = true;
-        TestUnlockTask testUnlockTask = new TestUnlockTask();
+        TestUnlockTask testUnlockTask = new TestUnlockTask(syncMetricLogJobTrigger);
         Future futureUnlockTask = singleThreadExecutor.submit(testUnlockTask);
         while (locked) {
             try {
@@ -45,12 +46,15 @@ public class SyncMetricLogJobTriggerTest {
             }
         }
         assertTrue(syncMetricLogJobTrigger.vetoJobExecution(null, null));
-        SyncMetricLogJobTriggerListener.releaseJob();
+        
         singleThreadExecutor.shutdown();
     }
     
     private class TestUnlockTask implements Runnable {
-
+        SyncMetricLogJobTriggerListener syncMetricLogJobTrigger;
+        public TestUnlockTask(SyncMetricLogJobTriggerListener syncMetricLogJobTrigger) {
+            this.syncMetricLogJobTrigger = syncMetricLogJobTrigger;
+        }
 
         @Override
         public void run() {
@@ -59,7 +63,7 @@ public class SyncMetricLogJobTriggerTest {
             } catch (InterruptedException ex) {
                 logger.info(ex,ex);
             }
-            SyncMetricLogJobTriggerListener.releaseJob();
+            syncMetricLogJobTrigger.triggerComplete(null, null, Trigger.CompletedExecutionInstruction.SET_TRIGGER_COMPLETE);
         }
     }
 }

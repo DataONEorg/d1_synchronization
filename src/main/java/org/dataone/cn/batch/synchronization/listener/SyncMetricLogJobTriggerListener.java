@@ -44,8 +44,21 @@ public class SyncMetricLogJobTriggerListener implements TriggerListener{
         return name;
     }
 
+    /* according to QuartzSchedulerThread and JobRunShell in Quartz 2.17
+      triggerComplete will not fire if the Trigger has been vetoed
+    */
     public void triggerComplete(Trigger trigger, JobExecutionContext context,
             Trigger.CompletedExecutionInstruction triggerInstructionCode) {
+        // The trigger will create a lock when evaluating if 
+        // the job should be vetoed useing vetoJobExecution
+        // vetoJobExecution will return true if it can obtain
+        // the lock or false if lock is already held
+        //
+        // If the Job completes and is not vetoed then
+        // This method releases the lock so that other
+        // trigger threads might obtain the lock again so
+        // as to call this job.
+        releaseJob();
         logger.debug("triggersComplete " );
 
     }
@@ -78,7 +91,7 @@ public class SyncMetricLogJobTriggerListener implements TriggerListener{
     
     // this is to be called when SyncMetricLogJob has completed
     // it's run
-    public static synchronized  void  releaseJob() {
+    private void  releaseJob() {
         synchronized(lock){
             logger.debug("releaseJob");
             lockJobQueue.poll();
@@ -86,12 +99,12 @@ public class SyncMetricLogJobTriggerListener implements TriggerListener{
     }
     // this is to be called to evaluate whether a trigger
     // should veto its job execution
-    private static  boolean  lockJob() {
+    private  boolean  lockJob() {
         boolean locked;
         synchronized(lock){
             locked =  lockJobQueue.offer(lock);
         }
-        logger.debug("lockJob is " + locked);
+        logger.debug("lockJob is " + locked + " queue size is " + lockJobQueue.size());
         return locked;
     }
 }
