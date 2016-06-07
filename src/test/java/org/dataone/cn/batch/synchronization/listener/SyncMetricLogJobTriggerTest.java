@@ -30,7 +30,7 @@ public class SyncMetricLogJobTriggerTest {
     public void testLocking() throws InterruptedException {
         ExecutorService singleThreadExecutor = Executors.newSingleThreadExecutor();
         SyncMetricLogJobTriggerListener syncMetricLogJobTrigger = new SyncMetricLogJobTriggerListener();
-        assertTrue(syncMetricLogJobTrigger.vetoJobExecution(null, null));
+        assertFalse(syncMetricLogJobTrigger.vetoJobExecution(null, null));
         boolean locked = true;
         TestUnlockTask testUnlockTask = new TestUnlockTask(syncMetricLogJobTrigger);
         Future futureUnlockTask = singleThreadExecutor.submit(testUnlockTask);
@@ -41,11 +41,11 @@ public class SyncMetricLogJobTriggerTest {
             } catch (ExecutionException ex) {
                 fail(ex.getMessage());
             } catch (TimeoutException ex) {
-                assertFalse(syncMetricLogJobTrigger.vetoJobExecution(null, null));
+                assertTrue(syncMetricLogJobTrigger.vetoJobExecution(null, null));
                 logger.info(ex);
             }
         }
-        assertTrue(syncMetricLogJobTrigger.vetoJobExecution(null, null));
+        assertFalse(syncMetricLogJobTrigger.vetoJobExecution(null, null));
         
         singleThreadExecutor.shutdown();
     }
