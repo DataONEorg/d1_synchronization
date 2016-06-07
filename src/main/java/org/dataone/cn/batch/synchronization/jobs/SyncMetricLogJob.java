@@ -39,6 +39,7 @@ public class SyncMetricLogJob implements Job {
         JobExecutionException jex = null;
 
         try {
+logger.debug("start");            
             if (ComponentActivationUtility.synchronizationIsActive()) {
                 HazelcastClient hazelcast = HazelcastClientFactory.getProcessingClient();
                 BlockingQueue<SyncObject> hzSyncObjectQueue = hazelcast.getQueue(syncObjectQueue);
@@ -46,7 +47,7 @@ public class SyncMetricLogJob implements Job {
             } else {
                 logger.warn("SyncMetricLogJob Disabled");
             }
-
+logger.debug("end");
         } catch (Exception ex) {
             logger.error(jobContext.getJobDetail().getKey().getName() + " died: " + ex.getMessage(), ex);
             // log this message, someone else has the lock (and they probably shouldn't)

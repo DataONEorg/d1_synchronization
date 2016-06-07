@@ -9,6 +9,7 @@ package org.dataone.cn.batch.synchronization.tasks;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
+import org.apache.log4j.Logger;
 import org.dataone.cn.log.MetricEvent;
 import org.dataone.cn.log.MetricLogClientFactory;
 import org.dataone.cn.log.MetricLogEntry;
@@ -22,15 +23,16 @@ import org.dataone.service.types.v1.NodeReference;
  * @author waltz
  */
 public class SyncMetricLogReport {
-    
+    static final Logger logger = Logger.getLogger(SyncMetricLogReport.class);
     public void reportSyncMetrics(BlockingQueue<SyncObject> hzSyncObjectQueue) {
+logger.debug("start");
         Map<String, MutableCounter> countSyncObjectPerNodeMap = new HashMap<>();
-        
+        SyncObject[] syncObjectArray = hzSyncObjectQueue.toArray(new SyncObject[0]);
         MetricLogEntry metricLogEntry = new MetricLogEntry(MetricEvent.SYNCHRONIZATION_QUEUED);
-        metricLogEntry.setMessage("Total Sync Objects Queued: " + hzSyncObjectQueue.size());
+        metricLogEntry.setMessage("Total Sync Objects Queued: " + syncObjectArray.length);
         MetricLogClientFactory.getMetricLogClient().logMetricEvent(metricLogEntry);
         
-        SyncObject[] syncObjectArray = hzSyncObjectQueue.toArray(new SyncObject[0]);
+        
         
         for (int i = 0; i < syncObjectArray.length; ++i) {
             String nodeId = syncObjectArray[i].getNodeId();
@@ -50,6 +52,7 @@ public class SyncMetricLogReport {
             metricLogEntry.setMessage("Sync Objects Queued: " + countSyncObjectPerNodeMap.get(nodeId).getInt());
              MetricLogClientFactory.getMetricLogClient().logMetricEvent(metricLogEntry);
         }
+logger.debug("end");
     }
 
     /**
