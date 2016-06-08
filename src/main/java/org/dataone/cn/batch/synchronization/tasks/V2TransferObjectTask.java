@@ -185,32 +185,32 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
             try {
                 Thread.sleep(remainingSleep);
             } catch (InterruptedException ex) {
-                logger.warn(task.taskLabel() + " Interrupted task-remaining-sleep");
+                logger.warn(buildStandardLogMessage(null, " Interrupted task-remaining-sleep"));
             }
         }
 
         Lock hzPidLock = hzProcessingClient.getLock(task.getPid());
         boolean isLockAcquired = false;
+        logger.info(buildStandardLogMessage(null, " Locking task, attempt " + task.getAttempt()));
 
-        logger.info(task.taskLabel() + " Locking task, attempt " + task.getAttempt());
         try {
             // TODO: consider replacing Lock with with IMap, for the automatic GC
             // see https://groups.google.com/forum/#!topic/hzProcessingClient/9YFGh3xwe8I
             isLockAcquired = hzPidLock.tryLock(1, TimeUnit.SECONDS); // both parameters define the wait time
             if (isLockAcquired) {
                 try {
-                    logger.info(task.taskLabel() + " Processing SyncObject");
+                    logger.info(buildStandardLogMessage(null,  " Processing SyncObject"));
                     SystemMetadata mnSystemMetadata = retrieveMNSystemMetadata();
-                    logger.info(task.taskLabel() + " MN system metadata retrieved...");
+                    logger.debug(task.taskLabel() + " MN system metadata retrieved...");
 
                     processTask(mnSystemMetadata);
                     callState = SyncObjectState.SUCCESS;
                     
                 } catch (RetryableException ex) {
                     if (task.getAttempt() < 20) {
-                        logger.warn(task.taskLabel() + " " + ex.getCause().getClass().getSimpleName() + ":" + ex.getCause().getMessage());
-                        logger.warn(task.taskLabel() + " RetryableException raised on attempt "
-                                + task.getAttempt() + " of 20.  Sleeping and requeueing.");
+                       
+                        logger.warn(buildStandardLogMessage(ex, " RetryableException raised on attempt "
+                                + task.getAttempt() + " of 20.  Sleeping and requeueing."));
 
                         task.setAttempt(task.getAttempt() + 1);
                         task.setSleepUntil((new Date()).getTime() + 5000L);
@@ -218,8 +218,8 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
                         hzProcessingClient.getQueue(synchronizationObjectQueue).put(task);
                         
                     } else {
-                        logger.error(task.taskLabel() + " Exceeded retry limit."
-                                + " Unable to process the SyncObject. Converting to UnrecoverableException");
+                        logger.error(buildStandardLogMessage(ex," Exceeded retry limit."
+                                + " Unable to process the SyncObject. Converting to UnrecoverableException"),ex);
                         throw new UnrecoverableException(task.getPid() + ": retry limits reached without success.",
                                 ex.getCause());
                     }
@@ -229,8 +229,8 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
                 if (task.getAttempt() < 100) {
                     callState = SyncObjectState.RETRY;
                     
-                    logger.warn(task.taskLabel()
-                            + " Cannot lock Pid! Requeueing the task. Attempt " + task.getLockAttempt());
+                    logger.warn(buildStandardLogMessage(null,
+                            " Cannot lock Pid! Requeueing the task. Attempt " + task.getLockAttempt()));
 
                     task.setLockAttempt(task.getLockAttempt() + 1);
                     task.setSleepUntil((new Date()).getTime() + 1000L);
@@ -240,7 +240,7 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
                     callState = SyncObjectState.FAILED;
                     
                     String message = "Cannot lock Pid! Reached Max attempts (100), abandoning processing of this pid.";
-                    logger.error(task.taskLabel() + message);
+                    logger.error(buildStandardLogMessage(null, message));
                     throw new SynchronizationFailed("5000",message);
                 }
             }
@@ -273,20 +273,19 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
             callState = SyncObjectState.FAILED;
             // was handled as Exception before I split this out
             // don't know if we need to handle it any differently,
-            logger.error(task.taskLabel() + " - Interrupted: " + e.getMessage());
+            logger.error(buildStandardLogMessage(e, "Interrupted: " + e.getMessage()), e);
 
         } catch (Exception e) {
             callState = SyncObjectState.FAILED;
-            e.printStackTrace();
-            logger.error(this.buildStandardLogMessage(e,null),e);
+            logger.error(this.buildStandardLogMessage(e,e.getMessage()),e);
 
         } finally {
             if (isLockAcquired) {
                 hzPidLock.unlock();
-                logger.debug(task.taskLabel() + " Unlocked Pid.");
+                logger.info(buildStandardLogMessage(null,  " Unlocked Pid."));
             }
         }
-        logger.debug(task.taskLabel() + " exiting with callState: " + callState);
+        logger.info(buildStandardLogMessage(null, " exiting with callState: " + callState));
         return callState;
     }
 
@@ -302,9 +301,9 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
         SystemMetadata systemMetadata = null;
         try {
             systemMetadata = getSystemMetadataHandleRetry(nodeCommunications.getMnRead(), D1TypeBuilder.buildIdentifier(task.getPid()));
-            logger.info(task.taskLabel() + " Retrieved SystemMetadata Identifier:"
+            logger.info(buildStandardLogMessage(null, " Retrieved SystemMetadata Identifier:"
                     + systemMetadata.getIdentifier().getValue() + " from node " + task.getNodeId()
-                    + " for ObjectInfo Identifier " + task.getPid());
+                    + " for ObjectInfo Identifier " + task.getPid()));
             if (!systemMetadata.getIdentifier().getValue().contentEquals(task.getPid())) {
                 // didn't get the right SystemMetadata after all
                 throw new InvalidSystemMetadata(
@@ -318,7 +317,7 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
                 );
             }
         } catch (BaseException ex) {
-            logger.error(task.taskLabel() + "\n" + ex.serialize(BaseException.FMT_XML));
+            logger.error(buildStandardLogMessage(ex, ex.getDescription()),ex);
             throw SyncFailedTask.createSynchronizationFailed(task.getPid(), null, ex);
 
 //        } catch (RetryableException ex) {
@@ -414,12 +413,12 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
                 processNewObject(mnSystemMetadata);
             }
         } catch (NotAuthorized ex) {
-            logger.warn(task.taskLabel() + " - NotAuthorized to claim the seriesId: " + ex.getDescription());
+            logger.error(buildStandardLogMessage(ex, "NotAuthorized to claim the seriesId"), ex);
             throw SyncFailedTask.createSynchronizationFailed(mnSystemMetadata.getIdentifier().getValue(),
                     "NotAuthorized to claim the seriesId", ex);
 
         } catch (RetryableException ex) {
-            logger.warn(task.taskLabel() + " - RetryableException: " + ex.getMessage());
+            logger.warn(buildStandardLogMessage(ex,"RetryableException "));
             throw ex;
         }
     }
@@ -459,10 +458,10 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
             Session verifySubmitter = new Session();
             verifySubmitter.setSubject(mnSystemMetadata.getSubmitter());
             identifierReservationService.hasReservation(verifySubmitter, mnSystemMetadata.getSubmitter(), mnSystemMetadata.getIdentifier());
-            logger.info(task.taskLabel() + " Pid is reserved by this object's submitter.");
+            logger.debug(task.taskLabel() + " Pid is reserved by this object's submitter.");
 
         } catch (NotFound e) {
-            logger.info(task.taskLabel() + " Pid is not reserved by anyone.");
+            logger.debug(task.taskLabel() + " Pid is not reserved by anyone.");
             // ok to continue...
         
         } catch (NotAuthorized | InvalidRequest e) {
@@ -534,21 +533,20 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
             }
 
         } catch (ServiceFailure ex) {
-            logger.error(task.taskLabel() + "\n" + ex.serialize(BaseException.FMT_XML));
+            logger.error(buildStandardLogMessage(ex, ex.getDescription()),ex);
             V2TransferObjectTask.extractRetryableException(ex);
             throw new UnrecoverableException(task.getPid(), ex);
 
         } catch (NotFound ex) {
-            logger.error(task.taskLabel() + " - format NotFound: " + ex.getDescription());
+            logger.error(buildStandardLogMessage(ex, "format NotFound: " + ex.getDescription()),ex);
             throw SyncFailedTask.createSynchronizationFailed(task.getPid(), "cn.Core could not find the format",  ex);
 
         } catch (NotImplemented ex) {
-            logger.error(task.taskLabel() + "\n" + ex.serialize(BaseException.FMT_XML));
+            logger.error(buildStandardLogMessage(ex, ex.getDescription()),ex);
             throw new UnrecoverableException(task.getPid() + " - Unexpectedly, cn.getFormat returned NotImplemented!!", ex);
 
         } catch (Exception ex) {
-            ex.printStackTrace();
-            logger.error(task.taskLabel() + "\n this didn't work", ex);
+            logger.error(buildStandardLogMessage(ex, ex.getMessage()),ex);
             throw new UnrecoverableException(task.getPid(), ex);
 
         }
@@ -577,7 +575,7 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
 
             Identifier pid = resolve(sysMeta.getIdentifier(),"SID");
 
-            logger.info(task.taskLabel() + " SeriesId is in use by " + pid.getValue());
+            logger.debug(task.taskLabel() + " SeriesId is in use by " + pid.getValue());
 
             // checking that the new object's submitter is authorized via SID head's accessPolicy
             SystemMetadata sidHeadSysMeta = getSystemMetadataHandleRetry(nodeCommunications.getCnRead(), sid);
@@ -592,17 +590,18 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
             // is obsoleted, that it is not obsoleted by a PID with a different SID?
         } catch (ServiceFailure e) {
             extractRetryableException(e);
-            String message = " couldn't access the CN /meta endpoint to check seriesId!! Reason: " + e.toString();
-            logger.error(task.taskLabel() + message, e);
+            String message = " couldn't access the CN /meta endpoint to check seriesId!! Reason: " + e.getDescription();
+
+            logger.error(buildStandardLogMessage(e, message), e);
             throw new UnrecoverableException(message, e);
             
         } catch (InvalidToken | NotImplemented e) {
-            String message = " couldn't access the CN /meta endpoint to check seriesId!! Reason: " + e.toString();
-            logger.error(task.taskLabel() + message, e);
+            String message = " couldn't access the CN /meta endpoint to check seriesId!! Reason: " + e.getDescription();
+            logger.error(buildStandardLogMessage(e, message), e);
             throw new UnrecoverableException(message, e);
         
         } catch (NotFound e) {
-            logger.info(task.taskLabel() + String.format(
+            logger.debug(task.taskLabel() + String.format(
                     " SeriesId (%s) doesn't exist for any object on the CN, checking reservation service...", 
                     sid.getValue()));
             
@@ -613,18 +612,19 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
                     throw new NotAuthorized("0000", "someone else (other than submitter) holds the reservation on the seriesId! " 
                             + sid.getValue());
                 }
-                logger.info(task.taskLabel() + " OK. SeriesId is reserved by this object's submitter or equivalent ID");
+                logger.debug(task.taskLabel() + " OK. SeriesId is reserved by this object's submitter or equivalent ID");
                 return;
             } catch (NotFound e1) {
-                logger.info(task.taskLabel() + " OK. SeriesId is not reserved.");
+                logger.debug(task.taskLabel() + " OK. SeriesId is not reserved.");
             } catch (InvalidRequest e1) {
                 String message = " Identifier Reservation Service threw unexpected InvalidRequest!! Reason: " + e1.getDescription();
-                logger.error(task.taskLabel() + message, e1);
+
+                logger.error(buildStandardLogMessage(e, message), e1);
                 throw new UnrecoverableException(message, e1);
             } catch (ServiceFailure e1) {
                 extractRetryableException(e1);
                 String message = " Identifier Reservation Service threw unexpected ServiceFailure!! Reason: " + e1.getDescription();
-                logger.error(task.taskLabel() + message, e1);
+                logger.error(buildStandardLogMessage(e, message), e1);
                 throw new UnrecoverableException(message, e1);
             }
         }
@@ -662,12 +662,12 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
         logger.debug(task.taskLabel() + " entering resolve...");
         try {
             ObjectLocationList oll = ((CNRead)nodeCommunications.getCnRead()).resolve(session, id);
-            logger.info(task.taskLabel() + String.format(" %s %s exists on the CN.", field, id.getValue()));
+            logger.debug(task.taskLabel() + String.format(" %s %s exists on the CN.", field, id.getValue()));
             return oll.getIdentifier();
 
         } catch (NotFound ex) {
             // assume if identifierReservationService has thrown NotFound exception SystemMetadata does not exist
-            logger.info(task.taskLabel() + String.format(" %s %s does not exist on the CN.", field, id.getValue()));
+            logger.debug(task.taskLabel() + String.format(" %s %s does not exist on the CN.", field, id.getValue()));
             throw ex;
             
         } catch (ServiceFailure e) {
@@ -699,7 +699,7 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
     //TODO: review sleep and exception handling
     private void createObject(SystemMetadata systemMetadata) throws RetryableException, UnrecoverableException, SynchronizationFailed {
 
-        logger.debug(task.taskLabel() + " entering createObject...");
+        logger.info(buildStandardLogMessage(null, "Start CreateObject"));
 
         Identifier d1Identifier = new Identifier();
         d1Identifier.setValue(systemMetadata.getIdentifier().getValue());
@@ -741,7 +741,7 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
                         } catch (NotAuthorized ex) {
                             if (tryAgain < 2) {
                                 ++tryAgain;
-                                logger.error(task.taskLabel() + " Got NotAuthorized on MNRead.get(), retrying...");
+                                logger.error(buildStandardLogMessage(ex, " Got NotAuthorized on MNRead.get(), retrying..."));
                                 //                            interruptableSleep(5000L);
                             } else {
                                 // only way to get out of loop if NotAuthorized keeps getting thrown
@@ -750,7 +750,7 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
                         } catch (ServiceFailure ex) {
                             if (tryAgain < 6) {
                                 ++tryAgain;
-                                logger.error(task.taskLabel() + " Got ServiceFailure on MNRead.get(), retrying...");
+                                logger.error(buildStandardLogMessage(ex, "Got ServiceFailure on MNRead.get(), retrying..."));
                                 //(5000L);
                             } else {
                                 // only way to get out of loop if ServiceFailure keeps getting thrown
@@ -765,19 +765,20 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
                     /*
                  validateResourceMap(objectFormat, sciMetaStream);
                      */
-                    logger.info(task.taskLabel() + " Calling CNCreate...");
+                    logger.debug(task.taskLabel() + " Calling CNCreate...");
                     d1Identifier = nodeCommunications.getCnCore().create(session, d1Identifier, sciMetaStream,
                             systemMetadata);
-                    logger.info(task.taskLabel() + " ... Created Object");
+                    logger.debug(task.taskLabel() + " ... CNCreate finished");
                 } finally {
                     IOUtils.closeQuietly(sciMetaStream);
                 }
             } else {
-                logger.info(task.taskLabel() + " Registering SystemMetadata...");
+                logger.debug(task.taskLabel() + " Registering SystemMetadata...");
                 nodeCommunications.getCnCore().registerSystemMetadata(session, d1Identifier,
                         systemMetadata);
-                logger.info(task.taskLabel() + " ... Registered SystemMetadata");
+                logger.debug(task.taskLabel() + " ... Registered SystemMetadata");
             }
+            logger.info(buildStandardLogMessage(null,  "Completed CreateObject"));
         } catch (ServiceFailure e) {
             extractRetryableException(e);
             throw new UnrecoverableException(task.getPid() + " in createObject, failed.",e);
@@ -846,7 +847,7 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
             if (checksumException != null) {
                 be.initCause(checksumException);
             }
-            logger.error(task.taskLabel() + ": " + errorMessage);
+            logger.error(buildStandardLogMessage(null,  errorMessage));
             throw be;
         }
     }
@@ -948,8 +949,8 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
         //XXX is cloning the identifier necessary?
         Identifier pid = D1TypeBuilder.cloneIdentifier(newSystemMetadata.getIdentifier());
 
-        logger.info(task.taskLabel() + " Processing as an Update");
-        logger.info(task.taskLabel() + " Getting sysMeta from HazelCast map");
+        logger.info(buildStandardLogMessage(null, "Start ProcessUpdate"));
+        logger.debug(task.taskLabel() + " Getting sysMeta from HazelCast map");
         // TODO: assume that if hasReservation indicates the id exists, that 
         // hzSystemMetadata will not be null...can we make this assumption?
         SystemMetadata hzSystemMetadata = hzSystemMetaMap.get(pid);
@@ -973,6 +974,7 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
             } else {
                 processPossibleNewReplica(newSystemMetadata, hzSystemMetadata, isV1Object);
             }
+            logger.info(buildStandardLogMessage(null,  " Completed ProcessUpdate"));
         } catch (InvalidSystemMetadata e) {
             if (validator == null) {
                 throw new UnrecoverableException("In processUpdates, bad SystemMetadata from the HzMap", e);
@@ -1003,7 +1005,7 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
         logger.debug(task.taskLabel() + " entering processPossibleNewReplica...");
         for (Replica replica : hzSystemMetadata.getReplicaList()) {
             if (task.getNodeId().equals(replica.getReplicaMemberNode().getValue())) {
-                logger.info(task.taskLabel() + " Non-authoritative source, existing replica.  No action needed");
+                logger.debug(task.taskLabel() + " Non-authoritative source, existing replica.  No action needed");
                 return;
             }
         }
@@ -1014,8 +1016,8 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
         mnReplica.setReplicaVerified(new Date());
         // * status can be set to completed because we verified the checksum 
 
-        logger.info(task.taskLabel() + " Non-authoritative source, adding the"
-                + " node as a replica");
+        logger.info(buildStandardLogMessage(null, "Non-authoritative source, adding the"
+                + " node as a replica"));
 
         try {
             nodeCommunications.getCnReplication().updateReplicationMetadata(session, newSystemMetadata.getIdentifier(),
@@ -1059,14 +1061,14 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
             // already been set.  Once set, it cannot change.
             if ((cnSystemMetadata.getObsoletedBy() == null)
                     && (mnSystemMetadata.getObsoletedBy() != null)) {
-                logger.info(task.taskLabel() + " Updating ObsoletedBy...");
+                logger.debug(task.taskLabel() + " Updating ObsoletedBy...");
 
                 nodeCommunications.getCnCore().setObsoletedBy(session, TypeFactory.buildIdentifier(task.getPid()),
                         mnSystemMetadata.getObsoletedBy(),
                         cnSystemMetadata.getSerialVersion().longValue());
                 //                auditReplicaSystemMetadata(pid);
                 // serial version will be updated at this point, so get the new version
-                logger.info(task.taskLabel() + " Updated ObsoletedBy");
+                logger.debug(task.taskLabel() + " Updated ObsoletedBy");
                 foundValidMNChange = true;
             }
 
@@ -1076,11 +1078,11 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
             // to false.
             if (((mnSystemMetadata.getArchived() != null) && mnSystemMetadata.getArchived())
                     && ((cnSystemMetadata.getArchived() == null) || !cnSystemMetadata.getArchived())) {
-                logger.info(task.taskLabel() + " Updating Archived...");
+                logger.debug(task.taskLabel() + " Updating Archived...");
                 nodeCommunications.getCnCore().archive(session, TypeFactory.buildIdentifier(task.getPid()));
                 //                auditReplicaSystemMetadata(pid);
                 // serial version will be updated at this point, so get the new version
-                logger.info(task.taskLabel() + " Updated Archived");
+                logger.debug(task.taskLabel() + " Updated Archived");
                 foundValidMNChange = true;
             }
 
@@ -1098,8 +1100,7 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
                     InvalidRequest invalidRequest = new InvalidRequest(
                             "567123",
                             "Synchronization unable to process the update request. Only archived and obsoletedBy may be updated");
-                    logger.error(task.taskLabel() + "\n" + invalidRequest.serialize(invalidRequest.FMT_XML));
-                    logger.warn(task.taskLabel() + " Ignoring update from MN. Only archived and obsoletedBy may be updated");
+                    logger.error(buildStandardLogMessage(invalidRequest, "Ignoring update from MN. Only archived and obsoletedBy may be updated"));
                     throw SyncFailedTask.createSynchronizationFailed(task.getPid(), null, invalidRequest);
                 }
             }
@@ -1156,21 +1157,21 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
                     // (the CN is authoritative for this property and the MNs aren't expected
                     // to maintain them.)
                     mnSystemMetadata.setReplicaList(validator.getReferenceSystemMetadata().getReplicaList());
-                    logger.info(task.taskLabel() + " Copied over existing Replica section from CN..");
+                    logger.debug(task.taskLabel() + " Copied over existing Replica section from CN..");
                 } else {
                     // if somehow the replica section is empty, recreate it based on
                     // this authoritative replica.
                     // (replication depends on at least the authoritativeMN to
                     // be listed in the replica section with a status of COMPLETED)
                     mnSystemMetadata = populateInitialReplicaList(mnSystemMetadata);
-                    logger.info(task.taskLabel() + " replica section empty, so initialized new ReplicaList");
+                    logger.debug(task.taskLabel() + " replica section empty, so initialized new ReplicaList");
                 }
 
                 // copy over the SerialVersion from the CN version or initialize
                 BigInteger cnSerialVersion = validator.getReferenceSystemMetadata().getSerialVersion();
                 if (cnSerialVersion == null) {
                     cnSerialVersion = BigInteger.ONE;
-                    logger.info(task.taskLabel() + " serialVersion empty, so initialized to 1.");
+                    logger.debug(task.taskLabel() + " serialVersion empty, so initialized to 1.");
                 }
                 mnSystemMetadata.setSerialVersion(cnSerialVersion);
 
@@ -1179,12 +1180,12 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
                 // persist the new systemMetadata
                 nodeCommunications.getCnCore().updateSystemMetadata(session, pid, mnSystemMetadata);
 
-                logger.info(task.taskLabel() + " Updated CN with new SystemMetadata");
+                logger.debug(task.taskLabel() + " Updated CN with new SystemMetadata");
                 // propagate the changes
                 notifyReplicaNodes(pid, false);
                 
             } else {
-                logger.info(task.taskLabel() + " No changes to update.");
+                logger.info(buildStandardLogMessage(null,  " No changes to update."));
             }
         } catch (ServiceFailure e) {
             if (validated) {
@@ -1236,16 +1237,16 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
 
             // if one and only one (XOR) is data, there's been a loggable change 
             if (!mnType.equalsIgnoreCase(cnType)) {
-                logger.warn(String.format("Format type for %s has changed from %s to %s",
-                        task.getPid(), cnFormatId.getValue().toUpperCase(), mnFormatId.getValue().toUpperCase()));
+                logger.warn(buildStandardLogMessage(null, String.format("Format type for %s has changed from %s to %s",
+                        task.getPid(), cnFormatId.getValue().toUpperCase(), mnFormatId.getValue().toUpperCase())));
             }
 
         } catch (ServiceFailure | NotFound | NotImplemented | InvalidRequest e) {
-            logger.warn(String.format("Format type change for %s could not be determined due to %s while looking up the ObjectFormat.",
-                    task.getPid(), e.getClass().getSimpleName()));
+            logger.error(buildStandardLogMessage(e,String.format("Format type change for %s could not be determined while looking up the ObjectFormat.",
+                    task.getPid())), e);
         } catch (Exception e) {
-            logger.warn(String.format("Format type change for %s could not be determined due to %s.",
-                    task.getPid(), e.getClass().getSimpleName()),
+            logger.error(buildStandardLogMessage(e,String.format("Format type change for %s could not be determined.",
+                    task.getPid())),
                     e);
         }
     }
@@ -1260,7 +1261,7 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
      */
     private void notifyReplicaNodes(Identifier pid, boolean notifyAuthNode) {
 
-        logger.info(task.taskLabel() + " Entering notifyReplicaNodes...");
+        logger.info(buildStandardLogMessage(null,  " Entering notifyReplicaNodes..."));
         SystemMetadata cnSystemMetadata = hzSystemMetaMap.get(pid);
         if (cnSystemMetadata != null) {
             List<Replica> prevReplicaList = cnSystemMetadata.getReplicaList();
@@ -1281,14 +1282,13 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
                         ServiceFailure | NotFound | InvalidRequest be) {
                     // failed notifications shouldn't result in a sync failure
                     // nor a retry, so we will log the exception and keep going
-                    logger.warn(task.taskLabel() + "Failed to notify replica member node " +
-                            replicaNodeId.getValue() + "  - " + be.getClass().getSimpleName() + 
-                            ":" + be.getDescription());
+                    logger.error(buildStandardLogMessage(be, "Failed to notify replica member node " +
+                            replicaNodeId.getValue()), be);
                 }
             }
         } else {
-            logger.error(task.taskLabel() + " null returned from Hazelcast "
-                    + hzSystemMetaMapString + " Map");
+            logger.error(buildStandardLogMessage(null,"null returned from Hazelcast "
+                    + hzSystemMetaMapString + " Map"));
         }
     }
 
@@ -1405,7 +1405,9 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
     protected String buildStandardLogMessage(Throwable th, String introMessage) {
         
         if (th == null) 
-            return introMessage;
+            return String.format("%s - %s",
+                    task.taskLabel(),
+                    introMessage);
 
         if (th instanceof BaseException) 
             return String.format("%s - %s - %s - %s",
