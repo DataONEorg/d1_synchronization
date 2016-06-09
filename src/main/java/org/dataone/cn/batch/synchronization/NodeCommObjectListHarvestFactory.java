@@ -17,7 +17,6 @@
  */
 package org.dataone.cn.batch.synchronization;
 
-import java.util.Date;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import org.apache.log4j.Logger;
@@ -26,12 +25,9 @@ import org.dataone.cn.batch.service.v2.NodeRegistrySyncService;
 import org.dataone.cn.batch.service.v2.impl.NodeRegistrySyncServiceImpl;
 import org.dataone.cn.batch.synchronization.type.NodeComm;
 
-import org.dataone.cn.ldap.NodeRegistrySyncFacade;
 import org.dataone.service.exceptions.NotFound;
-import org.dataone.service.exceptions.NotImplemented;
 import org.dataone.service.exceptions.ServiceFailure;
 import org.dataone.service.types.v2.Node;
-import org.dataone.service.types.v2.NodeList;
 import org.dataone.service.types.v1.NodeReference;
 import org.dataone.service.types.v1.Service;
 
