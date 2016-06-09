@@ -6,6 +6,7 @@
 
 package org.dataone.cn.batch.synchronization.tasks;
 
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
@@ -26,10 +27,12 @@ public class SyncMetricLogReport {
     static final Logger logger = Logger.getLogger(SyncMetricLogReport.class);
     public void reportSyncMetrics(BlockingQueue<SyncObject> hzSyncObjectQueue) {
 logger.debug("start");
+        Date metricLogReportDate = new Date(System.currentTimeMillis());
         Map<String, MutableCounter> countSyncObjectPerNodeMap = new HashMap<>();
         SyncObject[] syncObjectArray = hzSyncObjectQueue.toArray(new SyncObject[0]);
         MetricLogEntry metricLogEntry = new MetricLogEntry(MetricEvent.SYNCHRONIZATION_QUEUED);
         metricLogEntry.setMessage("Total Sync Objects Queued: " + syncObjectArray.length);
+        metricLogEntry.setDateLogged(metricLogReportDate);
         MetricLogClientFactory.getMetricLogClient().logMetricEvent(metricLogEntry);
         
         
@@ -50,6 +53,7 @@ logger.debug("start");
             nodeReference.setValue(nodeId);
             metricLogEntry = new MetricLogEntry(MetricEvent.SYNCHRONIZATION_QUEUED, nodeReference);
             metricLogEntry.setMessage("Sync Objects Queued: " + countSyncObjectPerNodeMap.get(nodeId).getInt());
+            metricLogEntry.setDateLogged(metricLogReportDate);
              MetricLogClientFactory.getMetricLogClient().logMetricEvent(metricLogEntry);
         }
 logger.debug("end");
