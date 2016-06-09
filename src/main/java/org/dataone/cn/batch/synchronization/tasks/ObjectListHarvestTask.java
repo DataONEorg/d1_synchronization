@@ -242,10 +242,13 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
         MetricLogEntry metricHarvestRetrievedLogEvent = new MetricLogEntry(
                 MetricEvent.SYNCHRONIZATION_HARVEST_RETRIEVED,
                 d1NodeReference, null, Integer.toString(syncMetricTotalRetrieved));
+        Date harvestMetricLogDate = new Date(metricHarvestRetrievedLogEvent.getDateLogged().getTime());
         metricLogger.logMetricEvent(metricHarvestRetrievedLogEvent);
+        
         MetricLogEntry metricHarvestSubmittedLogEvent = new MetricLogEntry(
                 MetricEvent.SYNCHRONIZATION_HARVEST_SUBMITTED,
                 d1NodeReference, null, Integer.toString(syncMetricTotalSubmitted));
+        metricHarvestSubmittedLogEvent.setDateLogged(harvestMetricLogDate);
         metricLogger.logMetricEvent(metricHarvestSubmittedLogEvent);
         // return the date of completion of the task
         return new Date();
