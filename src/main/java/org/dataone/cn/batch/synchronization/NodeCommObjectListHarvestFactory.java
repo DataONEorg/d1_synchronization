@@ -23,6 +23,7 @@ import java.util.concurrent.ConcurrentMap;
 import org.apache.log4j.Logger;
 import org.dataone.cn.batch.exceptions.NodeCommUnavailable;
 import org.dataone.cn.batch.service.v2.NodeRegistrySyncService;
+import org.dataone.cn.batch.service.v2.impl.NodeRegistrySyncServiceImpl;
 import org.dataone.cn.batch.synchronization.type.NodeComm;
 
 import org.dataone.cn.ldap.NodeRegistrySyncFacade;
@@ -74,34 +75,7 @@ public class NodeCommObjectListHarvestFactory implements NodeCommFactory {
 
             // figure out what client impl to use for this node, default to v1
             Object mNode = null;
-            NodeRegistrySyncService nodeRegistryService = new NodeRegistrySyncService() {
-
-            private NodeRegistrySyncFacade serviceImpl
-                    = new NodeRegistrySyncFacade();
-
-                @Override
-                public NodeList listNodes()
-                        throws ServiceFailure, NotImplemented {
-
-                    return serviceImpl.getApprovedNodeList();
-                }
-
-                @Override
-                public Node getNode(NodeReference nodeId) throws NotFound,
-                        ServiceFailure {
-                    return serviceImpl.getNode(nodeId);
-                }
-
-                @Override
-                public void setDateLastHarvested(NodeReference nodeIdentifier, Date lastDateNodeHarvested) throws ServiceFailure {
-                    serviceImpl.setDateLastHarvested(nodeIdentifier, lastDateNodeHarvested);
-                }
-
-                @Override
-                public Date getDateLastHarvested(NodeReference nodeIdentifier) throws ServiceFailure {
-                    return serviceImpl.getDateLastHarvested(nodeIdentifier);
-                }
-            };
+            NodeRegistrySyncService nodeRegistryService = new NodeRegistrySyncServiceImpl();
             Node node = null;
             boolean hasCore = false;
             boolean hasRead = false;

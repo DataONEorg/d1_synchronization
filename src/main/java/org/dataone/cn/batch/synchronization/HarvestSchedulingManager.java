@@ -48,10 +48,11 @@ import org.springframework.context.ApplicationContextAware;
 import java.io.File;
 
 import org.dataone.client.auth.CertificateManager;
+import org.dataone.cn.batch.service.v2.NodeRegistrySyncService;
+import org.dataone.cn.batch.service.v2.impl.NodeRegistrySyncServiceImpl;
 import org.dataone.cn.batch.synchronization.jobs.SyncMetricLogJob;
 import org.dataone.cn.batch.synchronization.listener.SyncMetricLogJobTriggerListener;
 import org.dataone.cn.hazelcast.HazelcastClientFactory;
-import org.dataone.service.cn.v2.impl.NodeRegistryServiceImpl;
 import org.dataone.service.exceptions.NotImplemented;
 import org.dataone.service.exceptions.ServiceFailure;
 import org.dataone.service.types.v2.NodeList;
@@ -59,7 +60,6 @@ import org.joda.time.DateTime;
 import static org.quartz.SimpleScheduleBuilder.simpleSchedule;
 import org.quartz.TriggerListener;
 import org.quartz.impl.matchers.KeyMatcher;
-import org.quartz.impl.matchers.NameMatcher;
 
 /**
  * this bean must be managed by Spring upon startup of spring it will execute via init method
@@ -83,8 +83,8 @@ public class HarvestSchedulingManager implements ApplicationContextAware {
 
     private Scheduler scheduler;
     ApplicationContext applicationContext;
-    private NodeRegistryServiceImpl nodeRegistryService
-            = new NodeRegistryServiceImpl();
+
+    private NodeRegistrySyncService nodeRegistryService = new NodeRegistrySyncServiceImpl();
     private static String clientCertificateLocation
             = Settings.getConfiguration().getString("D1Client.certificate.directory")
             + File.separator + Settings.getConfiguration().getString("D1Client.certificate.filename");
