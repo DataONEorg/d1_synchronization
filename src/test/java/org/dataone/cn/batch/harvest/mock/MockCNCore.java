@@ -56,7 +56,7 @@ import org.dataone.service.types.v2.ObjectFormat;
 import org.dataone.service.types.v2.ObjectFormatList;
 import org.dataone.service.types.v2.SystemMetadata;
 import org.dataone.service.util.TypeMarshaller;
-import org.jibx.runtime.JiBXException;
+import org.dataone.exceptions.MarshallingException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
@@ -115,7 +115,7 @@ public class MockCNCore implements CNCore {
             throw new ServiceFailure("1190", ex.getMessage());
         } catch (IOException ex) {
             throw new ServiceFailure("1190", ex.getMessage());
-        } catch (JiBXException ex) {
+        } catch (MarshallingException ex) {
             throw new InvalidSystemMetadata("1180", ex.getMessage());
         }
         return pid;

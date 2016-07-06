@@ -6,13 +6,14 @@ import java.io.IOException;
 import java.math.BigInteger;
 import java.util.Date;
 
+import org.dataone.exceptions.MarshallingException;
+
 import org.dataone.service.exceptions.InvalidRequest;
 import org.dataone.service.exceptions.InvalidSystemMetadata;
 import org.dataone.service.exceptions.ServiceFailure;
 import org.dataone.service.types.v1.Checksum;
 import org.dataone.service.types.v1.TypeFactory;
 import org.dataone.service.types.v2.SystemMetadata;
-import org.jibx.runtime.JiBXException;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -47,7 +48,7 @@ public class SystemMetadataValidatorTest {
     @Test
     public void testHasValidUpdates_archivedTrue2False()
             throws InvalidSystemMetadata, InstantiationException, IllegalAccessException, 
-            JiBXException, IOException, ServiceFailure, InvalidRequest {
+            MarshallingException, IOException, ServiceFailure, InvalidRequest {
         
         cnSystemMetadata.setArchived(true);
         SystemMetadataValidator v = new SystemMetadataValidator(cnSystemMetadata);
@@ -66,7 +67,7 @@ public class SystemMetadataValidatorTest {
     @Test
     public void testHasValidUpdates_archivedTrue2Null()
             throws InvalidSystemMetadata, InstantiationException, IllegalAccessException, 
-            JiBXException, IOException, ServiceFailure, InvalidRequest {
+            MarshallingException, IOException, ServiceFailure, InvalidRequest {
         
         cnSystemMetadata.setArchived(true);
         SystemMetadataValidator v = new SystemMetadataValidator(cnSystemMetadata);
@@ -85,7 +86,7 @@ public class SystemMetadataValidatorTest {
     @Test
     public void testHasValidUpdates_archivedFalse2True()
             throws InvalidSystemMetadata, InstantiationException, IllegalAccessException, 
-            JiBXException, IOException, ServiceFailure, InvalidRequest {
+            MarshallingException, IOException, ServiceFailure, InvalidRequest {
         
         cnSystemMetadata.setArchived(false);
         SystemMetadataValidator v = new SystemMetadataValidator(cnSystemMetadata);
@@ -99,7 +100,7 @@ public class SystemMetadataValidatorTest {
     @Test
     public void testHasValidUpdates_archivedNull2True()
             throws InvalidSystemMetadata, InstantiationException, IllegalAccessException, 
-            JiBXException, IOException, ServiceFailure, InvalidRequest {
+            MarshallingException, IOException, ServiceFailure, InvalidRequest {
         
         SystemMetadataValidator v = new SystemMetadataValidator(cnSystemMetadata);
         
@@ -112,7 +113,7 @@ public class SystemMetadataValidatorTest {
     @Test
     public void testHasValidUpdates_archivedTrue2True()
             throws InvalidSystemMetadata, InstantiationException, IllegalAccessException, 
-            JiBXException, IOException, ServiceFailure, InvalidRequest {
+            MarshallingException, IOException, ServiceFailure, InvalidRequest {
         
         cnSystemMetadata.setArchived(true);
         SystemMetadataValidator v = new SystemMetadataValidator(cnSystemMetadata);
@@ -127,7 +128,7 @@ public class SystemMetadataValidatorTest {
     @Test
     public void testHasValidUpdates_archivedFalse2False()
             throws InvalidSystemMetadata, InstantiationException, IllegalAccessException, 
-            JiBXException, IOException, ServiceFailure, InvalidRequest {
+            MarshallingException, IOException, ServiceFailure, InvalidRequest {
         
         cnSystemMetadata.setArchived(false);
         SystemMetadataValidator v = new SystemMetadataValidator(cnSystemMetadata);
@@ -141,7 +142,7 @@ public class SystemMetadataValidatorTest {
     @Test
     public void testHasValidUpdates_archivedNull2Null()
             throws InvalidSystemMetadata, InstantiationException, IllegalAccessException, 
-            JiBXException, IOException, ServiceFailure, InvalidRequest {
+            MarshallingException, IOException, ServiceFailure, InvalidRequest {
         
         SystemMetadataValidator v = new SystemMetadataValidator(cnSystemMetadata);
         
@@ -153,7 +154,7 @@ public class SystemMetadataValidatorTest {
     @Test
     public void testHasValidUpdates_archivedFalse2Null()
             throws InvalidSystemMetadata, InstantiationException, IllegalAccessException, 
-            JiBXException, IOException, ServiceFailure, InvalidRequest {
+            MarshallingException, IOException, ServiceFailure, InvalidRequest {
         
         cnSystemMetadata.setArchived(false);
         SystemMetadataValidator v = new SystemMetadataValidator(cnSystemMetadata);
@@ -166,7 +167,7 @@ public class SystemMetadataValidatorTest {
     @Test
     public void testHasValidUpdates_archivedNull2False()
             throws InvalidSystemMetadata, InstantiationException, IllegalAccessException, 
-            JiBXException, IOException, ServiceFailure, InvalidRequest {
+            MarshallingException, IOException, ServiceFailure, InvalidRequest {
         
         SystemMetadataValidator v = new SystemMetadataValidator(cnSystemMetadata);
         

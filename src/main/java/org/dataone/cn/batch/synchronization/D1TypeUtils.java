@@ -5,12 +5,12 @@ import java.io.IOException;
 import java.util.Arrays;
 
 import org.apache.commons.io.IOUtils;
+import org.dataone.exceptions.MarshallingException;
 import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.NodeReference;
 import org.dataone.service.types.v1.ObjectFormatIdentifier;
 import org.dataone.service.types.v1.Subject;
 import org.dataone.service.util.TypeMarshaller;
-import org.jibx.runtime.JiBXException;
 
 /**
  * This class offers direct and efficient equality comparison of DataONE types without having 
@@ -139,7 +139,7 @@ public class D1TypeUtils {
      * @throws JiBXException
      * @throws IOException
      */
-    public static boolean serializedFormEquals(Object object1, Object object2) throws JiBXException, IOException {
+    public static boolean serializedFormEquals(Object object1, Object object2) throws MarshallingException, IOException {
         
         if (object1 == object2)
             return true;
