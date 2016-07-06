@@ -34,6 +34,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 
 import org.apache.commons.io.IOUtils;
+import org.dataone.exceptions.MarshallingException;
 import org.apache.log4j.Logger;
 import org.dataone.cn.batch.exceptions.NodeCommUnavailable;
 import org.dataone.cn.batch.synchronization.NodeCommSyncObjectFactory;
@@ -73,7 +74,7 @@ import org.dataone.service.types.v2.TypeFactory;
 import org.dataone.service.util.TypeMarshaller;
 import org.dspace.foresite.OREException;
 import org.dspace.foresite.OREParserException;
-import org.jibx.runtime.JiBXException;
+
 
 /**
  * Transfer an object from a MemberNode(MN) to a CoordinatingNode(CN). Executes as a thread that is executed by the
@@ -273,7 +274,7 @@ public class TransferObjectTask implements Callable<Void> {
                     // TODO: why does the logger.warn statements have "+ ex" in the message?
                     if (tryAgain < 2) {
                         ++tryAgain;
-                        logger.error(task.taskLabel() + "\n" + ex.serialize(ex.FMT_XML));
+                        logger.error(task.taskLabel() + "\n" + ex.serialize(BaseException.FMT_XML));
                         try {
                             Thread.sleep(5000L);
                         } catch (InterruptedException ex1) {
@@ -286,7 +287,7 @@ public class TransferObjectTask implements Callable<Void> {
                 } catch (ServiceFailure ex) {
                     if (tryAgain < 6) {
                         ++tryAgain;
-                        logger.error(task.taskLabel() + "\n" + ex.serialize(ex.FMT_XML));
+                        logger.error(task.taskLabel() + "\n" + ex.serialize(BaseException.FMT_XML));
                         try {
                             Thread.sleep(5000L);
                         } catch (InterruptedException ex1) {
@@ -306,7 +307,7 @@ public class TransferObjectTask implements Callable<Void> {
                         + " retrieved from getObjectList is different from that contained in systemMetadata "
                         + systemMetadata.getIdentifier().getValue());
                 logger.error(task.taskLabel() + "\n"
-                        + invalidSystemMetadata.serialize(invalidSystemMetadata.FMT_XML));
+                        + invalidSystemMetadata.serialize(BaseException.FMT_XML));
                 submitSynchronizationFailed(task.getPid(), invalidSystemMetadata);
                 return null;
             }
@@ -315,23 +316,23 @@ public class TransferObjectTask implements Callable<Void> {
                     + " for ObjectInfo Identifier " + identifier.getValue());
 
         } catch (NotAuthorized ex) {
-            logger.error(task.taskLabel() + "\n" + ex.serialize(ex.FMT_XML));
+            logger.error(task.taskLabel() + "\n" + ex.serialize(BaseException.FMT_XML));
             submitSynchronizationFailed(task.getPid(), ex);
             return null;
         } catch (InvalidToken ex) {
-            logger.error(task.taskLabel() + "\n" + ex.serialize(ex.FMT_XML));
+            logger.error(task.taskLabel() + "\n" + ex.serialize(BaseException.FMT_XML));
             submitSynchronizationFailed(task.getPid(), ex);
             return null;
         } catch (ServiceFailure ex) {
-            logger.error(task.taskLabel() + "\n" + ex.serialize(ex.FMT_XML));
+            logger.error(task.taskLabel() + "\n" + ex.serialize(BaseException.FMT_XML));
             submitSynchronizationFailed(task.getPid(), ex);
             return null;
         } catch (NotFound ex) {
-            logger.error(task.taskLabel() + "\n" + ex.serialize(ex.FMT_XML));
+            logger.error(task.taskLabel() + "\n" + ex.serialize(BaseException.FMT_XML));
             submitSynchronizationFailed(task.getPid(), ex);
             return null;
         } catch (NotImplemented ex) {
-            logger.error(task.taskLabel() + "\n" + ex.serialize(ex.FMT_XML));
+            logger.error(task.taskLabel() + "\n" + ex.serialize(BaseException.FMT_XML));
             submitSynchronizationFailed(task.getPid(), ex);
             return null;
         } catch (Exception ex) {
@@ -423,15 +424,15 @@ public class TransferObjectTask implements Callable<Void> {
             }
 
         } catch (ServiceFailure ex) {
-            logger.error(task.taskLabel() + "\n" + ex.serialize(ex.FMT_XML));
+            logger.error(task.taskLabel() + "\n" + ex.serialize(BaseException.FMT_XML));
             submitSynchronizationFailed(task.getPid(), ex);
             return null;
         } catch (NotFound ex) {
-            logger.error(task.taskLabel() + "\n" + ex.serialize(ex.FMT_XML));
+            logger.error(task.taskLabel() + "\n" + ex.serialize(BaseException.FMT_XML));
             submitSynchronizationFailed(task.getPid(), ex);
             return null;
         } catch (NotImplemented ex) {
-            logger.error(task.taskLabel() + "\n" + ex.serialize(ex.FMT_XML));
+            logger.error(task.taskLabel() + "\n" + ex.serialize(BaseException.FMT_XML));
             submitSynchronizationFailed(task.getPid(), ex);
             return null;
         } catch (Exception ex) {
@@ -544,37 +545,37 @@ public class TransferObjectTask implements Callable<Void> {
                 }
             }
         } catch (VersionMismatch ex) {
-            logger.warn(task.taskLabel() + "\n" + ex.serialize(ex.FMT_XML));
+            logger.warn(task.taskLabel() + "\n" + ex.serialize(BaseException.FMT_XML));
             throw ex;
         } catch (InvalidSystemMetadata ex) {
-            logger.error(task.taskLabel() + "\n" + ex.serialize(ex.FMT_XML));
+            logger.error(task.taskLabel() + "\n" + ex.serialize(BaseException.FMT_XML));
             submitSynchronizationFailed(systemMetadata.getIdentifier().getValue(), ex);
         } catch (InvalidToken ex) {
-            logger.error(task.taskLabel() + "\n" + ex.serialize(ex.FMT_XML));
+            logger.error(task.taskLabel() + "\n" + ex.serialize(BaseException.FMT_XML));
             submitSynchronizationFailed(systemMetadata.getIdentifier().getValue(), ex);
         } catch (NotFound ex) {
-            logger.error(task.taskLabel() + "\n" + ex.serialize(ex.FMT_XML));
+            logger.error(task.taskLabel() + "\n" + ex.serialize(BaseException.FMT_XML));
             submitSynchronizationFailed(systemMetadata.getIdentifier().getValue(), ex);
         } catch (NotAuthorized ex) {
-            logger.error(task.taskLabel() + "\n" + ex.serialize(ex.FMT_XML));
+            logger.error(task.taskLabel() + "\n" + ex.serialize(BaseException.FMT_XML));
             submitSynchronizationFailed(systemMetadata.getIdentifier().getValue(), ex);
         } catch (InvalidRequest ex) {
-            logger.error(task.taskLabel() + "\n" + ex.serialize(ex.FMT_XML));
+            logger.error(task.taskLabel() + "\n" + ex.serialize(BaseException.FMT_XML));
             submitSynchronizationFailed(systemMetadata.getIdentifier().getValue(), ex);
         } catch (ServiceFailure ex) {
-            logger.error(task.taskLabel() + "\n" + ex.serialize(ex.FMT_XML));
+            logger.error(task.taskLabel() + "\n" + ex.serialize(BaseException.FMT_XML));
             submitSynchronizationFailed(systemMetadata.getIdentifier().getValue(), ex);
         } catch (InsufficientResources ex) {
-            logger.error(task.taskLabel() + "\n" + ex.serialize(ex.FMT_XML));
+            logger.error(task.taskLabel() + "\n" + ex.serialize(BaseException.FMT_XML));
             submitSynchronizationFailed(systemMetadata.getIdentifier().getValue(), ex);
         } catch (NotImplemented ex) {
-            logger.error(task.taskLabel() + "\n" + ex.serialize(ex.FMT_XML));
+            logger.error(task.taskLabel() + "\n" + ex.serialize(BaseException.FMT_XML));
             submitSynchronizationFailed(systemMetadata.getIdentifier().getValue(), ex);
         } catch (UnsupportedType ex) {
-            logger.error(task.taskLabel() + "\n" + ex.serialize(ex.FMT_XML));
+            logger.error(task.taskLabel() + "\n" + ex.serialize(BaseException.FMT_XML));
             submitSynchronizationFailed(systemMetadata.getIdentifier().getValue(), ex);
         } catch (IdentifierNotUnique ex) {
-            logger.error(task.taskLabel() + "\n" + ex.serialize(ex.FMT_XML));
+            logger.error(task.taskLabel() + "\n" + ex.serialize(BaseException.FMT_XML));
             submitSynchronizationFailed(systemMetadata.getIdentifier().getValue(), ex);
         } catch (Exception ex) {
             ex.printStackTrace();
@@ -797,7 +798,7 @@ public class TransferObjectTask implements Callable<Void> {
             ByteArrayOutputStream os = new ByteArrayOutputStream();
             TypeMarshaller.marshalTypeToOutputStream(sysmeta, os);
             os.close();
-        } catch (JiBXException e) {
+        } catch (MarshallingException e) {
             caught = e;
         } catch (IOException e) {
             caught = e;
@@ -900,7 +901,7 @@ public class TransferObjectTask implements Callable<Void> {
                     InvalidRequest invalidRequest = new InvalidRequest(
                             "567123",
                             "Synchronization unable to process the update request. Only archived and obsoletedBy may be updated");
-                    logger.error(task.taskLabel() + "\n" + invalidRequest.serialize(invalidRequest.FMT_XML));
+                    logger.error(task.taskLabel() + "\n" + invalidRequest.serialize(BaseException.FMT_XML));
                     submitSynchronizationFailed(pid.getValue(), invalidRequest);
                     logger.warn(task.taskLabel() + " Ignoring update from MN. Only archived and obsoletedBy may be updated");
                 }
@@ -938,7 +939,7 @@ public class TransferObjectTask implements Callable<Void> {
                 InvalidRequest invalidRequest = new InvalidRequest(
                         "567123",
                         "Not Authorized Node to perform Updates. Synchronization unable to process the update request. Only archived and obsoletedBy may be updated from Authorized Node");
-                logger.error(task.taskLabel() + "\n" + invalidRequest.serialize(invalidRequest.FMT_XML));
+                logger.error(task.taskLabel() + "\n" + invalidRequest.serialize(BaseException.FMT_XML));
                 submitSynchronizationFailed(pid.getValue(), invalidRequest);
                 logger.warn(task.taskLabel() + " Ignoring update from Replica MN");
             }

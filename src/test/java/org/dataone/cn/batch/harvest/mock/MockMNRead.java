@@ -28,6 +28,8 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Date;
+
+import org.dataone.exceptions.MarshallingException;
 import org.apache.log4j.Logger;
 import org.dataone.service.exceptions.*;
 import org.dataone.service.mn.tier1.v1.MNRead;
@@ -40,7 +42,6 @@ import org.dataone.service.types.v1.Session;
 import org.dataone.service.types.v1.SystemMetadata;
 import org.dataone.service.util.EncodingUtilities;
 import org.dataone.service.util.TypeMarshaller;
-import org.jibx.runtime.JiBXException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
@@ -98,13 +99,13 @@ public class MockMNRead implements MNRead {
             logger.info("\n");
         } catch (InstantiationException ex) {
             ServiceFailure exception = new ServiceFailure("002", ex.getMessage());
-
+            throw exception;
         } catch (IllegalAccessException ex) {
             ServiceFailure exception = new ServiceFailure("003", ex.getMessage());
-
-        } catch (JiBXException ex) {
+            throw exception;
+        } catch (MarshallingException ex) {
             ServiceFailure exception = new ServiceFailure("004", ex.getMessage());
-
+            throw exception;
         } catch (FileNotFoundException ex) {
             logger.warn(ex);
             NotFound exception = new NotFound("005", ex.getMessage());
@@ -165,7 +166,7 @@ public class MockMNRead implements MNRead {
             throw new ServiceFailure("4801", ex.getClass().getName() + ": " + ex.getMessage());
         } catch (IllegalAccessException ex) {
             throw new ServiceFailure("4801", ex.getClass().getName() + ": " + ex.getMessage());
-        } catch (JiBXException ex) {
+        } catch (MarshallingException ex) {
             throw new ServiceFailure("4801", ex.getClass().getName() + ": " + ex.getMessage());
         }
     }

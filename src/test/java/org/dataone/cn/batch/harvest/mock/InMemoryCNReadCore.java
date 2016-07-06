@@ -4,7 +4,6 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -16,17 +15,10 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
 
-import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang.ArrayUtils;
-import org.apache.commons.lang.StringUtils;
-import org.dataone.client.D1Node;
-import org.dataone.client.v1.types.D1TypeBuilder;
+import org.dataone.exceptions.MarshallingException;
 import org.dataone.client.v2.CNode;
-import org.dataone.client.v2.MNode;
 import org.dataone.client.v2.formats.ObjectFormatCache;
-import org.dataone.service.cn.v2.CNCore;
-import org.dataone.service.cn.v2.CNRead;
 import org.dataone.service.exceptions.BaseException;
 import org.dataone.service.exceptions.IdentifierNotUnique;
 import org.dataone.service.exceptions.InsufficientResources;
@@ -38,7 +30,6 @@ import org.dataone.service.exceptions.NotAuthorized;
 import org.dataone.service.exceptions.NotFound;
 import org.dataone.service.exceptions.NotImplemented;
 import org.dataone.service.exceptions.ServiceFailure;
-import org.dataone.service.exceptions.SynchronizationFailed;
 import org.dataone.service.exceptions.UnsupportedMetadataType;
 import org.dataone.service.exceptions.UnsupportedType;
 import org.dataone.service.exceptions.VersionMismatch;
@@ -65,7 +56,6 @@ import org.dataone.service.types.v1.Session;
 import org.dataone.service.types.v1.Subject;
 import org.dataone.service.types.v1.SubjectInfo;
 import org.dataone.service.types.v1.util.AuthUtils;
-import org.dataone.service.types.v1.util.ChecksumUtil;
 import org.dataone.service.types.v1_1.QueryEngineDescription;
 import org.dataone.service.types.v1_1.QueryEngineList;
 import org.dataone.service.types.v2.Log;
@@ -77,9 +67,7 @@ import org.dataone.service.types.v2.ObjectFormatList;
 import org.dataone.service.types.v2.OptionList;
 import org.dataone.service.types.v2.SystemMetadata;
 import org.dataone.service.util.TypeMarshaller;
-import org.jibx.runtime.JiBXException;
 
-import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.IMap;
 
 /**
@@ -227,7 +215,7 @@ public class InMemoryCNReadCore implements CNode {
 //            // maybe we don't need to reconstitute to validate...
             TypeMarshaller.unmarshalTypeFromStream(SystemMetadata.class,
                     new ByteArrayInputStream(os.toByteArray()) );
-        } catch (JiBXException e) {
+        } catch (MarshallingException e) {
             caught = e;
         } catch (IOException e) {
             caught = e;

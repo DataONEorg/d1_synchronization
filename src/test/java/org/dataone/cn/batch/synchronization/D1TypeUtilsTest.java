@@ -14,7 +14,7 @@ import org.dataone.service.types.v1.Permission;
 import org.dataone.service.types.v1.ReplicationPolicy;
 import org.dataone.service.types.v1.Subject;
 import org.dataone.service.types.v1.util.AccessUtil;
-import org.jibx.runtime.JiBXException;
+import org.dataone.exceptions.MarshallingException;
 import org.junit.Test;
 
 public class D1TypeUtilsTest {
@@ -105,7 +105,7 @@ public class D1TypeUtilsTest {
     }
     
     @Test
-    public void testEquals_SerializedForm_Identifier() throws JiBXException, IOException {
+    public void testEquals_SerializedForm_Identifier() throws MarshallingException, IOException {
         
         assertTrue("Identifiers should be equal", 
                 D1TypeUtils.serializedFormEquals(D1TypeBuilder.buildIdentifier("biff"), 
@@ -124,7 +124,7 @@ public class D1TypeUtilsTest {
     }
     
     @Test
-    public void testEquals_SerializedForm_AccessPolicy() throws JiBXException, IOException {
+    public void testEquals_SerializedForm_AccessPolicy() throws MarshallingException, IOException {
         
         AccessPolicy ap1a = AccessUtil.createSingleRuleAccessPolicy(
                 new String[]{"alice","bob","eve"}, new Permission[]{Permission.CHANGE_PERMISSION});
@@ -152,7 +152,7 @@ public class D1TypeUtilsTest {
     }
     
     @Test
-    public void testEquals_SerializedForm_ReplicationPolicy() throws JiBXException, IOException {
+    public void testEquals_SerializedForm_ReplicationPolicy() throws MarshallingException, IOException {
         
         ReplicationPolicy rp1a = new ReplicationPolicy();
         rp1a.setNumberReplicas(2);

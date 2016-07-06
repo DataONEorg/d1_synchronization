@@ -9,6 +9,7 @@ import java.util.List;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.ObjectUtils;
 import org.apache.commons.lang.StringUtils;
+import org.dataone.exceptions.MarshallingException;
 import org.apache.log4j.Logger;
 import org.dataone.cn.batch.synchronization.D1TypeUtils;
 import org.dataone.service.exceptions.IdentifierNotUnique;
@@ -23,7 +24,6 @@ import org.dataone.service.mn.tier1.v2.MNRead;
 import org.dataone.service.types.v1.Checksum;
 import org.dataone.service.types.v2.SystemMetadata;
 import org.dataone.service.util.TypeMarshaller;
-import org.jibx.runtime.JiBXException;
 
 /**
  * This class contains methods for validating a SystemMetata instance against
@@ -72,7 +72,7 @@ public class SystemMetadataValidator {
         try {
             TypeMarshaller.marshalTypeToOutputStream(sysmeta, os);
             os.close();
-        } catch (JiBXException | IOException e) {
+        } catch (MarshallingException | IOException e) {
             String pid = "null";
             if (sysmeta != null && !D1TypeUtils.valueEquals(sysmeta.getIdentifier(),null)) {
                 pid = sysmeta.getIdentifier().getValue();
@@ -379,7 +379,7 @@ public class SystemMetadataValidator {
             if(!D1TypeUtils.serializedFormEquals(newSysMeta.getAccessPolicy(), cnSysMeta.getAccessPolicy())) {
                 return true; 
             }
-        } catch (JiBXException | IOException e1) {
+        } catch (MarshallingException | IOException e1) {
             message.append("Problems serializing one of the AccessPolicies: " + e1.getMessage());
         }
 
@@ -387,7 +387,7 @@ public class SystemMetadataValidator {
             if(!D1TypeUtils.serializedFormEquals(newSysMeta.getReplicationPolicy(), cnSysMeta.getReplicationPolicy())) {
                 return true; 
             }
-        } catch (JiBXException | IOException e1) {
+        } catch (MarshallingException | IOException e1) {
             message.append(" Could not compare serialized forms of the ReplicationPolicies");
         }
         if (message.length() > 0) {
@@ -423,7 +423,7 @@ public class SystemMetadataValidator {
                     return true;
                 }
             }
-        } catch (JiBXException | IOException e) {
+        } catch (MarshallingException | IOException e) {
             if (progress == 0) {
                 logger.error("Couldn't reserialize the AccessPolicy of the new systemMetadata!", e);
             } else {
@@ -452,7 +452,7 @@ public class SystemMetadataValidator {
                     return true;
                 }
             }
-        } catch (JiBXException | IOException e) {
+        } catch (MarshallingException | IOException e) {
             if (progress == 0) {
                 logger.error("Couldn't reserialize the ReplicationPolicy of the reference systemMetadata!", e);
             } else {
