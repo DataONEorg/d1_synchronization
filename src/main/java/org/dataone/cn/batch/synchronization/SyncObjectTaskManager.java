@@ -28,14 +28,12 @@ import org.quartz.SchedulerException;
 import org.springframework.core.task.SimpleAsyncTaskExecutor;
 
 /**
- * Manages the SyncObjectTask runnable class as a single daemon threaded executable. 
- * If the SyncObjectTask should return from execution,
- * evaluate the conditions by which it returned and determine
- * if the task may be executed again.
+ * Manages the SyncObjectTask runnable class as a single daemon threaded executable. If the SyncObjectTask should return
+ * from execution, evaluate the conditions by which it returned and determine if the task may be executed again.
  *
- * TODO: If the SyncObjectTaskManager dies, the entire synchronization process should
- * be shutdown and a report sent to someone about its failure!
- * 
+ * TODO: If the SyncObjectTaskManager dies, the entire synchronization process should be shutdown and a report sent to
+ * someone about its failure!
+ *
  * @author waltz
  */
 public class SyncObjectTaskManager implements Runnable {
@@ -47,7 +45,7 @@ public class SyncObjectTaskManager implements Runnable {
     // but maybe it will force the executor to remove the thread (???)
     Future syncObjectTaskManagerFuture = null;
     HarvestSchedulingManager harvestSchedulingManager;
-    
+
     public void init() {
         syncObjectTaskManagerFuture = taskExecutor.submit(this);
     }
@@ -64,57 +62,65 @@ public class SyncObjectTaskManager implements Runnable {
         // activateJob decides if the task should be submitted
         // therefore, this thread may be running, but not waiting on a
         // task
-       
-        do {
-            if (ComponentActivationUtility.synchronizationIsActive()) {
-                
-                logger.info("SyncObjectTaskManager Start");
-                FutureTask futureTask = new FutureTask(syncObjectTask);
-                taskExecutor.execute(futureTask);
-
-                try {
-                    futureTask.get();
-                } catch (InterruptedException ex) {
-                    logger.warn(ex.getMessage());
-                } catch (ExecutionException ex) {
-                    if (ex.getCause() instanceof ExecutionDisabledException) {
-                    logger.warn("Excecution Disabled continue polling until shutdown");
-                    shouldContinueRunning = true; 
-                    } else {
-                    logger.error(ex,ex);
-                    shouldContinueRunning = false;
-                    }
-                } catch (Exception ex) {
-                    logger.error(ex,ex);
-                    shouldContinueRunning = false;
-                }
-                if (futureTask.isCancelled()) {
-                    logger.warn("SyncObjectTask was cancelled");
-                    shouldContinueRunning = false;
-                } else {
-                    // An InterruptedException occurred that was not
-                    // a task cancellation, so cancel the task and
-                    // resubmit
-                    futureTask.cancel(true);
-                }
-            } else {
-                logger.debug("SyncObjectTaskManager is disabled");
-                try {
-                    Thread.sleep(30000L);
-                } catch (InterruptedException ex1) {
-                    logger.warn(ex1.getMessage());
-                    shouldContinueRunning = false;
-                }
-            }
-        } while (shouldContinueRunning);
-        logger.info("SyncObjectTaskManager Complete");
-        syncObjectTaskManagerFuture.cancel(true);
-        
-        ComponentActivationUtility.disableSynchronization();
         try {
-            harvestSchedulingManager.halt();
-        } catch (SchedulerException ex) {
-            logger.error("Unable to halt Scheduled Tasks after failure: " + ex, ex);
+            do {
+                if (ComponentActivationUtility.synchronizationIsActive()) {
+
+                    logger.info("SyncObjectTaskManager Start");
+                    FutureTask futureTask = new FutureTask(syncObjectTask);
+                    taskExecutor.execute(futureTask);
+
+                    try {
+                        futureTask.get();
+                    } catch (InterruptedException ex) {
+                        logger.warn(ex.getMessage());
+                    } catch (ExecutionException ex) {
+                        if (ex.getCause() instanceof ExecutionDisabledException) {
+                            logger.warn("Excecution Disabled continue polling until shutdown");
+                            shouldContinueRunning = true;
+                        } else {
+                            logger.error(ex, ex);
+                            shouldContinueRunning = false;
+                        }
+                    } catch (Exception ex) {
+                        logger.error(ex, ex);
+                        shouldContinueRunning = false;
+                    }
+                    if (futureTask.isCancelled()) {
+                        logger.warn("SyncObjectTask was cancelled");
+                        shouldContinueRunning = false;
+                    } else {
+                    // An InterruptedException occurred that was not
+                        // a task cancellation, so cancel the task and
+                        // resubmit
+                        futureTask.cancel(true);
+                    }
+                } else {
+                    logger.debug("SyncObjectTaskManager is disabled");
+                    try {
+                        Thread.sleep(30000L);
+                    } catch (InterruptedException ex1) {
+                        logger.warn(ex1.getMessage());
+                        shouldContinueRunning = false;
+                    }
+                }
+            } while (shouldContinueRunning);
+            logger.info("SyncObjectTaskManager Complete");
+            syncObjectTaskManagerFuture.cancel(true);
+        } catch (Exception ex) {
+            logger.error(ex, ex);
+        } finally {
+            try {
+                ComponentActivationUtility.disableSynchronization();
+                logger.info("disableSynchronization Complete " + ComponentActivationUtility.synchronizationIsActive());
+            } catch (Exception ex) {
+                logger.error(ex, ex);
+            }
+            try {
+                harvestSchedulingManager.halt();
+            } catch (SchedulerException ex) {
+                logger.error("Unable to halt Scheduled Tasks after failure: " + ex, ex);
+            }
         }
     }
 
@@ -141,5 +147,5 @@ public class SyncObjectTaskManager implements Runnable {
     public void setHarvestSchedulingManager(HarvestSchedulingManager harvestSchedulingManager) {
         this.harvestSchedulingManager = harvestSchedulingManager;
     }
-    
+
 }
