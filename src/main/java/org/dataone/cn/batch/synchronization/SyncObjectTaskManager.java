@@ -78,11 +78,11 @@ public class SyncObjectTaskManager implements Runnable {
                     logger.warn(ex.getMessage());
                 } catch (ExecutionException ex) {
                     if (ex.getCause() instanceof ExecutionDisabledException) {
-                    logger.warn("Excecution Disabled continue polling until shutdown");
-                    shouldContinueRunning = true; 
+                        logger.warn("Excecution Disabled continue polling until shutdown");
+                        shouldContinueRunning = true; 
                     } else {
-                    logger.error(ex,ex);
-                    shouldContinueRunning = false;
+                        logger.error(ex,ex);
+                        shouldContinueRunning = false;
                     }
                 } catch (Exception ex) {
                     logger.error(ex,ex);

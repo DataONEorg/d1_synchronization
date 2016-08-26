@@ -96,7 +96,10 @@ public class SyncFailedTask implements Callable<String> {
         }
         SynchronizationFailed syncFailed = new SynchronizationFailed(
                 "6001", 
-                "Synchronization task of [PID::]" + pid + "[::PID] failed. " + be.getDescription()
+                String.format("Synchronization task of [PID::] %s [::PID] failed. Cause: %s: %s", 
+                        pid, 
+                        be.getClass().getSimpleName(),
+                        be.getDescription())
                 );
         syncFailed.setPid(pid);
         syncFailed.setNodeId(nodeId);
@@ -110,6 +113,7 @@ public class SyncFailedTask implements Callable<String> {
     }
         
     public void submitSynchronizationFailed(SynchronizationFailed syncFailed) {
+        logger.warn(task.taskLabel() + " " + syncFailed.serialize(BaseException.FMT_XML));
         try {
             Object mnRead = nodeCommunications.getMnRead();
             if (mnRead instanceof MNRead) {
@@ -119,13 +123,13 @@ public class SyncFailedTask implements Callable<String> {
                ((org.dataone.service.mn.tier1.v1.MNRead) mnRead).synchronizationFailed(session, syncFailed);
             }
         } catch (InvalidToken ex) {
-            logger.error(task.taskLabel() + " " + ex.serialize(ex.FMT_XML));
+            logger.error(task.taskLabel() + " " + ex.serialize(BaseException.FMT_XML));
         } catch (NotAuthorized ex) {
-            logger.error(task.taskLabel() + " " + ex.serialize(ex.FMT_XML));
+            logger.error(task.taskLabel() + " " + ex.serialize(BaseException.FMT_XML));
         } catch (NotImplemented ex) {
-            logger.error(task.taskLabel() + " " + ex.serialize(ex.FMT_XML));
+            logger.error(task.taskLabel() + " " + ex.serialize(BaseException.FMT_XML));
         } catch (ServiceFailure ex) {
-            logger.error(task.taskLabel() + " " + ex.serialize(ex.FMT_XML));
+            logger.error(task.taskLabel() + " " + ex.serialize(BaseException.FMT_XML));
         } catch (Exception ex) {
             logger.error(task.taskLabel() + " " + ex.getMessage());
         }

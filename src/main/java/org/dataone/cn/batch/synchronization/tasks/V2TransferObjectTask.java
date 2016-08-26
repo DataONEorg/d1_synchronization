@@ -533,9 +533,9 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
             }
 
         } catch (ServiceFailure ex) {
-            logger.error(buildStandardLogMessage(ex, ex.getDescription()),ex);
+            logger.error(buildStandardLogMessage(ex, "serviceFailure while finding format:" + ex.getDescription()),ex);
             V2TransferObjectTask.extractRetryableException(ex);
-            throw new UnrecoverableException(task.getPid(), ex);
+            throw new UnrecoverableException(task.getPid() + " - from cn.getFormat", ex);
 
         } catch (NotFound ex) {
             logger.error(buildStandardLogMessage(ex, "format NotFound: " + ex.getDescription()),ex);
@@ -547,7 +547,7 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
 
         } catch (Exception ex) {
             logger.error(buildStandardLogMessage(ex, ex.getMessage()),ex);
-            throw new UnrecoverableException(task.getPid(), ex);
+            throw new UnrecoverableException(task.getPid() + " - from cn.getFormat", ex);
 
         }
         return systemMetadata;
@@ -672,10 +672,10 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
             
         } catch (ServiceFailure e) {
             V2TransferObjectTask.extractRetryableException(e);
-            throw new UnrecoverableException("Unexpected Exception!! " + e.getDescription(), e);
+            throw new UnrecoverableException("Unexpected Exception from CN /resolve !" + e.getDescription(), e);
 
         } catch ( NotImplemented | InvalidToken | NotAuthorized e) {
-            throw new UnrecoverableException("Unexpected Exception!! " + e.getDescription(), e);
+            throw new UnrecoverableException("Unexpected Exception from CN /resolve ! " + e.getDescription(), e);
         }
     }
 
@@ -712,6 +712,7 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
         // the bump might be a very big bump forward in time.
         
         // systemMetadata.setDateSysMetadataModified(new Date());
+//
         try {       
             ObjectFormat objectFormat = nodeCommunications.getCnCore().getFormat(
                     systemMetadata.getFormatId());
@@ -721,6 +722,7 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
 
             if ((objectFormat != null) && !objectFormat.getFormatType().equalsIgnoreCase("DATA")) {
                 // this input stream gets used as parameter to the create call.
+                
                 InputStream sciMetaStream = null;
                 try {
                     // get the scimeta object and then feed it to metacat
@@ -766,11 +768,13 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
                  validateResourceMap(objectFormat, sciMetaStream);
                      */
                     logger.debug(task.taskLabel() + " Calling CNCreate...");
+//                    cis = new CountingInputStream(sciMetaStream);
                     d1Identifier = nodeCommunications.getCnCore().create(session, d1Identifier, sciMetaStream,
                             systemMetadata);
                     logger.debug(task.taskLabel() + " ... CNCreate finished");
                 } finally {
                     IOUtils.closeQuietly(sciMetaStream);
+//                    IOUtils.closeQuietly(cis);
                 }
             } else {
                 logger.debug(task.taskLabel() + " Registering SystemMetadata...");
@@ -781,9 +785,9 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
             logger.info(buildStandardLogMessage(null,  "Completed CreateObject"));
         } catch (ServiceFailure e) {
             extractRetryableException(e);
-            throw new UnrecoverableException(task.getPid() + " in createObject, failed.",e);
+            throw new UnrecoverableException(task.getPid() + " cn.createObject failed");
         } catch (BaseException e) {
-            throw new UnrecoverableException(task.getPid() + " in createObject, failed.",e);
+            throw new UnrecoverableException(task.getPid() + " cn.createObject failed.",e);
         }
     }
 
@@ -882,7 +886,7 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
                 resourceBytes = IOUtils.toByteArray(sciMetaStream);
             } catch (IOException e) {
                 throw new InsufficientResources("413",
-                        "Unable to create ByteArrayInputStream for pid: "
+                        "Could not validate Resource Map: Unable to create ByteArrayInputStream for pid: "
                         + task.getPid() + " with message: "
                         + e.getMessage());
             } finally {
@@ -1191,7 +1195,7 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
             if (validated) {
                 // from cn.updateSystemMetadata
                 V2TransferObjectTask.extractRetryableException(e);
-                throw new UnrecoverableException("Failed to update cn with new valid SystemMetadata!", e);
+                throw new UnrecoverableException("Failed to update CN with new valid SystemMetadata!", e);
             } else {
                 // could be content problem in new sysmeta, or an IO problem.
                 throw SyncFailedTask.createSynchronizationFailed(task.getPid(), "Problems validating the new SystemMetadata!", e);
@@ -1200,7 +1204,7 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
         } catch (InvalidRequest e) {
             if (validated) {
                 // from cn.updateSystemMetadata, shouldn't ever get here if validated, so not an MN fault
-                throw new UnrecoverableException("Failed to update cn with new valid SystemMetadata!", e);
+                throw new UnrecoverableException("Failed to update CN with new valid SystemMetadata!", e);
             } else {
                 // thrown because of invalid changes
                 throw SyncFailedTask.createSynchronizationFailed(task.getPid(), "The new SystemMetadata contains invalid changes.", e);
@@ -1211,7 +1215,7 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
             throw SyncFailedTask.createSynchronizationFailed(task.getPid(), "The new SystemMetadata was rejected as invalid by the CN.", e);
         } catch (NotImplemented | NotAuthorized | InvalidToken e) {
             // from cn.updateSystemMetadata
-            throw new UnrecoverableException("Failed to update cn with new valid SystemMetadata!", e);
+            throw new UnrecoverableException("Failed to update CN with new valid SystemMetadata!", e);
         }
     }
 
@@ -1368,7 +1372,7 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
                 logger.info(buildStandardLogMessage(null," Notified (v1) " + nodeId.getValue()));
             }
         } catch (NodeCommUnavailable e) {
-            throw new ServiceFailure("0000", e.getMessage());
+            throw new ServiceFailure("0000", "In notifyReplicaNode: " + e.getMessage());
         } finally {
             if (nodeComm != null)
                 nodeComm.setState(NodeCommState.AVAILABLE);
