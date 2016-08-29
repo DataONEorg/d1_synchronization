@@ -136,7 +136,7 @@ public class D1TypeUtils {
      * @param object1
      * @param object2
      * @return
-     * @throws JiBXException
+     * @throws MarshallingException
      * @throws IOException
      */
     public static boolean serializedFormEquals(Object object1, Object object2) throws MarshallingException, IOException {
