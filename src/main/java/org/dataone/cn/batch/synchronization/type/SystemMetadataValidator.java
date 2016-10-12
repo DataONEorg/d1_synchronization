@@ -9,9 +9,9 @@ import java.util.List;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.ObjectUtils;
 import org.apache.commons.lang.StringUtils;
-import org.dataone.exceptions.MarshallingException;
 import org.apache.log4j.Logger;
 import org.dataone.cn.batch.synchronization.D1TypeUtils;
+import org.dataone.exceptions.MarshallingException;
 import org.dataone.service.exceptions.IdentifierNotUnique;
 import org.dataone.service.exceptions.InvalidRequest;
 import org.dataone.service.exceptions.InvalidSystemMetadata;
@@ -68,11 +68,9 @@ public class SystemMetadataValidator {
     public static void schemaValidateSystemMetadata(SystemMetadata sysmeta) throws InvalidSystemMetadata {
 
         logger.info("Entering schemaValidateSysMeta method...");
-        ByteArrayOutputStream os = new ByteArrayOutputStream();
         try {
-            TypeMarshaller.marshalTypeToOutputStream(sysmeta, os);
-            os.close();
-        } catch (MarshallingException | IOException e) {
+            TypeMarshaller.validateAgainstSchema(sysmeta);
+        } catch (MarshallingException e) {
             String pid = "null";
             if (sysmeta != null && !D1TypeUtils.valueEquals(sysmeta.getIdentifier(),null)) {
                 pid = sysmeta.getIdentifier().getValue();
@@ -82,9 +80,6 @@ public class SystemMetadataValidator {
             be.initCause(e);
             logger.error(errorMessage, be);
             throw be;
-        }
-        finally {
-            IOUtils.closeQuietly(os);
         }
     }
     
