@@ -584,7 +584,7 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
                     Permission.CHANGE_PERMISSION,
                     sidHeadSysMeta)) {
                 throw new NotAuthorized("0000", "Submitter does not have CHANGE rights on the SeriesId as determined by"
-                        + " the current head of the Sid collection, whose pid is: " + pid);
+                        + " the current head of the Sid collection, whose pid is: " + pid.getValue());
             }
             // TODO: should we check to see that if the current head of the series
             // is obsoleted, that it is not obsoleted by a PID with a different SID?
