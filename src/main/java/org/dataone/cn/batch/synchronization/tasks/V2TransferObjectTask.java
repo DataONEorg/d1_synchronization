@@ -213,7 +213,7 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
                                 + task.getAttempt() + " of 20.  Sleeping and requeueing."));
 
                         task.setAttempt(task.getAttempt() + 1);
-                        task.setSleepUntil((new Date()).getTime() + 5000L);
+                        task.setSleepUntil(System.currentTimeMillis() + 5000L);
 
                         hzProcessingClient.getQueue(synchronizationObjectQueue).put(task);
                         
@@ -226,14 +226,14 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
                 }
             } else {
                 // lock-retry handling
-                if (task.getAttempt() < 100) {
+                if (task.getLockAttempt() < 100) {
                     callState = SyncObjectState.RETRY;
                     
                     logger.warn(buildStandardLogMessage(null,
                             " Cannot lock Pid! Requeueing the task. Attempt " + task.getLockAttempt()));
 
                     task.setLockAttempt(task.getLockAttempt() + 1);
-                    task.setSleepUntil((new Date()).getTime() + 1000L);
+                    task.setSleepUntil(System.currentTimeMillis() + 1000L);
                     hzProcessingClient.getQueue(synchronizationObjectQueue).put(task);
                     
                 } else {
