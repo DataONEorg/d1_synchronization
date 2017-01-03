@@ -176,12 +176,14 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
                     ExecutionDisabledException ex = new ExecutionDisabledException(d1NodeReference.getValue() + "- Disabled");
                     throw ex;
                 }
-                // read up to a 1000 objects (the default, but it can be overwritten)
+                // read up to 1000 objects (the default, but it can be overwritten)
                 // from ListObjects and process before retrieving more
                 if (start == 0 || (start < total)) {
                     readQueue = this.retrieve(mnNodeComm, startHarvestDate, endHarvestInterval);
                     syncMetricTotalRetrieved += readQueue.size();
                     int loopCount = 0;
+                    
+                    // wait until the sync queue is short enough to add these new ones
                     while (((hzSyncObjectQueue.size() + readQueue.size()) > maxSyncObjectQueueSize) && (loopCount < 1440)) {
 
                         if (!ComponentActivationUtility.synchronizationIsActive()) {
@@ -210,18 +212,17 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
                     for (ObjectInfo objectInfo : readQueue) {
                         SyncObject syncObject = new SyncObject(d1Node.getIdentifier().getValue(), objectInfo.getIdentifier().getValue());
 
-                        if ((objectInfo.getDateSysMetadataModified().after(lastMofidiedDate)) && !(objectInfo.getDateSysMetadataModified().after(endHarvestInterval))) {
-                            // increase the lastModifiedDate if the current record's modified date
-                            // is after the date currently specified.
-                            // However, if the date returned is past endHarvestInterval, then an update must have
-                            // occurred between the time query was returned and this statement is processed
-                            lastMofidiedDate = objectInfo.getDateSysMetadataModified();
-                        }
-                        // process the unexpected update, the next time synchronization is run
-                        if (!objectInfo.getDateSysMetadataModified().after(endHarvestInterval)) {
+                        // only process items within the harvest time interval
+                        if (!objectInfo.getDateSysMetadataModified().after(endHarvestInterval) &&
+                                !objectInfo.getDateSysMetadataModified().before(startHarvestDate)) {
+
                             ++syncMetricTotalSubmitted;
                             hzSyncObjectQueue.put(syncObject);
                             logger.debug("placed on hzSyncObjectQueue- " + syncObject.taskLabel());
+
+                            if (objectInfo.getDateSysMetadataModified().after(lastMofidiedDate)) {
+                                lastMofidiedDate = objectInfo.getDateSysMetadataModified();
+                            }
                         }
                     }
 
