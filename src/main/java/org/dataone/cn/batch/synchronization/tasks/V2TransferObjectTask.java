@@ -226,7 +226,7 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
                 }
             } else {
                 // lock-retry handling
-                if (task.getAttempt() < 100) {
+                if (task.getLockAttempt() < 100) {
                     callState = SyncObjectState.RETRY;
                     
                     logger.warn(buildStandardLogMessage(null,
