@@ -180,7 +180,7 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
         SyncObjectState callState = SyncObjectState.STARTED;
         
         
-        long remainingSleep = task.getSleepUntil() - (new Date()).getTime();
+        long remainingSleep = task.getSleepUntil() - System.currentTimeMillis();
         if (remainingSleep > 0) {
             try {
                 Thread.sleep(remainingSleep);
@@ -189,15 +189,17 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
             }
         }
 
+        // TODO: consider replacing Lock with with IMap, for the automatic GC
+        // see https://groups.google.com/forum/#!topic/hzProcessingClient/9YFGh3xwe8I
         Lock hzPidLock = hzProcessingClient.getLock(task.getPid());
-        boolean isLockAcquired = false;
-        logger.info(buildStandardLogMessage(null, " Locking task, attempt " + task.getAttempt()));
-
+        
+        // this section must be thread-safe otherwise, we may skip unlocking a lock.
+        // see http://docs.hazelcast.org/docs/3.5/manual/html/lock.html
         try {
-            // TODO: consider replacing Lock with with IMap, for the automatic GC
-            // see https://groups.google.com/forum/#!topic/hzProcessingClient/9YFGh3xwe8I
-            isLockAcquired = hzPidLock.tryLock(1, TimeUnit.SECONDS); // both parameters define the wait time
-            if (isLockAcquired) {
+            logger.info(buildStandardLogMessage(null, " Locking task, attempt " + task.getLockAttempt()));
+            
+            if (hzPidLock.tryLock(1, TimeUnit.SECONDS)) {
+                // got lock
                 try {
                     logger.info(buildStandardLogMessage(null,  " Processing SyncObject"));
                     SystemMetadata mnSystemMetadata = retrieveMNSystemMetadata();
@@ -208,7 +210,8 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
                     
                 } catch (RetryableException ex) {
                     if (task.getAttempt() < 20) {
-                       
+                        callState = SyncObjectState.RETRY;
+                        
                         logger.warn(buildStandardLogMessage(ex, " RetryableException raised on attempt "
                                 + task.getAttempt() + " of 20.  Sleeping and requeueing."));
 
@@ -223,6 +226,9 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
                         throw new UnrecoverableException(task.getPid() + ": retry limits reached without success.",
                                 ex.getCause());
                     }
+                } finally {
+                    hzPidLock.unlock();
+                    logger.info(buildStandardLogMessage(null,  " Unlocked Pid."));
                 }
             } else {
                 // lock-retry handling
@@ -279,12 +285,7 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
             callState = SyncObjectState.FAILED;
             logger.error(this.buildStandardLogMessage(e,e.getMessage()),e);
 
-        } finally {
-            if (isLockAcquired) {
-                hzPidLock.unlock();
-                logger.info(buildStandardLogMessage(null,  " Unlocked Pid."));
-            }
-        }
+        } 
         logger.info(buildStandardLogMessage(null, " exiting with callState: " + callState));
         return callState;
     }
