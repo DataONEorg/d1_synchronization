@@ -48,6 +48,9 @@ import org.dataone.cn.batch.synchronization.type.NodeCommState;
 import org.dataone.cn.batch.synchronization.type.SyncObjectState;
 import org.dataone.cn.batch.synchronization.type.SystemMetadataValidator;
 import org.dataone.cn.hazelcast.HazelcastClientFactory;
+import org.dataone.cn.log.MetricEvent;
+import org.dataone.cn.log.MetricLogClientFactory;
+import org.dataone.cn.log.MetricLogEntry;
 import org.dataone.cn.synchronization.types.SyncObject;
 import org.dataone.configuration.Settings;
 import org.dataone.ore.ResourceMapFactory;
@@ -285,8 +288,15 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
             callState = SyncObjectState.FAILED;
             logger.error(this.buildStandardLogMessage(e,e.getMessage()),e);
 
-        } 
-        logger.info(buildStandardLogMessage(null, " exiting with callState: " + callState));
+        } finally {
+            logger.info(buildStandardLogMessage(null, " exiting with callState: " + callState));
+
+            MetricLogEntry metricLogEntry = new MetricLogEntry(MetricEvent.SYNCHRONIZATION_TASK_EXECUTION);
+            metricLogEntry.setNodeId(TypeFactory.buildNodeReference(task.getNodeId()));
+            metricLogEntry.setPid(TypeFactory.buildIdentifier(task.getPid()));
+            metricLogEntry.setMessage("status=" + callState);
+            MetricLogClientFactory.getMetricLogClient().logMetricEvent(metricLogEntry);
+        }
         return callState;
     }
 
@@ -794,6 +804,11 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
         } catch (ServiceFailure e) {
             extractRetryableException(e);
             throw new UnrecoverableException(task.getPid() + " cn.createObject failed");
+//      } catch (NotFound e) {
+            // this can happen if a MN has the system Metadata but stopped hosting
+            // the object.  (Mutable Member Nodes)
+            // We need to register the system Metadata
+            // https://redmine.dataone.org/issues/8049
         } catch (BaseException e) {
             throw new UnrecoverableException(task.getPid() + " cn.createObject failed.",e);
         }
