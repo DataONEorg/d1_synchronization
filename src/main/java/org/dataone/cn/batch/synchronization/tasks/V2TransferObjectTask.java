@@ -290,12 +290,12 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
 
         } finally {
             logger.info(buildStandardLogMessage(null, " exiting with callState: " + callState));
-
-            MetricLogEntry metricLogEntry = new MetricLogEntry(MetricEvent.SYNCHRONIZATION_TASK_EXECUTION);
-            metricLogEntry.setNodeId(TypeFactory.buildNodeReference(task.getNodeId()));
-            metricLogEntry.setPid(TypeFactory.buildIdentifier(task.getPid()));
-            metricLogEntry.setMessage("status=" + callState);
-            MetricLogClientFactory.getMetricLogClient().logMetricEvent(metricLogEntry);
+// XXX: Hold until 2.4, because it depends on an update to d1_cn_common
+//            MetricLogEntry metricLogEntry = new MetricLogEntry(MetricEvent.SYNCHRONIZATION_TASK_EXECUTION);
+//            metricLogEntry.setNodeId(TypeFactory.buildNodeReference(task.getNodeId()));
+//            metricLogEntry.setPid(TypeFactory.buildIdentifier(task.getPid()));
+//            metricLogEntry.setMessage("status=" + callState);
+//            MetricLogClientFactory.getMetricLogClient().logMetricEvent(metricLogEntry);
         }
         return callState;
     }
