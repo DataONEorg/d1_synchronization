@@ -48,6 +48,9 @@ import org.dataone.cn.batch.synchronization.type.NodeCommState;
 import org.dataone.cn.batch.synchronization.type.SyncObjectState;
 import org.dataone.cn.batch.synchronization.type.SystemMetadataValidator;
 import org.dataone.cn.hazelcast.HazelcastClientFactory;
+import org.dataone.cn.log.MetricEvent;
+import org.dataone.cn.log.MetricLogClientFactory;
+import org.dataone.cn.log.MetricLogEntry;
 import org.dataone.cn.synchronization.types.SyncObject;
 import org.dataone.configuration.Settings;
 import org.dataone.ore.ResourceMapFactory;
@@ -180,7 +183,7 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
         SyncObjectState callState = SyncObjectState.STARTED;
         
         
-        long remainingSleep = task.getSleepUntil() - (new Date()).getTime();
+        long remainingSleep = task.getSleepUntil() - System.currentTimeMillis();
         if (remainingSleep > 0) {
             try {
                 Thread.sleep(remainingSleep);
@@ -189,15 +192,17 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
             }
         }
 
+        // TODO: consider replacing Lock with with IMap, for the automatic GC
+        // see https://groups.google.com/forum/#!topic/hzProcessingClient/9YFGh3xwe8I
         Lock hzPidLock = hzProcessingClient.getLock(task.getPid());
-        boolean isLockAcquired = false;
-        logger.info(buildStandardLogMessage(null, " Locking task, attempt " + task.getAttempt()));
-
+        
+        // this section must be thread-safe otherwise, we may skip unlocking a lock.
+        // see http://docs.hazelcast.org/docs/3.5/manual/html/lock.html
         try {
-            // TODO: consider replacing Lock with with IMap, for the automatic GC
-            // see https://groups.google.com/forum/#!topic/hzProcessingClient/9YFGh3xwe8I
-            isLockAcquired = hzPidLock.tryLock(1, TimeUnit.SECONDS); // both parameters define the wait time
-            if (isLockAcquired) {
+            logger.info(buildStandardLogMessage(null, " Locking task, attempt " + task.getLockAttempt()));
+            
+            if (hzPidLock.tryLock(1, TimeUnit.SECONDS)) {
+                // got lock
                 try {
                     logger.info(buildStandardLogMessage(null,  " Processing SyncObject"));
                     SystemMetadata mnSystemMetadata = retrieveMNSystemMetadata();
@@ -208,12 +213,13 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
                     
                 } catch (RetryableException ex) {
                     if (task.getAttempt() < 20) {
-                       
+                        callState = SyncObjectState.RETRY;
+                        
                         logger.warn(buildStandardLogMessage(ex, " RetryableException raised on attempt "
                                 + task.getAttempt() + " of 20.  Sleeping and requeueing."));
 
                         task.setAttempt(task.getAttempt() + 1);
-                        task.setSleepUntil((new Date()).getTime() + 5000L);
+                        task.setSleepUntil(System.currentTimeMillis() + 5000L);
 
                         hzProcessingClient.getQueue(synchronizationObjectQueue).put(task);
                         
@@ -223,6 +229,9 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
                         throw new UnrecoverableException(task.getPid() + ": retry limits reached without success.",
                                 ex.getCause());
                     }
+                } finally {
+                    hzPidLock.unlock();
+                    logger.info(buildStandardLogMessage(null,  " Unlocked Pid."));
                 }
             } else {
                 // lock-retry handling
@@ -233,7 +242,7 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
                             " Cannot lock Pid! Requeueing the task. Attempt " + task.getLockAttempt()));
 
                     task.setLockAttempt(task.getLockAttempt() + 1);
-                    task.setSleepUntil((new Date()).getTime() + 1000L);
+                    task.setSleepUntil(System.currentTimeMillis() + 1000L);
                     hzProcessingClient.getQueue(synchronizationObjectQueue).put(task);
                     
                 } else {
@@ -280,12 +289,14 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
             logger.error(this.buildStandardLogMessage(e,e.getMessage()),e);
 
         } finally {
-            if (isLockAcquired) {
-                hzPidLock.unlock();
-                logger.info(buildStandardLogMessage(null,  " Unlocked Pid."));
-            }
+            logger.info(buildStandardLogMessage(null, " exiting with callState: " + callState));
+// XXX: Hold until 2.4, because it depends on an update to d1_cn_common
+//            MetricLogEntry metricLogEntry = new MetricLogEntry(MetricEvent.SYNCHRONIZATION_TASK_EXECUTION);
+//            metricLogEntry.setNodeId(TypeFactory.buildNodeReference(task.getNodeId()));
+//            metricLogEntry.setPid(TypeFactory.buildIdentifier(task.getPid()));
+//            metricLogEntry.setMessage("status=" + callState);
+//            MetricLogClientFactory.getMetricLogClient().logMetricEvent(metricLogEntry);
         }
-        logger.info(buildStandardLogMessage(null, " exiting with callState: " + callState));
         return callState;
     }
 
@@ -585,6 +596,7 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
                     Collections.singletonList(sysMeta.getSubmitter()),
                     Permission.CHANGE_PERMISSION,
                     sidHeadSysMeta)) {
+
                 if (logger.isDebugEnabled()) 
                     logger.debug("Submitter doesn't have the change permission on the pid "
                             + pid.getValue() + ". We will try if the rights holder has the permission.");
@@ -595,7 +607,6 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
                     throw new NotAuthorized("0000", "Both the submitter and rightsHolder does not have CHANGE rights on the SeriesId as determined by"
                             + " the current head of the Sid collection, whose pid is: " + pid.getValue());
                 }
-                
             }
             // TODO: should we check to see that if the current head of the series
             // is obsoleted, that it is not obsoleted by a PID with a different SID?
@@ -800,6 +811,11 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
         } catch (ServiceFailure e) {
             extractRetryableException(e);
             throw new UnrecoverableException(task.getPid() + " cn.createObject failed");
+//      } catch (NotFound e) {
+            // this can happen if a MN has the system Metadata but stopped hosting
+            // the object.  (Mutable Member Nodes)
+            // We need to register the system Metadata
+            // https://redmine.dataone.org/issues/8049
         } catch (BaseException e) {
             throw new UnrecoverableException(task.getPid() + " cn.createObject failed.",e);
         }
