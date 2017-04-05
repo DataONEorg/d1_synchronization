@@ -116,7 +116,7 @@ public class SyncFailedTask implements Callable<String> {
         logger.warn(String.format("%s - SynchronizationFailed: detail code: %s id:%s nodeId:%s description:%s", 
                 task.taskLabel(), 
                 syncFailed.getDetail_code(),
-                syncFailed.getIdentifier(),
+                syncFailed.getPid(),
                 syncFailed.getNodeId(),
                 syncFailed.getDescription()
                 ));
