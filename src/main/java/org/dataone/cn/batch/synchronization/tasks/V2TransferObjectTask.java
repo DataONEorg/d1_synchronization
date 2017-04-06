@@ -264,6 +264,9 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
             // this is the proper location to decide whether or not to notify the MemberNode
             // (these are exceptions caused by internal problems)
             
+            // in all cases, we need to log
+            logger.error(buildStandardLogMessage(e.getCause(),"UnrecoverableException: " + e.getMessage()),e);
+            
             // report to MN, for now
 
             SyncFailedTask syncFailedTask = new SyncFailedTask(nodeCommunications, task);
@@ -274,9 +277,6 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
                 syncFailedTask.submitSynchronizationFailed(task.getPid(), null,
                         new ServiceFailure("5000", this.buildStandardLogMessage(e.getCause(), null)));
 
-            // in all cases, we need to log
-            logger.error(buildStandardLogMessage(e.getCause(),"UnrecoverableException: " + e.getMessage()),e);
-            
         
         } catch (InterruptedException e) {
             callState = SyncObjectState.FAILED;
