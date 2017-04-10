@@ -256,6 +256,7 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
         } catch (SynchronizationFailed e) {
             callState = SyncObjectState.FAILED;
             
+            logger.error(buildStandardLogMessage(e.getCause(),"SynchronizationFailed: " + e.getMessage()),e);
             SyncFailedTask syncFailedTask = new SyncFailedTask(nodeCommunications, task);
             syncFailedTask.submitSynchronizationFailed(e);
 
