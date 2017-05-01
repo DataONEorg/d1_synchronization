@@ -774,7 +774,19 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
                                 // only way to get out of loop if NotAuthorized keeps getting thrown
                                 throw ex;
                             }
+                        } catch (NotFound ex) {
+                            // this can happen if a MN has the system Metadata but stopped hosting
+                            // the object.  (Mutable Member Nodes)
+                            // We might be able to take advantage of this information
+                            // (see https://redmine.dataone.org/issues/8049)
+                            // but for now it's a deal-breaker for synchronization, so make sure 
+                            // the cause of the sync failure is clear
+                            
+                            logger.warn(buildStandardLogMessage(ex, "Got NotFound from MNRead.get()"));
+                            throw new NotFound("-1", "Got NotFound from MNRead.get(): " + ex.getDescription());
+
                         } catch (ServiceFailure ex) {
+                        
                             if (tryAgain < 6) {
                                 ++tryAgain;
                                 logger.error(buildStandardLogMessage(ex, "Got ServiceFailure on MNRead.get(), retrying..."));
@@ -811,13 +823,9 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
         } catch (ServiceFailure e) {
             extractRetryableException(e);
             throw new UnrecoverableException(task.getPid() + " cn.createObject failed");
-//      } catch (NotFound e) {
-            // this can happen if a MN has the system Metadata but stopped hosting
-            // the object.  (Mutable Member Nodes)
-            // We need to register the system Metadata
-            // https://redmine.dataone.org/issues/8049
+            
         } catch (BaseException e) {
-            throw new UnrecoverableException(task.getPid() + " cn.createObject failed.",e);
+            throw new UnrecoverableException(task.getPid() + " cn.createObject failed: " + e.getDescription(),e);
         }
     }
 
