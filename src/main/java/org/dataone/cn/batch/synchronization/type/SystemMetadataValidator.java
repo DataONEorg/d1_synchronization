@@ -252,9 +252,13 @@ public class SystemMetadataValidator {
             illegalChangeFields.add("submitter");
         }
 
-        // obsoletes:   can only be set at creation, so is effectively immutable here
+        // obsoletes:   can only go from null => a value
         if (!D1TypeUtils.equals(cnSysMeta.getObsoletes(), newSysMeta.getObsoletes())) {
-            illegalChangeFields.add("obsoletes");
+            if (cnSysMeta.getObsoletedBy() == null) {
+                changes++;
+            } else {
+                illegalChangeFields.add("obsoletes");
+            }
         }
 
         // obsoletedBy:   can only go from null => a value
