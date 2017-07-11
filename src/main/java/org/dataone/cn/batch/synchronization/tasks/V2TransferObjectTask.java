@@ -540,7 +540,8 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
                 cnReplica.setReplicationStatus(ReplicationStatus.COMPLETED);
                 cnReplica.setReplicaVerified(new Date());
                 systemMetadata.addReplica(cnReplica);
-                logger.debug(task.taskLabel()
+                if (logger.isDebugEnabled()) 
+                    logger.debug(task.taskLabel()
                         + " Added CN as replica because formatType " + objectFormat.getFormatType()
                         + " is not DATA");
             }
@@ -588,7 +589,8 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
 
             Identifier pid = resolve(sysMeta.getIdentifier(),"SID");
 
-            logger.debug(task.taskLabel() + " SeriesId is in use by " + pid.getValue());
+            if (logger.isDebugEnabled()) 
+                logger.debug(task.taskLabel() + " SeriesId is in use by " + pid.getValue());
 
             // checking that the new object's submitter is authorized via SID head's accessPolicy
             SystemMetadata sidHeadSysMeta = getSystemMetadataHandleRetry(nodeCommunications.getCnRead(), sid);
@@ -596,7 +598,10 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
                     Collections.singletonList(sysMeta.getSubmitter()),
                     Permission.CHANGE_PERMISSION,
                     sidHeadSysMeta)) {
-                logger.debug("Submitter doesn't have the change permission on the pid "+pid.getValue()+". We will try if the rights holder has the permission.");
+
+                if (logger.isDebugEnabled()) 
+                    logger.debug("Submitter doesn't have the change permission on the pid "
+                            + pid.getValue() + ". We will try if the rights holder has the permission.");
                 if(!AuthUtils.isAuthorized(
                     Collections.singletonList(sysMeta.getRightsHolder()),
                     Permission.CHANGE_PERMISSION,
@@ -621,9 +626,10 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
             throw new UnrecoverableException(message, e);
         
         } catch (NotFound e) {
-            logger.debug(task.taskLabel() + String.format(
-                    " SeriesId (%s) doesn't exist for any object on the CN, checking reservation service...", 
-                    sid.getValue()));
+            if (logger.isDebugEnabled()) 
+                logger.debug(task.taskLabel() + String.format(
+                        " SeriesId (%s) doesn't exist for any object on the CN, checking reservation service...", 
+                        sid.getValue()));
             
             try { 
                 Session verifySubmitter = new Session();
@@ -682,12 +688,14 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
         logger.debug(task.taskLabel() + " entering resolve...");
         try {
             ObjectLocationList oll = ((CNRead)nodeCommunications.getCnRead()).resolve(session, id);
-            logger.debug(task.taskLabel() + String.format(" %s %s exists on the CN.", field, id.getValue()));
+            if (logger.isDebugEnabled()) 
+                logger.debug(task.taskLabel() + String.format(" %s %s exists on the CN.", field, id.getValue()));
             return oll.getIdentifier();
 
         } catch (NotFound ex) {
             // assume if identifierReservationService has thrown NotFound exception SystemMetadata does not exist
-            logger.debug(task.taskLabel() + String.format(" %s %s does not exist on the CN.", field, id.getValue()));
+            if (logger.isDebugEnabled())  
+                logger.debug(task.taskLabel() + String.format(" %s %s does not exist on the CN.", field, id.getValue()));
             throw ex;
             
         } catch (ServiceFailure e) {
@@ -805,14 +813,10 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
             logger.info(buildStandardLogMessage(null,  "Completed CreateObject"));
         } catch (ServiceFailure e) {
             extractRetryableException(e);
-            throw new UnrecoverableException(task.getPid() + " cn.createObject failed");
-//      } catch (NotFound e) {
-            // this can happen if a MN has the system Metadata but stopped hosting
-            // the object.  (Mutable Member Nodes)
-            // We need to register the system Metadata
-            // https://redmine.dataone.org/issues/8049
+            throw new UnrecoverableException(task.getPid() + " cn.createObject failed",e);
+            
         } catch (BaseException e) {
-            throw new UnrecoverableException(task.getPid() + " cn.createObject failed.",e);
+            throw new UnrecoverableException(task.getPid() + " cn.createObject failed: " + e.getDescription(),e);
         }
     }
 
