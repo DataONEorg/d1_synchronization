@@ -822,7 +822,7 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
             logger.info(buildStandardLogMessage(null,  "Completed CreateObject"));
         } catch (ServiceFailure e) {
             extractRetryableException(e);
-            throw new UnrecoverableException(task.getPid() + " cn.createObject failed");
+            throw new UnrecoverableException(task.getPid() + " cn.createObject failed",e);
             
         } catch (BaseException e) {
             throw new UnrecoverableException(task.getPid() + " cn.createObject failed: " + e.getDescription(),e);
