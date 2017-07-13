@@ -254,7 +254,7 @@ public class SystemMetadataValidator {
 
         // obsoletes:   can only go from null => a value
         if (!D1TypeUtils.equals(cnSysMeta.getObsoletes(), newSysMeta.getObsoletes())) {
-            if (cnSysMeta.getObsoletedBy() == null) {
+            if (cnSysMeta.getObsoletes() == null) {
                 changes++;
             } else {
                 illegalChangeFields.add("obsoletes");

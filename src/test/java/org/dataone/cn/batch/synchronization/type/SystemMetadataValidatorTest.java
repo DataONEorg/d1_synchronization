@@ -178,6 +178,70 @@ public class SystemMetadataValidatorTest {
     }
     
 
+    @Test
+    public void testHasValidUpdates_obsoletesNull2AValue()
+            throws InvalidSystemMetadata, InstantiationException, IllegalAccessException, 
+            MarshallingException, IOException, ServiceFailure, InvalidRequest {
+        
+        SystemMetadataValidator v = new SystemMetadataValidator(cnSystemMetadata);
+        
+        SystemMetadata newSysmeta = TypeFactory.clone(standardSysMeta);
+        
+        newSysmeta.setObsoletes(TypeFactory.buildIdentifier("foo"));
+        v.hasValidUpdates(newSysmeta);
+    }
+    
+    @Test
+    public void testHasInValidUpdates_obsoletesSet2Null()
+            throws InvalidSystemMetadata, InstantiationException, IllegalAccessException, 
+            MarshallingException, IOException, ServiceFailure, InvalidRequest {
+        
+        cnSystemMetadata.setObsoletes(TypeFactory.buildIdentifier("fool"));
+        SystemMetadataValidator v = new SystemMetadataValidator(cnSystemMetadata);
+        
+        SystemMetadata newSysmeta = TypeFactory.clone(standardSysMeta);
+        
+        newSysmeta.setObsoletes(null);
+        try {
+            v.hasValidUpdates(newSysmeta);
+            fail("Should not pass 'hasValidUpdates when obsoletes goes from a value to null");
+        } catch (InvalidRequest e) {
+            ;
+        }
+    }
+    
+    @Test
+    public void testHasValidUpdates_obsoletedByNull2AValue()
+            throws InvalidSystemMetadata, InstantiationException, IllegalAccessException, 
+            MarshallingException, IOException, ServiceFailure, InvalidRequest {
+        
+        SystemMetadataValidator v = new SystemMetadataValidator(cnSystemMetadata);
+        
+        SystemMetadata newSysmeta = TypeFactory.clone(standardSysMeta);
+        
+        newSysmeta.setObsoletedBy(TypeFactory.buildIdentifier("foo"));
+        v.hasValidUpdates(newSysmeta);
+    }
+    
+    @Test
+    public void testHasInValidUpdates_obsoletedBySet2Null()
+            throws InvalidSystemMetadata, InstantiationException, IllegalAccessException, 
+            MarshallingException, IOException, ServiceFailure, InvalidRequest {
+        
+        cnSystemMetadata.setObsoletedBy(TypeFactory.buildIdentifier("fool"));
+        SystemMetadataValidator v = new SystemMetadataValidator(cnSystemMetadata);
+        
+        SystemMetadata newSysmeta = TypeFactory.clone(standardSysMeta);
+        
+        newSysmeta.setObsoletedBy(null);
+        try {
+            v.hasValidUpdates(newSysmeta);
+            fail("Should not pass 'hasValidUpdates when obsoletedBy goes from a value to null");
+        } catch (InvalidRequest e) {
+            ;
+        }
+    }
+    
 
 //    @Test
     public void testValidateEssentialProperties() {
