@@ -17,44 +17,45 @@
  */
 package org.dataone.cn.batch.synchronization.tasks;
 
-import com.hazelcast.client.HazelcastClient;
-
 import java.io.Serializable;
-import java.util.ArrayList;
 import java.util.Date;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map.Entry;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
+
 import org.apache.log4j.Logger;
 import org.dataone.cn.ComponentActivationUtility;
 import org.dataone.cn.batch.exceptions.ExecutionDisabledException;
+import org.dataone.cn.batch.exceptions.NodeCommUnavailable;
 import org.dataone.cn.batch.service.v2.NodeRegistrySyncService;
 import org.dataone.cn.batch.synchronization.NodeCommFactory;
 import org.dataone.cn.batch.synchronization.NodeCommObjectListHarvestFactory;
-import org.dataone.cn.batch.synchronization.jobs.MemberNodeHarvestJob;
 import org.dataone.cn.batch.synchronization.type.NodeComm;
 import org.dataone.cn.hazelcast.HazelcastClientFactory;
 import org.dataone.cn.log.MetricEvent;
 import org.dataone.cn.log.MetricLogClient;
 import org.dataone.cn.log.MetricLogClientFactory;
 import org.dataone.cn.log.MetricLogEntry;
-
 import org.dataone.cn.synchronization.types.SyncObject;
 import org.dataone.configuration.Settings;
-
+import org.dataone.service.exceptions.BaseException;
 import org.dataone.service.exceptions.InvalidRequest;
 import org.dataone.service.exceptions.InvalidToken;
 import org.dataone.service.exceptions.NotAuthorized;
+import org.dataone.service.exceptions.NotFound;
 import org.dataone.service.exceptions.NotImplemented;
 import org.dataone.service.exceptions.ServiceFailure;
 import org.dataone.service.mn.tier1.v2.MNRead;
-import org.dataone.service.types.v2.Node;
 import org.dataone.service.types.v1.NodeReference;
-import org.dataone.service.types.v1.ObjectInfo;
 import org.dataone.service.types.v1.ObjectList;
 import org.dataone.service.types.v1.Session;
+import org.dataone.service.types.v2.Node;
 import org.dataone.service.util.DateTimeMarshaller;
 import org.joda.time.MutableDateTime;
+
+import com.hazelcast.client.HazelcastClient;
 
 /**
  * An executable task that retrieve a list of ObjectInfos by calling listObject on a MN and then submits them on the
@@ -68,16 +69,16 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
 
     NodeReference d1NodeReference;
     private Session session;
-    private int start = 0;
-    private int total = 0;
     Integer batchSize;
     MutableDateTime currentDateTime = new MutableDateTime(new Date());
     Date endHarvestInterval;
     int backoffSeconds = 10;
-    static final Logger logger = Logger.getLogger(ObjectListHarvestTask.class);
-    static final MetricLogClient metricLogger = MetricLogClientFactory.getMetricLogClient();
-    private int syncMetricTotalSubmitted;
-    private int syncMetricTotalRetrieved;
+
+    
+    static final Logger __logger = Logger.getLogger(ObjectListHarvestTask.class);
+    static final MetricLogClient __metricLogger = MetricLogClientFactory.getMetricLogClient();
+    private int __syncMetricTotalSubmitted;
+    private int __syncMetricTotalRetrieved;
 
     /**
      * Define the ObjectList Harvest task for a Member Node.
@@ -96,216 +97,315 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
      *
      * Method to be called in a separately executing thread.
      *
-     * @return Date
-     * @throws Exception
+     * Harvest from the MemberNode and add all of the pids to the synchronization queue
+     * The strategy is to accumulate the objectInfos for the full time window and sort
+     * the items into ascending chronological order.  Periodically the lastHarvestedDate
+     * will be updated to avoid a complete reharvest in the face of system failures.  
+     * Exceptions thrown means some or all will be reharvested (depending on whether an
+     * intermediate update of lastHarvestedDate was able to take place).
+     * 
+     * @returns Date - when execution ends
+     * @throws NodeCommUnavailable - if the harvest task can't get a NodeComm from the pool
+     * @throws InterruptedException - if puts to the synchronizationQueue are interrupted while waiting
+     * @throws ServiceFailure - if any communication problem with the synchronizationQueue, the NodeComm service, or nodeRegistry
+     * @throws ExecutionDisabledException - if synchronization is disabled
+     * @throws NotImplemented - from listObjects
+     * @throws NotAuthorized - from listObjects
+     * @throws InvalidToken  - from listObjects
+     * @throws InvalidRequest - from listObjects
+     * @throws NotFound - from listObjects
      */
     @Override
     public Date call() throws Exception {
-        syncMetricTotalSubmitted = 0;
-        syncMetricTotalRetrieved = 0;
-        String synchronizationObjectQueue = Settings.getConfiguration().getString("dataone.hazelcast.synchronizationObjectQueue");
-
-        Integer maxSyncObjectQueueSize = Settings.getConfiguration().getInt("Synchronization.max_syncobjectqueue_size");
+        // throws NodeCommUnavailable, InterruptedException, ServiceFailure, ExecutionDisabledException, NotFound, InvalidRequest, InvalidToken, NotAuthorized, NotImplemented {
+   
+ 
+        __logger.info(d1NodeReference.getValue() + "- Calling ObjectListHarvestTask");
+        __syncMetricTotalSubmitted = 0;
+        __syncMetricTotalRetrieved = 0;       
+        
         if (!ComponentActivationUtility.synchronizationIsActive()) {
+            // throwing this exception will not update
+            // last harvested date on the node, causing
+            // a reharvesting of all records
             ExecutionDisabledException ex = new ExecutionDisabledException(d1NodeReference.getValue() + "- Disabled");
             throw ex;
         }
-        logger.info(d1NodeReference.getValue() + "- Calling ObjectListHarvestTask");
-        // we are going to write directly to ldap for the updateLastHarvested
-        // Because we do not have an DataONE API method, Sync has its own
-        // NodeRegistrySyncService and its own NodeRegistrySyncFacade.
-        // The implementation is an anonymous class in the NodeCommObjectListHarvestFactory
-
-        // Assuming that only one MN harvesting job is executing at at time
-        // therefore, only one mnNodeComm per MemberNode is needed for all the runs of
-        // the harvester
-        //  The above is no longer a valid assumption since it assumed the dependent
-        // d1 components were not thread-safe. Now Both d1_libclient_java
-        // and the new NodeRegistrySyncFacade are thread-safe. 
-        // the issue is that MNode requires a base_url for instantiation
-        // -rpw 05/25/2016
         
+
+        // try to get NodeComms
         NodeCommFactory nodeCommFactory = NodeCommObjectListHarvestFactory.getInstance();
         NodeComm mnNodeComm = nodeCommFactory.getNodeComm(d1NodeReference);
         NodeRegistrySyncService nodeRegistryService = mnNodeComm.getNodeRegistryService();
-
-        HazelcastClient hazelcast = HazelcastClientFactory.getProcessingClient();
         
-        // the hzSyncObjectQueue communicates 
+        // get SynchronizationQueue and stats
+        String synchronizationObjectQueue = Settings.getConfiguration().getString("dataone.hazelcast.synchronizationObjectQueue");
+        Integer maxSyncObjectQueueSize    = Settings.getConfiguration().getInt("Synchronization.max_syncobjectqueue_size");
+        
+        HazelcastClient hazelcast = HazelcastClientFactory.getProcessingClient();        
         BlockingQueue<SyncObject> hzSyncObjectQueue = hazelcast.getQueue(synchronizationObjectQueue);
-        // Need the LinkedHashMap to preserve insertion order
-        Node d1Node = nodeRegistryService.getNode(d1NodeReference);
-        Date lastMofidiedDate = d1Node.getSynchronization().getLastHarvested();
-        MutableDateTime startHarvestDateTime = new MutableDateTime(lastMofidiedDate);
+        
+        
+        // limit the number of pids to submit to the synchronization queue
+        int maximumToHarvest = maxSyncObjectQueueSize - hzSyncObjectQueue.size();
+        __logger.info(d1NodeReference.getValue() + " - harvest limited to " + maximumToHarvest + " items.");
+        
+        SortedHarvestTimepointMap harvest = getFullObjectList(mnNodeComm, maximumToHarvest);
+        
 
-        startHarvestDateTime.addMillis(1);
-        Date startHarvestDate = startHarvestDateTime.toDate();
+        // submit to the sync queue, periodically updating the node's lastHarvestedDate
+        // (we can do this since the pids are already sorted)  
+        int requeueTolerance = 100;
+        int subjectToReharvest = 0;
 
-        List<ObjectInfo> readQueue = null;
-        // subtract 10 seconds from the current date time 
-        // the reasoning behind using a backoff
-        // is due to the fact that a member node may be 
-        // using the same date for a batch of objects
-        // that may take a few seconds to upload
-        // the backoff time will allow for the completion
-        // of an upload and not result in a loss of objects
-        // retrieved
-        currentDateTime.addSeconds(-backoffSeconds);
-        endHarvestInterval = currentDateTime.toDate();
-        if ((hzSyncObjectQueue.size() + batchSize) > maxSyncObjectQueueSize) {
-            // if we don't have much capacity to process a single batch then 
-            // make a smaller batch size for now
-            batchSize = batchSize / 2;
-        }
-        // make certain it is still after the lastModified date
-        if (startHarvestDate.before(endHarvestInterval)) {
-            // if not then do not run (we should be running this less than every ten seconds for a membernode
-            logger.debug(d1NodeReference.getValue() + "- starting retrieval " + d1Node.getBaseURL()
-                    + " with startDate of " + DateTimeMarshaller.serializeDateToUTC(startHarvestDate)
-                    + " and endDate of " + DateTimeMarshaller.serializeDateToUTC(endHarvestInterval));
-            do {
 
-                if (!ComponentActivationUtility.synchronizationIsActive()) {
-                    // throwing this exception will not update
-                    // last harvested date on the node, causing
-                    // a reharvesting of all records
-                    // if the DateLastHarvested was modified on the node
-                    // to be the most recent lastMofidiedDate, then
-                    // it is likely that, on the next run, records will be missed
-                    // since nodeList(objectList?) is not an ordered list
-                    ExecutionDisabledException ex = new ExecutionDisabledException(d1NodeReference.getValue() + "- Disabled");
-                    throw ex;
-                }
-                // read up to 1000 objects (the default, but it can be overwritten)
-                // from ListObjects and process before retrieving more
-                if (start == 0 || (start < total)) {
-                    readQueue = this.retrieve(mnNodeComm, startHarvestDate, endHarvestInterval);
-                    syncMetricTotalRetrieved += readQueue.size();
-                    int loopCount = 0;
-                    
-                    // wait until the sync queue is short enough to add these new ones
-                    while (((hzSyncObjectQueue.size() + readQueue.size()) > maxSyncObjectQueueSize) && (loopCount < 1440)) {
+        Date currentModDate = null;
+        Iterator<Entry<Date,List<String>>> it = harvest.getAscendingIterator();
+        while (it.hasNext()) 
+        {
+            Entry<Date,List<String>> timepoint = it.next();
+            
+            // submit all pids in the timepoint
+            for(String pidString : timepoint.getValue()) {
+                
+                SyncObject syncObject = new SyncObject(this.d1NodeReference.getValue(), pidString);
 
-                        if (!ComponentActivationUtility.synchronizationIsActive()) {
-                            // throwing this exception will not update
-                            // last harvested date on the node, causing
-                            // a reharvesting of all records
-                            // if the DateLastHarvested was modified on the node
-                            // to be the most recent lastMofidiedDate, then
-                            // it is likely on the next run, records will be missed
-                            // since nodeList is not an ordered list
-                            ExecutionDisabledException ex = new ExecutionDisabledException(d1NodeReference.getValue() + "- Disabled");
-                            throw ex;
-                        }
-                        logger.debug("Sleeping for 5 secs. hzSyncObjectQueue has " + hzSyncObjectQueue.size() + " # of objects.");
-                        Thread.sleep(5000L);
-
-                        ++loopCount;
-                    }
-                    if (loopCount >= 1440) {
-                        //Sleep is 5 secs, looping 1440 should be 2 hrs of waiting..
-                        // I'd say something has gone horribly wrong and so dying would be
-                        // appropriate
-                        nodeRegistryService.setDateLastHarvested(d1NodeReference, lastMofidiedDate);
-                        throw new Exception("hzSyncObjectQueue has not had more than " + hzSyncObjectQueue.remainingCapacity() + " remaining capacity for 2 hrs.");
-                    }
-                    for (ObjectInfo objectInfo : readQueue) {
-                        SyncObject syncObject = new SyncObject(d1Node.getIdentifier().getValue(), objectInfo.getIdentifier().getValue());
-
-                        // only process items within the harvest time interval
-                        if (!objectInfo.getDateSysMetadataModified().after(endHarvestInterval) &&
-                                !objectInfo.getDateSysMetadataModified().before(startHarvestDate)) {
-
-                            ++syncMetricTotalSubmitted;
-                            hzSyncObjectQueue.put(syncObject);
-                            logger.debug("placed on hzSyncObjectQueue- " + syncObject.taskLabel());
-
-                            if (objectInfo.getDateSysMetadataModified().after(lastMofidiedDate)) {
-                                lastMofidiedDate = objectInfo.getDateSysMetadataModified();
-                            }
-                        }
-                    }
-
-                } else {
-                    readQueue = null;
-                }
-            } while ((readQueue != null) && (!readQueue.isEmpty()));
-
-            if (lastMofidiedDate.after(d1Node.getSynchronization().getLastHarvested())) {
-                // use nodeAccess directly to avoid hazelcast broadcasting the event
-                nodeRegistryService.setDateLastHarvested(d1NodeReference, lastMofidiedDate);
+                __syncMetricTotalSubmitted++;
+                hzSyncObjectQueue.put(syncObject);
+                __logger.debug("placed on hzSyncObjectQueue- " + syncObject.taskLabel());
+                subjectToReharvest++;
             }
-        } else {
-            logger.info(d1NodeReference.getValue() + "- Difference between Node's LastHarvested Date and Current Date time was less than 10 seconds");
+            
+            currentModDate = timepoint.getKey();
+         
+            if (subjectToReharvest > requeueTolerance) {
+                try {
+                    nodeRegistryService.setDateLastHarvested(d1NodeReference, currentModDate);
+                    __logger.info(this.d1NodeReference.getValue() + " - updated lastHarvestedDate to " + currentModDate);
+                    subjectToReharvest = 0;
+                    
+                } catch (ServiceFailure e) {
+                    // how far to let the lastHarvestedDate lag behind the queue submissions?
+                    __logger.error(this.d1NodeReference.getValue() + " harvest - nodeRegistry not accepting new lastHarvestedDate!");
+                    throw e;
+                }
+            } 
         }
-        logger.info(d1NodeReference.getValue() + "- ObjectListHarvestTask End");
+        // after all are processed set lastHarvestedDate to the currentModDate.
+        try {
+            nodeRegistryService.setDateLastHarvested(d1NodeReference, currentModDate);
+        } catch (ServiceFailure e) {
+            // how far to let the lastHarvestedDate lag behind the queue submissions?
+            __logger.warn(this.d1NodeReference.getValue() + " harvest - nodeRegistry not accepting new lastHarvestedDate!");
+        }
+        
+        
+        
+        __logger.info(d1NodeReference.getValue() + "- ObjectListHarvestTask End");
         
         MetricLogEntry metricHarvestRetrievedLogEvent = new MetricLogEntry(
                 MetricEvent.SYNCHRONIZATION_HARVEST_RETRIEVED,
-                d1NodeReference, null, Integer.toString(syncMetricTotalRetrieved));
+                d1NodeReference, null, Integer.toString(__syncMetricTotalRetrieved));
         Date harvestMetricLogDate = new Date(metricHarvestRetrievedLogEvent.getDateLogged().getTime());
-        metricLogger.logMetricEvent(metricHarvestRetrievedLogEvent);
+        __metricLogger.logMetricEvent(metricHarvestRetrievedLogEvent);
         
         MetricLogEntry metricHarvestSubmittedLogEvent = new MetricLogEntry(
                 MetricEvent.SYNCHRONIZATION_HARVEST_SUBMITTED,
-                d1NodeReference, null, Integer.toString(syncMetricTotalSubmitted));
+                d1NodeReference, null, Integer.toString(__syncMetricTotalSubmitted));
         metricHarvestSubmittedLogEvent.setDateLogged(harvestMetricLogDate);
-        metricLogger.logMetricEvent(metricHarvestSubmittedLogEvent);
+        __metricLogger.logMetricEvent(metricHarvestSubmittedLogEvent);
+        
+
         // return the date of completion of the task
+        // (not sure how this is used)
         return new Date();
     }
-
-    /*
-     * performs the retrieval of the nodelist from a membernode. It retrieves the list in batches and should be called
-     * iteratively until all objects have been retrieved from a node.
-     * 
-     * @param Node d1Node
-     * @param Date fromDate
-     * @param Date toDate
-     * @return List<ObjectInfo>
+    
+    
+    /**
+     * get the set of timepoints and associated pids to put on the sync queue
+     * @param nodeComm
+     * @return
+     * @throws NotFound
+     * @throws ServiceFailure
+     * @throws InvalidRequest
+     * @throws NotImplemented 
+     * @throws NotAuthorized 
+     * @throws InvalidToken 
      */
-    private List<ObjectInfo> retrieve(NodeComm nodeComm, Date fromDate, Date toDate) {
-
-        List<ObjectInfo> writeQueue = new ArrayList<ObjectInfo>();
-
-        ObjectList objectList = null;
-        Boolean replicationStatus = null;
-
+    private SortedHarvestTimepointMap getFullObjectList(NodeComm nodeComm, Integer maxToHarvest) 
+            throws NotFound, ServiceFailure, InvalidRequest, InvalidToken, NotAuthorized, NotImplemented {
+        
+        
+        // 1. set up the harvest time interval of
+        //
+        //       lastHarvestDate to (currentTime - backoffSeconds)
+        //
+        // the backoff is to help ensure that objects with the same date
+        // are all loaded and available in listObjects.
+        // Otherwise, the next harvest would miss those.
+        
+        Node d1Node = nodeComm.getNodeRegistryService().getNode(d1NodeReference);
+        Date lastModifiedDate = d1Node.getSynchronization().getLastHarvested();
+ 
+        MutableDateTime startHarvestDateTime = new MutableDateTime(lastModifiedDate);
+        startHarvestDateTime.addMillis(1);
+        Date startHarvestDate = startHarvestDateTime.toDate();
+        
+        currentDateTime.addSeconds(-backoffSeconds);
+        endHarvestInterval = currentDateTime.toDate();
+        
+        __logger.debug(d1NodeReference.getValue() + "- starting retrieval " + d1Node.getBaseURL()
+                + " with startDate of " + DateTimeMarshaller.serializeDateToUTC(startHarvestDate)
+                + " and endDate of " + DateTimeMarshaller.serializeDateToUTC(endHarvestInterval));
+        
+        
+        // Member Nodes are only required to support the 'fromDate' parameter in listObjects.
+        // However, most implementations support 'count' and 'start' and 'toDate'
+        // Because of varying implementations, multiple strategies for harvesting are needed.
+        // 
+        // If a parameter is not supported, the MemberNode is required to throw InvalidRequest
+        // if that parameter is used in the request.  This method uses this fact to determine
+        // the harvest strategy.
+        
+        //
+        //   2. determine the strategy while also getting the total within the harvest time window
+        //
+        int total = -1;
         try {
-            Object mnRead = nodeComm.getMnRead();
-            if (mnRead instanceof MNRead) {
-                objectList = ((MNRead) mnRead).listObjects(session, fromDate, toDate, null, null, replicationStatus, start, batchSize);
-            }
-            if (mnRead instanceof org.dataone.service.mn.tier1.v1.MNRead) {
-                objectList = ((org.dataone.service.mn.tier1.v1.MNRead) mnRead).listObjects(session, fromDate, toDate, null, replicationStatus, start, batchSize);
-            }
-            // always execute for the first run (for start = 0)
-            // otherwise skip because when the start is equal or greater
-            // then total, then all objects have been harvested
+            ObjectList ol = doListObjects(nodeComm,startHarvestDate,endHarvestInterval,0,0);
+            total = ol.getTotal();
+            __logger.info(d1NodeReference.getValue() + "- has " + total + " pids to harvest.");
+                                
+        } catch (InvalidRequest e) {
+            // proceed assuming it's the start/count that's not implemented
 
-            // if objectList is null or the count is 0 or the list is empty, then
-            // there is nothing to process
-            if (!((objectList == null)
-                    || (objectList.getCount() == 0)
-                    || (objectList.getObjectInfoList().isEmpty()))) {
-
-                start += objectList.getCount();
-                writeQueue.addAll(objectList.getObjectInfoList());
-                total = objectList.getTotal();
-               
-            }
-        } catch (NotAuthorized ex) {
-            logger.error(d1NodeReference.getValue() + "- " + ex.serialize(ex.FMT_XML));
-        } catch (InvalidRequest ex) {
-            logger.error(d1NodeReference.getValue() + "- " + ex.serialize(ex.FMT_XML));
-        } catch (NotImplemented ex) {
-            logger.error(d1NodeReference.getValue() + "- " + ex.serialize(ex.FMT_XML));
-        } catch (ServiceFailure ex) {
-            logger.error(d1NodeReference.getValue() + "- " + ex.serialize(ex.FMT_XML));
-        } catch (InvalidToken ex) {
-            logger.error(d1NodeReference.getValue() + "- " + ex.serialize(ex.FMT_XML));
+            __logger.warn(d1NodeReference.getValue() + "- Node doesn't like slicing parameters, trying single-page harvest strategy: "  + e.serialize(BaseException.FMT_XML));
+            
+            //
+            //  3a. use the all-in-one harvest strategy
+            //
+            return doAllInOneHarvest(nodeComm,startHarvestDate,endHarvestInterval, maxToHarvest);
+            
+            
+        } catch (InvalidToken | NotAuthorized | NotImplemented | ServiceFailure e) {
+            // if here, nothing was harvested so exit with exception after logging
+            __logger.error(d1NodeReference.getValue() + "- " + e.serialize(BaseException.FMT_XML));
         }
-
-        return writeQueue;
+   
+        //
+        // 3b.  use the paged-harvest strategy
+        //
+        return doPagedHarvest(nodeComm,startHarvestDate, endHarvestInterval, total, maxToHarvest);
     }
+   
+    
+    
+    /**
+     * Assemble the timepoint-pid map from the ObjectList iteratively, using paging
+     * @param nodeComm
+     * @param start
+     * @param end
+     * @param total
+     * @return
+     * @throws ServiceFailure 
+     * @throws NotImplemented 
+     * @throws NotAuthorized 
+     * @throws InvalidToken 
+     * @throws InvalidRequest 
+     */
+    private SortedHarvestTimepointMap doPagedHarvest(NodeComm nodeComm, Date fromDate, Date toDate, Integer total, Integer maxToHarvest) 
+            throws InvalidRequest, InvalidToken, NotAuthorized, NotImplemented, ServiceFailure {
+
+        SortedHarvestTimepointMap harvest = new SortedHarvestTimepointMap(fromDate,toDate,maxToHarvest);
+        
+        int currentStart = 0;
+        int latestReportedTotal = total;
+        int count = Math.min(this.batchSize,  latestReportedTotal - currentStart);
+        while (currentStart < latestReportedTotal) {
+            ObjectList ol = doListObjects(nodeComm, fromDate, toDate, currentStart, count);
+            
+            if (ol.sizeObjectInfoList() == 0) {
+                break;
+            }
+            __syncMetricTotalRetrieved += ol.sizeObjectInfoList();
+            
+            currentStart += ol.sizeObjectInfoList();
+            latestReportedTotal = ol.getTotal();
+            
+            harvest.addObjectList(ol);
+        }        
+        return harvest;
+    }
+  
+    
+    /**
+     * The all in one strategy is basically asserting that everything requested must be returned
+     * in the response because there is no other way to know we have all of them and advance the
+     * dateLastHarvested value.
+     * 
+     * @param nodeComm
+     * @param start
+     * @param end
+     * @return
+     * @throws InvalidRequest
+     * @throws InvalidToken
+     * @throws NotAuthorized
+     * @throws NotImplemented
+     * @throws ServiceFailure
+     */
+    private SortedHarvestTimepointMap doAllInOneHarvest(NodeComm nodeComm, Date fromDate, Date toDate, Integer maxToHarvest) 
+            throws InvalidRequest, InvalidToken, NotAuthorized, NotImplemented, ServiceFailure {
+             
+        
+        // 1. try to get the entire list of items matching the date criteria
+        
+        ObjectList ol = null;
+        try {
+            ol = doListObjects(nodeComm, fromDate, toDate, null, null);
+        } 
+        catch (InvalidRequest e) {
+            // since 'start' and 'count' parameters are null, proceed assuming it's now only the fromDate that works
+            
+            __logger.warn(d1NodeReference.getValue() + "- Node doesn't like toDate parameters, trying basic strategy " + e.serialize(BaseException.FMT_XML));
+            
+            ol = doListObjects(nodeComm, fromDate, null, null, null);
+            __syncMetricTotalRetrieved += ol.sizeObjectInfoList();
+        }
+        
+        
+        // 2. check that listObjects returned the entire list for the time interval
+        
+        if (ol.getTotal() != ol.sizeObjectInfoList()) {
+            
+            __logger.error(d1NodeReference.getValue() + " - MemberNode does not support paging, " +
+                    "but also doesn't return the total list within the harvest period.  Cannot harvest!");
+        
+            throw new InvalidRequest("0000-MNode Failure","Cannot reliably harvest from this MemberNode:  " +
+            		"It does not support paging, yet does not return all of the object infos for the time period requested!");
+        }
+         
+        // 3. add the objectList to the harvest
+        
+        SortedHarvestTimepointMap harvest = new SortedHarvestTimepointMap(fromDate,toDate,maxToHarvest);
+        harvest.addObjectList(ol);
+        
+       
+        return harvest;
+    }
+    
+    private ObjectList doListObjects(NodeComm nodeComm, Date fromDate, Date toDate, Integer start, Integer count) 
+    throws InvalidRequest, InvalidToken, NotAuthorized, NotImplemented, ServiceFailure {
+        
+        ObjectList objectList = null;
+        Object mnRead = nodeComm.getMnRead();
+        if (mnRead instanceof MNRead) {
+            objectList = ((MNRead) mnRead).listObjects(session, fromDate, toDate, null, null, null, start, count);
+        }
+        if (mnRead instanceof org.dataone.service.mn.tier1.v1.MNRead) {
+            objectList = ((org.dataone.service.mn.tier1.v1.MNRead) mnRead).listObjects(session, fromDate, toDate, null, null, start, count);
+        }
+        return objectList;
+    }
+ 
 }
