@@ -74,7 +74,7 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
     Date endHarvestInterval;
     int backoffSeconds = 10;
 
-    
+    /* there are so many logging statements, I'm prefixing them with underscore to make for easier source code reading */
     static final Logger __logger = Logger.getLogger(ObjectListHarvestTask.class);
     static final MetricLogClient __metricLogger = MetricLogClientFactory.getMetricLogClient();
     private int __syncMetricTotalSubmitted;
@@ -140,14 +140,15 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
         
         // get SynchronizationQueue and stats
         String synchronizationObjectQueue = Settings.getConfiguration().getString("dataone.hazelcast.synchronizationObjectQueue");
-        Integer maxSyncObjectQueueSize    = Settings.getConfiguration().getInt("Synchronization.max_syncobjectqueue_size");
+        Integer maxSyncObjectQueueSize    = Settings.getConfiguration().getInt("Synchronization.max_syncobjectqueue_size",50000);
+        Integer maxHarvestSize            = Settings.getConfiguration().getInt("Synchronization.max_harvest_size",50000);
         
         HazelcastClient hazelcast = HazelcastClientFactory.getProcessingClient();        
         BlockingQueue<SyncObject> hzSyncObjectQueue = hazelcast.getQueue(synchronizationObjectQueue);
         
         
         // limit the number of pids to submit to the synchronization queue
-        int maximumToHarvest = maxSyncObjectQueueSize - hzSyncObjectQueue.size();
+        int maximumToHarvest = Math.min(maxHarvestSize, maxSyncObjectQueueSize - hzSyncObjectQueue.size());
         __logger.info(d1NodeReference.getValue() + " - harvest limited to " + maximumToHarvest + " items.");
         
         SortedHarvestTimepointMap harvest = getFullObjectList(mnNodeComm, maximumToHarvest);
@@ -203,17 +204,18 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
         
         __logger.info(d1NodeReference.getValue() + "- ObjectListHarvestTask End");
         
-        MetricLogEntry metricHarvestRetrievedLogEvent = new MetricLogEntry(
+        MetricLogEntry __metricHarvestRetrievedLogEvent = new MetricLogEntry(
                 MetricEvent.SYNCHRONIZATION_HARVEST_RETRIEVED,
                 d1NodeReference, null, Integer.toString(__syncMetricTotalRetrieved));
-        Date harvestMetricLogDate = new Date(metricHarvestRetrievedLogEvent.getDateLogged().getTime());
-        __metricLogger.logMetricEvent(metricHarvestRetrievedLogEvent);
+        Date __harvestMetricLogDate = (Date)__metricHarvestRetrievedLogEvent.getDateLogged().clone();
+        __metricLogger.logMetricEvent(__metricHarvestRetrievedLogEvent);
         
-        MetricLogEntry metricHarvestSubmittedLogEvent = new MetricLogEntry(
+        MetricLogEntry __metricHarvestSubmittedLogEvent = new MetricLogEntry(
                 MetricEvent.SYNCHRONIZATION_HARVEST_SUBMITTED,
                 d1NodeReference, null, Integer.toString(__syncMetricTotalSubmitted));
-        metricHarvestSubmittedLogEvent.setDateLogged(harvestMetricLogDate);
-        __metricLogger.logMetricEvent(metricHarvestSubmittedLogEvent);
+        // make the second the same Date for better alignment in viewed logs.
+        __metricHarvestSubmittedLogEvent.setDateLogged(__harvestMetricLogDate);
+        __metricLogger.logMetricEvent(__metricHarvestSubmittedLogEvent);
         
 
         // return the date of completion of the task
