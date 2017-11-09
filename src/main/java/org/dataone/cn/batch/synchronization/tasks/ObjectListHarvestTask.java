@@ -235,7 +235,7 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
      * @throws NotAuthorized 
      * @throws InvalidToken 
      */
-    private SortedHarvestTimepointMap getFullObjectList(NodeComm nodeComm, Integer maxToHarvest) 
+    protected SortedHarvestTimepointMap getFullObjectList(NodeComm nodeComm, Integer maxToHarvest) 
             throws NotFound, ServiceFailure, InvalidRequest, InvalidToken, NotAuthorized, NotImplemented {
         
         
@@ -246,9 +246,7 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
         // the backoff is to help ensure that objects with the same date
         // are all loaded and available in listObjects.
         // Otherwise, the next harvest would miss those.
-        
-        Node d1Node = nodeComm.getNodeRegistryService().getNode(d1NodeReference);
-        Date lastModifiedDate = d1Node.getSynchronization().getLastHarvested();
+        Date lastModifiedDate = nodeComm.getNodeRegistryService().getDateLastHarvested(d1NodeReference);
  
         MutableDateTime startHarvestDateTime = new MutableDateTime(lastModifiedDate);
         startHarvestDateTime.addMillis(1);
@@ -257,10 +255,11 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
         currentDateTime.addSeconds(-backoffSeconds);
         endHarvestInterval = currentDateTime.toDate();
         
-        __logger.debug(d1NodeReference.getValue() + "- starting retrieval " + d1Node.getBaseURL()
+        if (__logger.isDebugEnabled()) {
+            __logger.debug(d1NodeReference.getValue() + "- starting retrieval " + nodeComm.getNodeRegistryService().getNode(d1NodeReference).getBaseURL()
                 + " with startDate of " + DateTimeMarshaller.serializeDateToUTC(startHarvestDate)
                 + " and endDate of " + DateTimeMarshaller.serializeDateToUTC(endHarvestInterval));
-        
+        }
         
         // Member Nodes are only required to support the 'fromDate' parameter in listObjects.
         // However, most implementations support 'count' and 'start' and 'toDate'
@@ -399,15 +398,16 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
     private ObjectList doListObjects(NodeComm nodeComm, Date fromDate, Date toDate, Integer start, Integer count) 
     throws InvalidRequest, InvalidToken, NotAuthorized, NotImplemented, ServiceFailure {
         
-        ObjectList objectList = null;
+
         Object mnRead = nodeComm.getMnRead();
         if (mnRead instanceof MNRead) {
-            objectList = ((MNRead) mnRead).listObjects(session, fromDate, toDate, null, null, null, start, count);
+            return ((MNRead) mnRead).listObjects(session, fromDate, toDate, null, null, null, start, count);
         }
         if (mnRead instanceof org.dataone.service.mn.tier1.v1.MNRead) {
-            objectList = ((org.dataone.service.mn.tier1.v1.MNRead) mnRead).listObjects(session, fromDate, toDate, null, null, start, count);
+            return  ((org.dataone.service.mn.tier1.v1.MNRead) mnRead).listObjects(session, fromDate, toDate, null, null, start, count);
         }
-        return objectList;
+        throw new ServiceFailure("0000", this.d1NodeReference.getValue() + 
+                " - the NodeComm.getMNRead() did not return a usable instance.  Got instance of " + mnRead.getClass().getCanonicalName());
     }
  
 }

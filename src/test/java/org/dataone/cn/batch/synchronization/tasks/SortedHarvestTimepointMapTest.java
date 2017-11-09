@@ -32,7 +32,7 @@ public class SortedHarvestTimepointMapTest {
         SortedHarvestTimepointMap harvest = new SortedHarvestTimepointMap(null,null,null);
         
         // test the methods prior to adding anything
-        assertEquals("Map should be empty before adding anything", 0,harvest.getTotalPids());
+        assertEquals("Map should be empty before adding anything", 0,harvest.getHarvestSize());
         assertNull("latest timepoint should be empty prior to adding anything",harvest.getLatestTimePoint());
         assertNull("earliest timepoint should be empty prior to adding anything",harvest.getEarliestTimePoint());
         
@@ -52,7 +52,7 @@ public class SortedHarvestTimepointMapTest {
         
         assertEquals("getLatestTimepoint() should return the original currentTime", currentTime, harvest.getLatestTimePoint().getTime());
         assertEquals("getEarliestTimePoint() should return the currentTime - 900", currentTime -900, harvest.getEarliestTimePoint().getTime());
-        assertEquals("getTotalPids() should return all 10", 10, harvest.getTotalPids());
+        assertEquals("getHarvestSize() should return all 10", 10, harvest.getHarvestSize());
         Iterator<Entry<Date,List<String>>> it = harvest.getAscendingIterator();
         int i = 0;
         while (it.hasNext()) {
@@ -73,7 +73,7 @@ public class SortedHarvestTimepointMapTest {
         assertEquals("getLatestTimepoint() [2] should now return the original currentTime", currentTime, harvest.getLatestTimePoint().getTime());
         assertEquals("getEarliestTimepoint() [2] should  return the original currentTime - 9 *100", currentTime -900, harvest.getEarliestTimePoint().getTime());
 
-        assertEquals("getTotalPids() should return all 20", 20, harvest.getTotalPids());
+        assertEquals("getHarvestSize() should return all 20", 20, harvest.getHarvestSize());
         Iterator<Entry<Date,List<String>>> it2 = harvest.getAscendingIterator();
         int j = 0;
         while (it2.hasNext()) {
@@ -102,7 +102,7 @@ public class SortedHarvestTimepointMapTest {
         
         
         assertEquals("getLatestTimepoint() should return the original currentTime", currentTime, harvest.getLatestTimePoint().getTime());
-        assertEquals("getTotalPids() should return only the 7 of 10 that are in time window", 7, harvest.getTotalPids());
+        assertEquals("getHarvestSize() should return only the 7 of 10 that are in time window", 7, harvest.getHarvestSize());
         Iterator<Entry<Date,List<String>>> it = harvest.getAscendingIterator();
         int i = 0;
         while (it.hasNext()) {
@@ -129,7 +129,7 @@ public class SortedHarvestTimepointMapTest {
         }
         assertEquals("getAscendingIterator() [2] should iterate over all 7 timepoints",7,j); 
         assertEquals("getLatestTimepoint() [2] should still return the original currentTime", currentTime, harvest.getLatestTimePoint().getTime());
-        assertEquals("getTotalPids() should return 7 * 2 = 14", 14, harvest.getTotalPids());
+        assertEquals("getHarvestSize() should return 7 * 2 = 14", 14, harvest.getHarvestSize());
     }
     
     
@@ -150,7 +150,7 @@ public class SortedHarvestTimepointMapTest {
         
         
         assertEquals("getLatestTimepoint() should return the original currentTime minus 3 * 100", currentTime-300, harvest.getLatestTimePoint().getTime());
-        assertEquals("getTotalPids() should return only the 7 of 10 that are in harvest size", 7, harvest.getTotalPids());
+        assertEquals("getHarvestSize() should return only the 7 of 10 that are in harvest size", 7, harvest.getHarvestSize());
         Iterator<Entry<Date,List<String>>> it = harvest.getAscendingIterator();
         int i = 0;
         while (it.hasNext()) {
@@ -178,7 +178,7 @@ public class SortedHarvestTimepointMapTest {
         }
         assertEquals("getAscendingIterator() [2] should iterate over 3 timepoints (with 2 identifiers each)",3,j);
         assertEquals("getLatestTimepoint() [2] should still return the original currentTime - 7 *100", currentTime -700, harvest.getLatestTimePoint().getTime());
-        assertEquals("getTotalPids() should return 3*2", 6, harvest.getTotalPids());
+        assertEquals("getHarvestSize() should return 3*2", 6, harvest.getHarvestSize());
     }
     
     @Test
@@ -199,7 +199,7 @@ public class SortedHarvestTimepointMapTest {
         
         
         assertEquals("getLatestTimepoint() should return the original currentTime minus 1 * 100", currentTime-100, harvest.getLatestTimePoint().getTime());
-        assertEquals("getTotalPids() should return only the 8 of 10 that are in time window", 8, harvest.getTotalPids());
+        assertEquals("getHarvestSize() should return only the 8 of 10 that are in time window", 8, harvest.getHarvestSize());
         Iterator<Entry<Date,List<String>>> it = harvest.getAscendingIterator();
         int i = 0;
         while (it.hasNext()) {
@@ -228,7 +228,7 @@ public class SortedHarvestTimepointMapTest {
         assertEquals("getAscendingIterator() [2] should iterate over 8 timepoints (with 2 identifiers each)",8,j);
         assertEquals("getLatestTimepoint() [2] should still return the original currentTime - 1 *100", currentTime -100, harvest.getLatestTimePoint().getTime());
         assertEquals("getEarliestTimepoint() [2] should still return the original currentTime - 8 *100", currentTime -800, harvest.getEarliestTimePoint().getTime());
-        assertEquals("getTotalPids() should return 8*2", 16, harvest.getTotalPids());
+        assertEquals("getHarvestSize() should return 8*2", 16, harvest.getHarvestSize());
     }
 
 }

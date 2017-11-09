@@ -40,10 +40,26 @@ public class SortedHarvestTimepointMap {
     private Integer maxHarvestSize = null;
     private int totalRetainedPids = 0;
     
-    
+    /* the managed data structure */
     private TreeMap<Date,List<String>> pidMap = new TreeMap<>();
-        
-    int getTotalPids() {
+
+   
+    /**
+     * Constructor that accepts optional limits on what gets added
+     * @param fromDate - the earliest timepoint accepted
+     * @param toDate - the latest timepoint accepted
+     */
+    public SortedHarvestTimepointMap(Date fromDate, Date toDate, Integer maxHarvestSize) {
+        this.fromDate = fromDate;
+        this.toDate = toDate;
+        this.maxHarvestSize = maxHarvestSize;
+    }
+    
+    
+    /**
+     * @return the total number of identifiers in the map
+     */
+    int getHarvestSize() {
         return totalRetainedPids;
     }
     
@@ -68,17 +84,7 @@ public class SortedHarvestTimepointMap {
             return null;
         }
     }
-    
-    /**
-     * Constructor that accepts optional limits on what gets added
-     * @param fromDate - the earliest timepoint accepted
-     * @param toDate - the latest timepoint accepted
-     */
-    public SortedHarvestTimepointMap(Date fromDate, Date toDate, Integer maxHarvestSize) {
-        this.fromDate = fromDate;
-        this.toDate = toDate;
-        this.maxHarvestSize = maxHarvestSize;
-    }
+
     
     /**
      * Adds elements of the ObjectList to the map, if they are in the time window,
