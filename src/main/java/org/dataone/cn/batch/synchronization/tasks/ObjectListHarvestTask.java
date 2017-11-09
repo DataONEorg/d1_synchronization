@@ -142,6 +142,7 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
         String synchronizationObjectQueue = Settings.getConfiguration().getString("dataone.hazelcast.synchronizationObjectQueue");
         Integer maxSyncObjectQueueSize    = Settings.getConfiguration().getInt("Synchronization.max_syncobjectqueue_size",50000);
         Integer maxHarvestSize            = Settings.getConfiguration().getInt("Synchronization.max_harvest_size",50000);
+        Integer requeueTolerance          = Settings.getConfiguration().getInt("Synchronization.harvest_update_latestHarvestDate_frequency",100);
         
         HazelcastClient hazelcast = HazelcastClientFactory.getProcessingClient();        
         BlockingQueue<SyncObject> hzSyncObjectQueue = hazelcast.getQueue(synchronizationObjectQueue);
@@ -151,57 +152,17 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
         int maximumToHarvest = Math.min(maxHarvestSize, maxSyncObjectQueueSize - hzSyncObjectQueue.size());
         __logger.info(d1NodeReference.getValue() + " - harvest limited to " + maximumToHarvest + " items.");
         
+        
+   
+        
         SortedHarvestTimepointMap harvest = getFullObjectList(mnNodeComm, maximumToHarvest);
         
-
-        // submit to the sync queue, periodically updating the node's lastHarvestedDate
-        // (we can do this since the pids are already sorted)  
-        int requeueTolerance = 100;
-        int subjectToReharvest = 0;
-
-
-        Date currentModDate = null;
-        Iterator<Entry<Date,List<String>>> it = harvest.getAscendingIterator();
-        while (it.hasNext()) 
-        {
-            Entry<Date,List<String>> timepoint = it.next();
-            
-            // submit all pids in the timepoint
-            for(String pidString : timepoint.getValue()) {
-                
-                SyncObject syncObject = new SyncObject(this.d1NodeReference.getValue(), pidString);
-
-                __syncMetricTotalSubmitted++;
-                hzSyncObjectQueue.put(syncObject);
-                __logger.debug("placed on hzSyncObjectQueue- " + syncObject.taskLabel());
-                subjectToReharvest++;
-            }
-            
-            currentModDate = timepoint.getKey();
-         
-            if (subjectToReharvest > requeueTolerance) {
-                try {
-                    nodeRegistryService.setDateLastHarvested(d1NodeReference, currentModDate);
-                    __logger.info(this.d1NodeReference.getValue() + " - updated lastHarvestedDate to " + currentModDate);
-                    subjectToReharvest = 0;
-                    
-                } catch (ServiceFailure e) {
-                    // how far to let the lastHarvestedDate lag behind the queue submissions?
-                    __logger.error(this.d1NodeReference.getValue() + " harvest - nodeRegistry not accepting new lastHarvestedDate!");
-                    throw e;
-                }
-            } 
-        }
-        // after all are processed set lastHarvestedDate to the currentModDate.
-        try {
-            nodeRegistryService.setDateLastHarvested(d1NodeReference, currentModDate);
-        } catch (ServiceFailure e) {
-            // how far to let the lastHarvestedDate lag behind the queue submissions?
-            __logger.warn(this.d1NodeReference.getValue() + " harvest - nodeRegistry not accepting new lastHarvestedDate!");
-        }
         
         
+        spoolToSynchronizationQueue(harvest, hzSyncObjectQueue, nodeRegistryService, requeueTolerance);
+
         
+           
         __logger.info(d1NodeReference.getValue() + "- ObjectListHarvestTask End");
         
         MetricLogEntry __metricHarvestRetrievedLogEvent = new MetricLogEntry(
@@ -222,6 +183,70 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
         // (not sure how this is used)
         return new Date();
     }
+  
+    
+    /** 
+     * Submit the harvest to the sync queue, periodically updating the node's lastHarvestedDate
+     * (able to do this since the pids are already sorted)
+     * @param harvest
+     * @param hzSyncObjectQueue
+     * @param nodeRegistryService
+     * @throws InterruptedException
+     * @throws ServiceFailure
+     */
+    protected void spoolToSynchronizationQueue(
+            SortedHarvestTimepointMap harvest, 
+            BlockingQueue<SyncObject> hzSyncObjectQueue, 
+            NodeRegistrySyncService nodeRegistryService,
+            Integer requeueTolerance)  throws InterruptedException, ServiceFailure {
+ 
+        
+        
+        int vulnerableToReharvest = 0;
+
+        Date currentModDate = null;
+        Iterator<Entry<Date,List<String>>> it = harvest.getAscendingIterator();
+        while (it.hasNext()) 
+        {
+            Entry<Date,List<String>> timepoint = it.next();
+
+            // submit all pids in the timepoint
+            for(String pidString : timepoint.getValue()) {
+
+                SyncObject syncObject = new SyncObject(this.d1NodeReference.getValue(), pidString);
+
+                __syncMetricTotalSubmitted++;
+                hzSyncObjectQueue.put(syncObject);
+                __logger.trace("placed on hzSyncObjectQueue- " + syncObject.taskLabel());
+                vulnerableToReharvest++;
+            }
+
+            currentModDate = timepoint.getKey();
+
+            if (vulnerableToReharvest >= requeueTolerance) {
+                try {
+                    nodeRegistryService.setDateLastHarvested(d1NodeReference, currentModDate);
+                    __logger.info(this.d1NodeReference.getValue() + " - updated lastHarvestedDate to " + currentModDate);
+                    vulnerableToReharvest = 0;
+
+                } catch (ServiceFailure e) {
+                    // how far to let the lastHarvestedDate lag behind the queue submissions?
+                    __logger.error(this.d1NodeReference.getValue() + " harvest - nodeRegistry not accepting new lastHarvestedDate!");
+                    throw e;
+                }
+            } 
+        }
+        // after all are processed set lastHarvestedDate to the currentModDate.
+        try {
+            nodeRegistryService.setDateLastHarvested(d1NodeReference, currentModDate);
+            __logger.info(this.d1NodeReference.getValue() + " - updated lastHarvestedDate to " + currentModDate + " ***end of harvest***");
+        } catch (ServiceFailure e) {
+            // how far to let the lastHarvestedDate lag behind the queue submissions?
+            __logger.warn(this.d1NodeReference.getValue() + " harvest - nodeRegistry not accepting new lastHarvestedDate!");
+        }
+
+    }
+    
     
     
     /**
