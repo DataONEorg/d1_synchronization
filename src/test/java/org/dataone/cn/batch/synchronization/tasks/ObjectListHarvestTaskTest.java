@@ -10,6 +10,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.SortedSet;
+import java.util.TimeZone;
 import java.util.TreeSet;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
@@ -56,7 +57,7 @@ public class ObjectListHarvestTaskTest {
 
     
     @Test
-    public void testSoolToSyncQueue() throws Exception {
+    public void testSpoolToSyncQueue() throws Exception {
         ObjectListHarvestTask task = new ObjectListHarvestTask(TypeFactory.buildNodeReference("urn:node:HARVEST_TEST"), 500);
        
          Calendar c = Calendar.getInstance();
@@ -92,6 +93,160 @@ public class ObjectListHarvestTaskTest {
         assertEquals("latestHarvestDate should be updated",new Date(startTime + 60000*3332),
                 nc.getNodeRegistryService().getDateLastHarvested(TypeFactory.buildNodeReference("urn:node:HARVEST_TEST")));
         assertEquals("the syncQueue should have all of the harvest", 3333,mockSyncQueue.size());
+    }
+    
+    
+    @Test
+    public void testMultipleHarvests_by_HarvestLimit() throws Exception {
+        int requestedPageSize = 500;
+        ObjectListHarvestTask task = new ObjectListHarvestTask(TypeFactory.buildNodeReference("urn:node:HARVEST_TEST"), requestedPageSize);
+       
+        Calendar c = Calendar.getInstance();
+        c.set(2017, 0, 1, 12, 0);
+        c.setTimeZone(TimeZone.getDefault());
+        long startTime = c.getTime().getTime();
+        ObjectList ol = new ObjectList();
+        for (int i=0; i < 2222; i++) {
+            ObjectInfo oi = new ObjectInfo();
+            oi.setIdentifier(TypeFactory.buildIdentifier("foo."+i));
+            oi.setDateSysMetadataModified(new Date(startTime + 60000*i));
+            ol.addObjectInfo(oi);
+        }
+        
+        // first harvest
+        
+        NodeComm nc = buildNodeComm(
+                new Date(startTime -100 ), // lastHarvestDate just before the objectList contents
+                ol,
+                700,  // mn page size - lower than batchSize
+                true,  //  paging
+                null,   // which exception to throw
+                null);  // when to throw it
+        
+        SortedHarvestTimepointMap retrieved =task.getFullObjectList(nc,
+                1000    // maxToHarvest
+                );
+        
+        assertEquals("should have harvested all",1000,retrieved.getHarvestSize());
+        assertEquals("earliest should match",new Date(startTime), retrieved.getEarliestTimePoint());
+        assertEquals("latest should match",new Date(startTime + 999*60000), retrieved.getLatestTimePoint());
+        
+        
+        BlockingQueue<SyncObject> mockSyncQueue = new ArrayBlockingQueue<>(10000);
+        task.spoolToSynchronizationQueue(retrieved, mockSyncQueue, nc.getNodeRegistryService(),60);
+        assertEquals("latestHarvestDate should be updated",new Date(startTime + 60000*999),
+                nc.getNodeRegistryService().getDateLastHarvested(TypeFactory.buildNodeReference("urn:node:HARVEST_TEST")));
+        assertEquals("the syncQueue should have all of the harvest", 1000 ,mockSyncQueue.size());
+
+        assertEquals("the nodeRegistry last harvest date should equal the latest of those retrieved (and held)", 
+                retrieved.getLatestTimePoint(),
+                nc.getNodeRegistryService().getDateLastHarvested(TypeFactory.buildNodeReference("urn:node:HARVEST_TEST")));
+
+        SortedHarvestTimepointMap secondHarvest = task.getFullObjectList(nc,
+                1300    // maxToHarvest  this should get the rest
+                );
+        
+        assertEquals("should have harvested all",1222,secondHarvest.getHarvestSize());
+        assertEquals("earliest should match",new Date(startTime + 1000*60000 ), secondHarvest.getEarliestTimePoint());
+        assertEquals("latest should match",new Date(startTime + 2221*60000), secondHarvest.getLatestTimePoint());
+        
+        
+        task.spoolToSynchronizationQueue(secondHarvest, mockSyncQueue, nc.getNodeRegistryService(),60);
+        assertEquals("latestHarvestDate should be updated",new Date(startTime + 60000*2221),
+                nc.getNodeRegistryService().getDateLastHarvested(TypeFactory.buildNodeReference("urn:node:HARVEST_TEST")));
+        assertEquals("the syncQueue should have all of the harvest", 2222 ,mockSyncQueue.size());
+        
+    }
+    
+    /**
+     * this test uses the same minute-by-minute update
+     * @throws Exception
+     */
+    @Test
+    public void testMultipleHarvests_timepoint_gt_harvestMax() throws Exception {
+        int requestedPageSize = 500;
+        ObjectListHarvestTask task = new ObjectListHarvestTask(TypeFactory.buildNodeReference("urn:node:HARVEST_TEST"), requestedPageSize);
+       
+        Calendar c = Calendar.getInstance();
+        c.set(2017, 0, 1, 12, 0);
+        c.setTimeZone(TimeZone.getDefault());
+        long startTime = c.getTime().getTime();
+        ObjectList ol = new ObjectList();
+        for (int i=0; i < 2222; i++) {
+            ObjectInfo oi = new ObjectInfo();
+            oi.setIdentifier(TypeFactory.buildIdentifier("foo."+i));
+            oi.setDateSysMetadataModified(new Date(startTime + 60000*i));
+            ol.addObjectInfo(oi);
+        }
+        
+        for (int i=0; i < 1500; i++) {
+            ObjectInfo oi = new ObjectInfo();
+            oi.setIdentifier(TypeFactory.buildIdentifier("gloop."+i));
+            oi.setDateSysMetadataModified(new Date(startTime + 60000*200));
+            ol.addObjectInfo(oi);
+        }
+        
+        // first harvest
+        
+        NodeComm nc = buildNodeComm(
+                new Date(startTime -100 ), // lastHarvestDate just before the objectList contents
+                ol,
+                700,  // mn page size - lower than batchSize
+                true,  //  paging
+                null,   // which exception to throw
+                null);  // when to throw it
+        
+        SortedHarvestTimepointMap retrieved =task.getFullObjectList(nc,
+                1000    // maxToHarvest
+                );
+        
+        // the large timepoint shouldn't process
+        
+        assertEquals("should have harvested only before large timepoint",200,retrieved.getHarvestSize());
+        assertEquals("earliest should match",new Date(startTime), retrieved.getEarliestTimePoint());
+        assertEquals("latest should match",new Date(startTime + 199*60000), retrieved.getLatestTimePoint());
+        
+        
+        BlockingQueue<SyncObject> mockSyncQueue = new ArrayBlockingQueue<>(10000);
+        task.spoolToSynchronizationQueue(retrieved, mockSyncQueue, nc.getNodeRegistryService(),60);
+        assertEquals("latestHarvestDate should be updated",new Date(startTime + 60000*199),
+                nc.getNodeRegistryService().getDateLastHarvested(TypeFactory.buildNodeReference("urn:node:HARVEST_TEST")));
+        assertEquals("the syncQueue should have only first 200 of the harvest", 200 ,mockSyncQueue.size());
+
+        assertEquals("the nodeRegistry last harvest date should equal the latest of those retrieved (and held)", 
+                retrieved.getLatestTimePoint(),
+                nc.getNodeRegistryService().getDateLastHarvested(TypeFactory.buildNodeReference("urn:node:HARVEST_TEST")));
+
+        SortedHarvestTimepointMap secondHarvest = task.getFullObjectList(nc,
+                1000    // maxToHarvest  this should get the rest
+                );
+        
+        assertEquals("should have harvested all",1501,secondHarvest.getHarvestSize());
+        assertEquals("earliest should match",new Date(startTime + 60000*200 ), secondHarvest.getEarliestTimePoint());
+        assertEquals("latest should match",new Date(startTime + 60000*200), secondHarvest.getLatestTimePoint());
+        
+        
+        task.spoolToSynchronizationQueue(secondHarvest, mockSyncQueue, nc.getNodeRegistryService(),60);
+        assertEquals("latestHarvestDate should be updated",new Date(startTime + 60000*200),
+                nc.getNodeRegistryService().getDateLastHarvested(TypeFactory.buildNodeReference("urn:node:HARVEST_TEST")));
+        assertEquals("the syncQueue should have all of the harvest", 1501 + 200 ,mockSyncQueue.size());
+        
+        
+        
+        SortedHarvestTimepointMap thirdHarvest = task.getFullObjectList(nc,
+                2500    // maxToHarvest  this should get the rest
+                );
+        
+        assertEquals("should have harvested all",2222-1-200,thirdHarvest.getHarvestSize());
+        assertEquals("earliest should match",new Date(startTime + 60000*201 ), thirdHarvest.getEarliestTimePoint());
+        assertEquals("latest should match",new Date(startTime + 60000*2221), thirdHarvest.getLatestTimePoint());
+        
+        
+        task.spoolToSynchronizationQueue(thirdHarvest, mockSyncQueue, nc.getNodeRegistryService(),60);
+        assertEquals("latestHarvestDate should be updated",new Date(startTime + 60000*2221),
+                nc.getNodeRegistryService().getDateLastHarvested(TypeFactory.buildNodeReference("urn:node:HARVEST_TEST")));
+        assertEquals("the syncQueue should have all of the harvest", 1500 + 2222 ,mockSyncQueue.size());
+        
     }
     
     
@@ -470,7 +625,9 @@ public class ObjectListHarvestTaskTest {
 
             @Override
             public void setDateLastHarvested(NodeReference nodeIdentifier, Date lastDateNodeHarvested) throws ServiceFailure {
-                lastHarvested = lastDateNodeHarvested;
+                
+                this.lastHarvested = lastDateNodeHarvested;
+                System.out.println("NodeRegistrySyncService setting dateLastHarvested: " + this.lastHarvested);
             }
 
             @Override

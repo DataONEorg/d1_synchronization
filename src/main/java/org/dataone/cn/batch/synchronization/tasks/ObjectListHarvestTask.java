@@ -325,7 +325,20 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
         return doPagedHarvest(nodeComm,startHarvestDate, endHarvestInterval, total, maxToHarvest);
     }
    
-    
+//    protected Date adjustFilterWindow(NodeComm nc, int total, int max, Date fromDate, Date toDate) 
+//            throws InvalidRequest, InvalidToken, NotAuthorized, NotImplemented, ServiceFailure {
+//        
+//        long adjustedToDate = toDate.getTime();
+//        long adjustedFromDate = fromDate.getTime();
+//        
+//        while (total > max * 2) {
+//            long deltaT = adjustedToDate - adjustedFromDate;
+//            adjustedToDate = adjustedFromDate + deltaT / 2;
+//            total = doListObjects(nc, new Date(adjustedFromDate), new Date(adjustedToDate),0,0).getTotal();
+//        }
+//        
+//        return new Date(adjustedToDate);
+//    }
     
     /**
      * Assemble the timepoint-pid map from the ObjectList iteratively, using paging

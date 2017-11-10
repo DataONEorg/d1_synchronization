@@ -26,8 +26,15 @@ import org.dataone.service.types.v1.ObjectList;
  * pids sharing the same dateSystemMetadataModified be part of the 
  * same harvest.  This class is careful to control removals and additions
  * to the Map such that only the latest timepoint can be removed, and
- * once removed, it as well as later timepoints can be added at a 
+ * once removed, it as well as later timepoints cannot be added at a 
  * later time.
+ * 
+ * The earliest timepoint in the map cannot be removed, or else the harvest
+ * could end up being empty, even though there are objects to harvest.  
+ * (For example, if a timepoint is larger than the maximum harvest size,
+ * it still needs to be harvested.  The harvest in this case will exceed 
+ * its maximum value, because it must complete the timepoint)
+ * 
  * 
  * @author rnahf
  *
@@ -117,7 +124,16 @@ public class SortedHarvestTimepointMap {
             totalRetainedPids++;
 
             if (this.maxHarvestSize != null && totalRetainedPids > this.maxHarvestSize) {
-                removeLatestTimePoint();       
+                if (pidMap.size() > 1) {
+                    removeLatestTimePoint();       
+                } 
+                // else 
+                //   keep the earliest timepoint, or else an excessively
+                //   large timepoints would never get harvested
+                //   (and synchronization would stall)
+                //   This mechanism will effectively finish the harvest
+                //   right before the large timepoint, then harvest the
+                //   large timepoint in the next execution.
             }
         }
     }
