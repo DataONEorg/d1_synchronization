@@ -15,9 +15,11 @@ import java.util.TreeSet;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 
+import org.dataone.cn.batch.exceptions.ExecutionDisabledException;
 import org.dataone.cn.batch.service.v2.NodeRegistrySyncService;
 import org.dataone.cn.batch.synchronization.type.NodeComm;
 import org.dataone.cn.synchronization.types.SyncObject;
+import org.dataone.configuration.Settings;
 import org.dataone.service.cn.v2.NodeRegistryService;
 import org.dataone.service.exceptions.IdentifierNotUnique;
 import org.dataone.service.exceptions.InsufficientResources;
@@ -53,6 +55,7 @@ public class ObjectListHarvestTaskTest {
 
     @Before
     public void setUp() throws Exception {
+        Settings.getConfiguration().addProperty("Synchronization.active", true);
     }
 
     
@@ -251,7 +254,7 @@ public class ObjectListHarvestTaskTest {
     
     
     @Test
-    public void testAllInOneHarvest_normal() throws NotFound, ServiceFailure, InvalidRequest, InvalidToken, NotAuthorized, NotImplemented {
+    public void testAllInOneHarvest_normal() throws NotFound, ServiceFailure, InvalidRequest, InvalidToken, NotAuthorized, NotImplemented, ExecutionDisabledException {
         ObjectListHarvestTask task = new ObjectListHarvestTask(TypeFactory.buildNodeReference("urn:node:HARVEST_TEST"), 100);
         
         Calendar c = Calendar.getInstance();
@@ -295,7 +298,7 @@ public class ObjectListHarvestTaskTest {
     }
 
     @Test
-    public void testAllInOneHarvest_incomplete() throws NotFound, ServiceFailure, InvalidToken, NotAuthorized, NotImplemented {
+    public void testAllInOneHarvest_incomplete() throws NotFound, ServiceFailure, InvalidToken, NotAuthorized, NotImplemented, ExecutionDisabledException {
         ObjectListHarvestTask task = new ObjectListHarvestTask(TypeFactory.buildNodeReference("urn:node:HARVEST_TEST"), 100);
         
         Calendar c = Calendar.getInstance();
@@ -358,7 +361,7 @@ public class ObjectListHarvestTaskTest {
     
     
     @Test
-    public void testAllInOneHarvest_empty() throws NotFound, ServiceFailure, InvalidToken, NotAuthorized, NotImplemented, InvalidRequest {
+    public void testAllInOneHarvest_empty() throws NotFound, ServiceFailure, InvalidToken, NotAuthorized, NotImplemented, InvalidRequest, ExecutionDisabledException {
         ObjectListHarvestTask task = new ObjectListHarvestTask(TypeFactory.buildNodeReference("urn:node:HARVEST_TEST"), 100);
         
         Calendar c = Calendar.getInstance();
@@ -467,7 +470,7 @@ public class ObjectListHarvestTaskTest {
     
     
     @Test
-    public void testPagedHarvest_empty() throws NotFound, ServiceFailure, InvalidToken, NotAuthorized, NotImplemented, InvalidRequest {
+    public void testPagedHarvest_empty() throws NotFound, ServiceFailure, InvalidToken, NotAuthorized, NotImplemented, InvalidRequest, ExecutionDisabledException {
         ObjectListHarvestTask task = new ObjectListHarvestTask(TypeFactory.buildNodeReference("urn:node:HARVEST_TEST"), 100);
         
         Calendar c = Calendar.getInstance();

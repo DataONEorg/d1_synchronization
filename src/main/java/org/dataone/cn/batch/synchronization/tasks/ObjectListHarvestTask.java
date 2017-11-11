@@ -154,13 +154,11 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
         
         
    
-        
+       
         SortedHarvestTimepointMap harvest = getFullObjectList(mnNodeComm, maximumToHarvest);
         
-        
-        
-        spoolToSynchronizationQueue(harvest, hzSyncObjectQueue, nodeRegistryService, requeueTolerance);
 
+        spoolToSynchronizationQueue(harvest, hzSyncObjectQueue, nodeRegistryService, requeueTolerance);
         
            
         __logger.info(d1NodeReference.getValue() + "- ObjectListHarvestTask End");
@@ -200,8 +198,7 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
             NodeRegistrySyncService nodeRegistryService,
             Integer requeueTolerance)  throws InterruptedException, ServiceFailure {
  
-        
-        
+
         int vulnerableToReharvest = 0;
 
         Date currentModDate = null;
@@ -238,8 +235,10 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
         }
         // after all are processed set lastHarvestedDate to the currentModDate.
         try {
-            nodeRegistryService.setDateLastHarvested(d1NodeReference, currentModDate);
-            __logger.info(this.d1NodeReference.getValue() + " - updated lastHarvestedDate to " + currentModDate + " ***end of harvest***");
+            if (currentModDate != null) {
+                nodeRegistryService.setDateLastHarvested(d1NodeReference, currentModDate);
+                __logger.info(this.d1NodeReference.getValue() + " - updated lastHarvestedDate to " + currentModDate + " ***end of harvest***");
+            }
         } catch (ServiceFailure e) {
             // how far to let the lastHarvestedDate lag behind the queue submissions?
             __logger.warn(this.d1NodeReference.getValue() + " harvest - nodeRegistry not accepting new lastHarvestedDate!");
@@ -259,9 +258,10 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
      * @throws NotImplemented 
      * @throws NotAuthorized 
      * @throws InvalidToken 
+     * @throws ExecutionDisabledException 
      */
     protected SortedHarvestTimepointMap getFullObjectList(NodeComm nodeComm, Integer maxToHarvest) 
-            throws NotFound, ServiceFailure, InvalidRequest, InvalidToken, NotAuthorized, NotImplemented {
+            throws NotFound, ServiceFailure, InvalidRequest, InvalidToken, NotAuthorized, NotImplemented, ExecutionDisabledException {
         
         
         // 1. set up the harvest time interval of
@@ -324,7 +324,11 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
         //
         return doPagedHarvest(nodeComm,startHarvestDate, endHarvestInterval, total, maxToHarvest);
     }
-   
+ 
+    
+    
+    
+    
 //    protected Date adjustFilterWindow(NodeComm nc, int total, int max, Date fromDate, Date toDate) 
 //            throws InvalidRequest, InvalidToken, NotAuthorized, NotImplemented, ServiceFailure {
 //        
@@ -339,6 +343,10 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
 //        
 //        return new Date(adjustedToDate);
 //    }
+ 
+    
+    
+    
     
     /**
      * Assemble the timepoint-pid map from the ObjectList iteratively, using paging
@@ -352,9 +360,10 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
      * @throws NotAuthorized 
      * @throws InvalidToken 
      * @throws InvalidRequest 
+     * @throws ExecutionDisabledException 
      */
     private SortedHarvestTimepointMap doPagedHarvest(NodeComm nodeComm, Date fromDate, Date toDate, Integer total, Integer maxToHarvest) 
-            throws InvalidRequest, InvalidToken, NotAuthorized, NotImplemented, ServiceFailure {
+            throws InvalidRequest, InvalidToken, NotAuthorized, NotImplemented, ServiceFailure, ExecutionDisabledException {
 
         SortedHarvestTimepointMap harvest = new SortedHarvestTimepointMap(fromDate,toDate,maxToHarvest);
         
@@ -362,6 +371,12 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
         int latestReportedTotal = total;
         int count = Math.min(this.batchSize,  latestReportedTotal - currentStart);
         while (currentStart < latestReportedTotal) {
+            
+            
+            if (!ComponentActivationUtility.synchronizationIsActive()) {
+                throw  new ExecutionDisabledException(d1NodeReference.getValue() + "- Disabled");
+            }
+            
             ObjectList ol = doListObjects(nodeComm, fromDate, toDate, currentStart, count);
             
             if (ol.sizeObjectInfoList() == 0) {
