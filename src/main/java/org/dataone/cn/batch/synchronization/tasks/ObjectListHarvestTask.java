@@ -152,30 +152,30 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
         int maximumToHarvest = Math.min(maxHarvestSize, maxSyncObjectQueueSize - hzSyncObjectQueue.size());
         __logger.info(d1NodeReference.getValue() + " - harvest limited to " + maximumToHarvest + " items.");
         
-        
-   
-       
-        SortedHarvestTimepointMap harvest = getFullObjectList(mnNodeComm, maximumToHarvest);
-        
+        if (maximumToHarvest > 0) {
 
-        spoolToSynchronizationQueue(harvest, hzSyncObjectQueue, nodeRegistryService, requeueTolerance);
-        
-           
-        __logger.info(d1NodeReference.getValue() + "- ObjectListHarvestTask End");
-        
-        MetricLogEntry __metricHarvestRetrievedLogEvent = new MetricLogEntry(
-                MetricEvent.SYNCHRONIZATION_HARVEST_RETRIEVED,
-                d1NodeReference, null, Integer.toString(__syncMetricTotalRetrieved));
-        Date __harvestMetricLogDate = (Date)__metricHarvestRetrievedLogEvent.getDateLogged().clone();
-        __metricLogger.logMetricEvent(__metricHarvestRetrievedLogEvent);
-        
-        MetricLogEntry __metricHarvestSubmittedLogEvent = new MetricLogEntry(
-                MetricEvent.SYNCHRONIZATION_HARVEST_SUBMITTED,
-                d1NodeReference, null, Integer.toString(__syncMetricTotalSubmitted));
-        // make the second the same Date for better alignment in viewed logs.
-        __metricHarvestSubmittedLogEvent.setDateLogged(__harvestMetricLogDate);
-        __metricLogger.logMetricEvent(__metricHarvestSubmittedLogEvent);
-        
+
+            SortedHarvestTimepointMap harvest = getFullObjectList(mnNodeComm, maximumToHarvest);
+
+
+            spoolToSynchronizationQueue(harvest, hzSyncObjectQueue, nodeRegistryService, requeueTolerance);
+
+
+            __logger.info(d1NodeReference.getValue() + "- ObjectListHarvestTask End");
+
+            MetricLogEntry __metricHarvestRetrievedLogEvent = new MetricLogEntry(
+                    MetricEvent.SYNCHRONIZATION_HARVEST_RETRIEVED,
+                    d1NodeReference, null, Integer.toString(__syncMetricTotalRetrieved));
+            Date __harvestMetricLogDate = (Date)__metricHarvestRetrievedLogEvent.getDateLogged().clone();
+            __metricLogger.logMetricEvent(__metricHarvestRetrievedLogEvent);
+
+            MetricLogEntry __metricHarvestSubmittedLogEvent = new MetricLogEntry(
+                    MetricEvent.SYNCHRONIZATION_HARVEST_SUBMITTED,
+                    d1NodeReference, null, Integer.toString(__syncMetricTotalSubmitted));
+            // make the second the same Date for better alignment in viewed logs.
+            __metricHarvestSubmittedLogEvent.setDateLogged(__harvestMetricLogDate);
+            __metricLogger.logMetricEvent(__metricHarvestSubmittedLogEvent);
+        }
 
         // return the date of completion of the task
         // (not sure how this is used)
@@ -280,6 +280,9 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
         currentDateTime.addSeconds(-backoffSeconds);
         endHarvestInterval = currentDateTime.toDate();
         
+        
+        
+        
         if (__logger.isDebugEnabled()) {
             __logger.debug(d1NodeReference.getValue() + "- starting retrieval " + nodeComm.getNodeRegistryService().getNode(d1NodeReference).getBaseURL()
                 + " with startDate of " + DateTimeMarshaller.serializeDateToUTC(startHarvestDate)
@@ -302,6 +305,11 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
             ObjectList ol = doListObjects(nodeComm,startHarvestDate,endHarvestInterval,0,0);
             total = ol.getTotal();
             __logger.info(d1NodeReference.getValue() + "- has " + total + " pids to harvest.");
+            
+            endHarvestInterval =  adjustFilterWindow(nodeComm,total,maxToHarvest,startHarvestDate, endHarvestInterval);
+            __logger.info(d1NodeReference.getValue() + "- adjusting harvest toDate to limit the total for paged harvest [to between max and 2*max]");
+            
+            
                                 
         } catch (InvalidRequest e) {
             // proceed assuming it's the start/count that's not implemented
@@ -328,21 +336,56 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
     
     
     
-    
-//    protected Date adjustFilterWindow(NodeComm nc, int total, int max, Date fromDate, Date toDate) 
-//            throws InvalidRequest, InvalidToken, NotAuthorized, NotImplemented, ServiceFailure {
-//        
-//        long adjustedToDate = toDate.getTime();
-//        long adjustedFromDate = fromDate.getTime();
-//        
-//        while (total > max * 2) {
-//            long deltaT = adjustedToDate - adjustedFromDate;
-//            adjustedToDate = adjustedFromDate + deltaT / 2;
-//            total = doListObjects(nc, new Date(adjustedFromDate), new Date(adjustedToDate),0,0).getTotal();
-//        }
-//        
-//        return new Date(adjustedToDate);
-//    }
+ 
+    /**
+     * This method should optimize the time window size so that the total within group is not 
+     * more than the maximum synchronization will take.  This will reduce load on the MNs in that
+     * they will not need to sort more objects than needed (assuming O(NlogN)).
+     */
+    protected Date adjustFilterWindow(NodeComm nc, int total, int max, Date fromDate, Date toDate) 
+            throws InvalidRequest, InvalidToken, NotAuthorized, NotImplemented, ServiceFailure {
+        
+        
+        if (total < max || total < 200) {
+            // the initial window is good OR not worth trying to optimize for small totals.
+            return toDate;
+        }
+        
+        long adjustedToDate = toDate.getTime();
+        long fromDateValue = fromDate.getTime();
+        boolean incomplete = false;
+        
+        int i = 0;
+        long deltaT = adjustedToDate - fromDateValue;
+        while (total > max * 2 || total < max) {
+            deltaT /= 2;
+            if (total < max) {
+                adjustedToDate = adjustedToDate + deltaT;
+            } else {
+                adjustedToDate = adjustedToDate - deltaT;
+            }
+            
+            if (__logger.isDebugEnabled()) {
+                __logger.debug(String.format("%d. total = %d, max = %d: adjustingFilterWindow: [%s to %s]",i, total, max, fromDate,new Date(adjustedToDate)));
+            }
+            
+            total = doListObjects(nc, fromDate, new Date(adjustedToDate),0,0).getTotal();     
+            
+            // avoid infinite optimizations for tightly clustered modification dates 
+            if (i++ > 25) {
+                incomplete = true;
+                break;
+            }
+        }
+        if (incomplete && total == 0) {
+            return toDate;
+        }
+        if (__logger.isDebugEnabled()) {
+            __logger.debug(String.format("final window: total = %d, max = %d: adjustingFilterWindow: [%s to %s]",i, total, max, fromDate,new Date(adjustedToDate)));
+        }
+        
+        return new Date(adjustedToDate);
+    }
  
     
     
