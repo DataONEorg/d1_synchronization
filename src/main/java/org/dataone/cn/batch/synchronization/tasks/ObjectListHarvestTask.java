@@ -380,9 +380,8 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
         if (incomplete && total == 0) {
             return toDate;
         }
-        if (__logger.isDebugEnabled()) {
-            __logger.debug(String.format("final window: total = %d, max = %d: adjustingFilterWindow: [%s to %s]",i, total, max, fromDate,new Date(adjustedToDate)));
-        }
+        __logger.info(d1NodeReference.getValue() + String.format(" - final time window: total = %d, max = %d: adjustingFilterWindow: [%s to %s]", total, max, fromDate,new Date(adjustedToDate)));
+
         
         return new Date(adjustedToDate);
     }

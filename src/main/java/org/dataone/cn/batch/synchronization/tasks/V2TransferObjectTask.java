@@ -579,21 +579,21 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
     private void validateSeriesId(SystemMetadata sysMeta) throws NotAuthorized, UnrecoverableException, RetryableException {
 
         logger.debug(task.taskLabel() + " entering validateSeriesId...");
+        
         Identifier sid = sysMeta.getSeriesId();
-
         if (sid == null || StringUtils.isBlank(sid.getValue())) {
             return;
         }
 
         try { // resolving the SID
 
-            Identifier pid = resolve(sysMeta.getIdentifier(),"SID");
+            Identifier headPid = resolve(sid,"SID");
 
             if (logger.isDebugEnabled()) 
-                logger.debug(task.taskLabel() + " SeriesId is in use by " + pid.getValue());
+                logger.debug(task.taskLabel() + " SeriesId is in use by " + headPid.getValue());
 
             // checking that the new object's submitter is authorized via SID head's accessPolicy
-            SystemMetadata sidHeadSysMeta = getSystemMetadataHandleRetry(nodeCommunications.getCnRead(), sid);
+            SystemMetadata sidHeadSysMeta = getSystemMetadataHandleRetry(nodeCommunications.getCnRead(), headPid);
             if (!AuthUtils.isAuthorized(
                     Collections.singletonList(sysMeta.getSubmitter()),
                     Permission.CHANGE_PERMISSION,
@@ -601,13 +601,13 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
 
                 if (logger.isDebugEnabled()) 
                     logger.debug("Submitter doesn't have the change permission on the pid "
-                            + pid.getValue() + ". We will try if the rights holder has the permission.");
+                            + headPid.getValue() + ". We will try if the rights holder has the permission.");
                 if(!AuthUtils.isAuthorized(
                     Collections.singletonList(sysMeta.getRightsHolder()),
                     Permission.CHANGE_PERMISSION,
                     sidHeadSysMeta)) {
                     throw new NotAuthorized("0000", "Both the submitter and rightsHolder does not have CHANGE rights on the SeriesId as determined by"
-                            + " the current head of the Sid collection, whose pid is: " + pid.getValue());
+                            + " the current head of the Sid collection, whose pid is: " + headPid.getValue());
                 }
                 
             }

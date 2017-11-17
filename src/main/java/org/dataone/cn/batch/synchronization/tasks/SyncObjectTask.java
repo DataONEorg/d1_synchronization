@@ -113,31 +113,38 @@ public class SyncObjectTask implements Callable<String> {
         //     informed of the synchronization failure. 
         // Hence, the SyncObject is needed to create and schedule a SyncFailedTask
 
-        SyncObject task = null;
+        
         try {
             do {  // forever, (unless exception thrown)
 
+                SyncObject task = null;
                 //
-                // (A). pull a task from the queue if synchronization is active
+                // (A). pull a task from the queue if synchronization is active and there is one
                 //
                 // Settings gets refreshed periodically           
                 if (ComponentActivationUtility.synchronizationIsActive()) {
                     // get next item off the SyncObject queue
-                    Long nowTime = (new Date()).getTime();
-                    if (nowTime > delayUntil) {
-                        task = hzSyncObjectQueue.poll(90L, TimeUnit.SECONDS);
-                    } 
-                    else if (nowTime + 500 > delayUntil) {
-                        // sleep instead of requeue
-                        interruptableSleep(delayUntil-nowTime);
-                        task = hzSyncObjectQueue.poll(90L, TimeUnit.SECONDS);
-                    } 
-                    else {
-                        // let the task be null 
-                        task = null;
-                    }
-                } else {
                     
+                    task = hzSyncObjectQueue.poll(60L, TimeUnit.SECONDS);
+                    
+                    
+                    
+// XXX: this delayUntil was never fully implemented, (note that delayUntil value was never changed from the default -1)
+// so commenting out for now.  The idea was to use the
+// task.getSleepUntil() value to induce a sleep assuming that 
+// any future tasks in the queue would have later task.getSleepUntils
+//                    Long nowTime = (new Date()).getTime();
+//                    if (nowTime > delayUntil) {
+//                        task = hzSyncObjectQueue.poll(90L, TimeUnit.SECONDS);
+//                    } 
+//                    else if (nowTime + 500 > delayUntil) {
+//                        // sleep instead of requeue
+//                        interruptableSleep(delayUntil-nowTime);
+//                        task = hzSyncObjectQueue.poll(90L, TimeUnit.SECONDS);
+//                    } 
+                    
+                } else {
+                                        
                     //
                     // (B).  Try to shutdown gracefully - exit if all tasks are complete,
                     //          and slow the infinite loop down, because there is not
@@ -152,17 +159,23 @@ public class SyncObjectTask implements Callable<String> {
                     // slow down the rate of future-reaping while sync is not active
                     //
                     // we really don't want to slow down things when sync becomes 
-                    // inactive, because it means that we wish to top the process
+                    // inactive, because it means that we wish to stop the process
                     // fairly quickly. -rpw
-                    //interruptableSleep(10000L);
+                    // 
+                    // true, but since each task takes about 3-4 seconds to complete, we can avoid 
+                    // unnecessary loops and many log statements while waiting.
+                    interruptableSleep(1000L);
                 }
                 
                 
                 // (C).  try to free up executor threads and nodeComms
                 
-                // reapFutures serially waits up to 250ms per future, so with the number of futures limited
-                // by number of nodeComms (defaluts to 5), this is up to a 1.25 second wait
-                // because each job lasts about 500ms, this seems to slow things down
+                // reapFutures serially waits FUTURE_REAP_WAIT ms per future, so with the number of futures limited
+                // by number of nodeComms (defaluts to 5) * number of member nodes (limited to 100), there can be up to
+                // 100 * FUTURE_REAP_WAIT ms imposed blocking time.
+                // (although, unless a job is stuck, the upper limit is the processing time of a single task - since they
+                // are all being processed in concurrently)
+
                 reapFutures(futuresMap);
 
                 // (D). try to get a NodeComm for the task and assign it to the executor
