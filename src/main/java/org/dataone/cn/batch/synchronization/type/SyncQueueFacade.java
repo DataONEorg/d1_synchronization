@@ -2,14 +2,11 @@ package org.dataone.cn.batch.synchronization.type;
 
 import java.util.Deque;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
-import org.dataone.client.exception.ClientSideException;
-import org.dataone.client.v1.CNode;
 import org.dataone.cn.hazelcast.HazelcastClientFactory;
 import org.dataone.cn.synchronization.types.SyncObject;
 
@@ -23,17 +20,29 @@ import com.hazelcast.core.IQueue;
 
 /**
  * A class to manage the particulars of adding and removing SyncObjects to the set of backing 
- * synchronization queues.
+ * synchronization queues.  As an EntryListener, it tracks when new nodes are added to the map,
+ * even from other CN instances. 
  * 
- * The basic usage pattern would be
+ * The typical usage pattern is expected to be:
  * 
  *  Harvester:
- *       syncQMan.add(syncObject);
+ *       syncQueueFacade.add(syncObject)
  * 
+ *  and cn.synchronize
+ *       syncQueueFacade.addWithPriority(syncObject)
+ * 
+ *  and even:
+ *       try {
+ *          process(synObject)
+ *       } catch (retryableException) 
+ *           syncQueueFacade.addWithPriority(syncObject)
+ *       }
+ *       
  *  SyncObjectTask:
  *       syncObject = syncQMan.poll(10, TimeUnit.MILLISECONDS)
  *       process(syncObject)
  *       
+ * 
  * @author rnahf
  *
  */
@@ -48,8 +57,7 @@ public class SyncQueueFacade implements EntryListener<String, IQueue<Object>> {
     protected Map<String,Integer> mapCountMap = new HashMap<>();
 
     public SyncQueueFacade() {
-        
-        
+                
         HazelcastClient processingClient = HazelcastClientFactory.getProcessingClient();
         IMap<String,IQueue<Object>> qMap = processingClient.getMap("dataone.synchronization.queueMap");
         
@@ -57,7 +65,7 @@ public class SyncQueueFacade implements EntryListener<String, IQueue<Object>> {
         
         IMap<String,IQueue<Object>> pqMap = processingClient.getMap("dataone.synchronization.priority.queueMap");
         
-        qMap.addEntryListener(this, false);
+        pqMap.addEntryListener(this, false);
     }
     
     
@@ -79,7 +87,8 @@ public class SyncQueueFacade implements EntryListener<String, IQueue<Object>> {
     }
     
     /**
-     * Adds a task to the appropriate priority queue, creating the queue if one doesn't exist 
+     * Adds a task to the appropriate priority queue, creating the queue if one doesn't exist.
+     * this.poll() method tries the priority queue before trying the regular ones 
 
      * @param syncObject
      */
@@ -100,32 +109,44 @@ public class SyncQueueFacade implements EntryListener<String, IQueue<Object>> {
     
 
     /**
-     * Returns the next SyncObject from the appropriate queue, or null if none exist within the given time period
-     * Note that if no queue exists for the , null will be returned without waiting.
-     * The priority queue for that node is polled first, adding a 100 microsecond overhead if the priority queue exists.
+     * Returns the next SyncObject from one of the syncQueues, or null if none
+     * exist in any of the SyncQueues.  This method iterates through all of the
+     * queues at most one time.
      * 
-     * @param timeout
+     * Note that multiple queues may be polled, so the method may block for 
+     * multiple timeouts.
+     * The strategy for pulling from the queues is to check the priority queue for
+     * the first node, then the regular queue if nothing is returned, and then
+     * to repeat for the next node until an item is found, or all of the queues have
+     * been polled one time.
+     * 
+     * @param perQueueTimeout
      * @param unit
      * @return
      * @throws InterruptedException
      */
-    public SyncObject poll(long timeout, TimeUnit unit) throws InterruptedException {
+    public SyncObject poll(long perQueueTimeout, TimeUnit unit) throws InterruptedException {
         HazelcastClient processingClient = HazelcastClientFactory.getProcessingClient();
 
         SyncObject item = null;            
         
-        String nextQueue = getNextNodeId();
+        //  go through the round robin no more than one time, or until you find an object
+        for (int i=0; i< nodeIdRoundRobin.size(); i++) {
+            String nextQueue = getNextNodeId();
         
-        IMap<String,IQueue<Object>> priorityQueueMap = processingClient.getMap("dataone.synchronization.priority.queueMap");
+            IMap<String,IQueue<Object>> priorityQueueMap = processingClient.getMap("dataone.synchronization.priority.queueMap");
 
-        if (priorityQueueMap.containsKey(nextQueue)) {
-            item = (SyncObject)priorityQueueMap.get(nextQueue).poll(100,TimeUnit.MICROSECONDS);
-        }
-        if (item == null) {
-            IMap<String,IQueue<Object>> qMap = processingClient.getMap("dataone.synchronization.queueMap");
-            if (qMap.containsKey(nextQueue)) {
-                item = (SyncObject) qMap.get(nextQueue).poll(timeout, unit);
+            if (priorityQueueMap.containsKey(nextQueue)) {
+                item = (SyncObject)priorityQueueMap.get(nextQueue).poll(100,TimeUnit.MICROSECONDS);
             }
+            if (item == null) {
+                IMap<String,IQueue<Object>> qMap = processingClient.getMap("dataone.synchronization.queueMap");
+                if (qMap.containsKey(nextQueue)) {
+                    item = (SyncObject) qMap.get(nextQueue).poll(perQueueTimeout, unit);
+                }
+            }
+            if (item != null) 
+                break;
         }
         return item;
     }
@@ -145,7 +166,7 @@ public class SyncQueueFacade implements EntryListener<String, IQueue<Object>> {
     
     
     /**
-     * Returns the map of all synchronization queues
+     * Returns the map of non-prioritized synchronization queues
      * @return
      */
     protected IMap<String, IQueue> getSyncQueueMap() {
@@ -153,6 +174,10 @@ public class SyncQueueFacade implements EntryListener<String, IQueue<Object>> {
         return processingClient.getMap("dataone.synchronization.queueMap");        
     }
     
+    /**
+     * Returns the map of prioritized synchronization queues
+     * @return
+     */
     protected IMap<String, IQueue> getPrioritySyncQueueMap() {
         HazelcastClient processingClient = HazelcastClientFactory.getProcessingClient();
         return processingClient.getMap("dataone.synchronization.priority.queueMap");        
@@ -162,8 +187,8 @@ public class SyncQueueFacade implements EntryListener<String, IQueue<Object>> {
     
     
     /**
-     * implements the RoundRobin approach to reading from multiple queues
-     * It pops the first item off the deque, pushes it onto the end,
+     * implements the Round Robin approach to reading from multiple queues
+     * It reads the first item of the queue, then cycles it to the end of the queue
      * and returns that value.
      * @return
      */
@@ -182,6 +207,15 @@ public class SyncQueueFacade implements EntryListener<String, IQueue<Object>> {
     }
     
 
+    
+    /**
+     * listens to map entries so that the round robin can be expanded
+     * to include the new node entry.
+     * 
+     * Listens to both the regular and prioritized maps, and simply stores
+     * the nodeId the first time it is encountered, not twice, so that equity
+     * is maintained.
+     */
     @Override
     public void entryAdded(EntryEvent<String, IQueue<Object>> event) {
         if (!nodeIdRoundRobin.contains(event.getKey()))
