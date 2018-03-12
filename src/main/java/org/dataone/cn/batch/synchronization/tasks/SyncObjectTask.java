@@ -39,6 +39,7 @@ import org.dataone.cn.batch.synchronization.NodeCommSyncObjectFactory;
 import org.dataone.cn.batch.synchronization.type.NodeComm;
 import org.dataone.cn.batch.synchronization.type.NodeCommState;
 import org.dataone.cn.batch.synchronization.type.SyncObjectState;
+import org.dataone.cn.batch.synchronization.type.SyncQueueFacade;
 import org.dataone.cn.hazelcast.HazelcastClientFactory;
 import org.dataone.cn.synchronization.types.SyncObject;
 import org.dataone.configuration.Settings;
@@ -97,9 +98,11 @@ public class SyncObjectTask implements Callable<String> {
         HazelcastClient hazelcast = HazelcastClientFactory.getProcessingClient();
         logger.info("Starting SyncObjectTask");
 
-        String syncObjectQueue = Settings.getConfiguration().getString("dataone.hazelcast.synchronizationObjectQueue");
-        BlockingQueue<SyncObject> hzSyncObjectQueue = hazelcast.getQueue(syncObjectQueue);
+//        String syncObjectQueue = Settings.getConfiguration().getString("dataone.hazelcast.synchronizationObjectQueue");
+//        BlockingQueue<SyncObject> hzSyncObjectQueue = hazelcast.getQueue(syncObjectQueue);
 
+        SyncQueueFacade hzSyncObjectQueue = new SyncQueueFacade();
+        
         HashMap<FutureTask<SyncObjectState>, HashMap<String, Object>> futuresMap = new HashMap<>();
         // the futures map is helpful in tracking the state of a TransferObjectTask
         // submitted to the task executor as a FutureTask
@@ -125,7 +128,12 @@ public class SyncObjectTask implements Callable<String> {
                 if (ComponentActivationUtility.synchronizationIsActive()) {
                     // get next item off the SyncObject queue
                     
-                    task = hzSyncObjectQueue.poll(60L, TimeUnit.SECONDS);
+                    // when there was only one queue, it was ok to wait longer for the queue to populate
+                    //task = hzSyncObjectQueue.poll(60L, TimeUnit.SECONDS);
+                    
+                    // now with one queue per node, we don't want to wait to long at any one queue
+                    // so this should be much shorter than the previous minute
+                    task = hzSyncObjectQueue.poll(100L, TimeUnit.MILLISECONDS);
                     
                     
                     
@@ -184,12 +192,14 @@ public class SyncObjectTask implements Callable<String> {
                     boolean success = executeTransferObjectTask(task, futuresMap);
                     if (!success) {
                         logger.info(task.taskLabel() + " - requeueing task.");
-                        hzSyncObjectQueue.put(task);
+                        // with the syn facade, we can express priority - this won't go to the back of a very long queue
+
+                        hzSyncObjectQueue.addWithPriority(task);
                         // if queue is short, try to pass off this task to another
                         // CN by sleeping a bit
-                        if (hzSyncObjectQueue.size() < 3) {
-                            interruptableSleep(5000L);
-                        }
+//                        if (hzSyncObjectQueue.size() < 3) {
+//                            interruptableSleep(5000L);
+//                        }
                     }
                 }
                 

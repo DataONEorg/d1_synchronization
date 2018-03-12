@@ -5,10 +5,14 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.log4j.Logger;
+import org.dataone.cn.batch.synchronization.tasks.SyncObjectTask;
 import org.dataone.cn.hazelcast.HazelcastClientFactory;
 import org.dataone.cn.synchronization.types.SyncObject;
+import org.dataone.configuration.Settings;
 
 import com.hazelcast.client.HazelcastClient;
 import com.hazelcast.core.EntryEvent;
@@ -48,24 +52,33 @@ import com.hazelcast.core.IQueue;
  */
 public class SyncQueueFacade implements EntryListener<String, IQueue<Object>> {
 
-  
+    static final Logger logger = Logger.getLogger(SyncObjectTask.class);
+    
     /* the list of nodeIds that are the keys of the queueMap(s) */
+    /* for shared roundrobin, a "SyncQueueQueue" could be implemented instead... */
     protected Deque<String> nodeIdRoundRobin = new LinkedList<String>();  //LL implements Deque interface
-
+    
+    protected String synchronizationObjectQueue = Settings.getConfiguration().getString("dataone.hazelcast.synchronizationObjectQueue"); 
+    
 //    protected Set<String> nodeIdSet = new HashSet<String>();
         
-    protected Map<String,Integer> mapCountMap = new HashMap<>();
+//    protected Map<String,Integer> mapCountMap = new HashMap<>();
 
     public SyncQueueFacade() {
                 
         HazelcastClient processingClient = HazelcastClientFactory.getProcessingClient();
-        IMap<String,IQueue<Object>> qMap = processingClient.getMap("dataone.synchronization.queueMap");
         
+        IMap<String,IQueue<Object>> qMap = processingClient.getMap("dataone.synchronization.queueMap");        
         qMap.addEntryListener(this, false);
         
-        IMap<String,IQueue<Object>> pqMap = processingClient.getMap("dataone.synchronization.priority.queueMap");
-        
+        IMap<String,IQueue<Object>> pqMap = processingClient.getMap("dataone.synchronization.priority.queueMap");      
         pqMap.addEntryListener(this, false);
+        
+        // this adds the legacy all in one queue to the map
+        // the listener should put this into the queue-name round robin
+        qMap.put("legacy", processingClient.getQueue(synchronizationObjectQueue));
+        
+        
     }
     
     
@@ -156,14 +169,64 @@ public class SyncQueueFacade implements EntryListener<String, IQueue<Object>> {
      * Returns the current set of keys of the SyncQueueMap
      * @return
      */
-    public Set<String> keySet() {
+//    public Set<String> keySet() {
+//        HazelcastClient processingClient = HazelcastClientFactory.getProcessingClient();
+//        IMap<String,IQueue<Object>> qMap = processingClient.getMap("dataone.synchronization.queueMap");
+//        return qMap.keySet();
+//        
+//    }
+ 
+
+    /**
+     * Returns the total number of items in the sync queues
+     * @return
+     */
+    public int size() {
         HazelcastClient processingClient = HazelcastClientFactory.getProcessingClient();
-        IMap<String,IQueue<Object>> qMap = processingClient.getMap("dataone.synchronization.queueMap");
-        return qMap.keySet();
         
+        int size = 0;
+        for (int i=0; i < nodeIdRoundRobin.size(); i++) {
+            String nextQueue = getNextNodeId();
+            
+            IMap<String,IQueue<Object>> priorityQueueMap = processingClient.getMap("dataone.synchronization.priority.queueMap");
+
+            if (priorityQueueMap.containsKey(nextQueue)) {
+                size += priorityQueueMap.get(nextQueue).size();
+            }
+            IMap<String,IQueue<Object>> qMap = processingClient.getMap("dataone.synchronization.queueMap");
+            if (qMap.containsKey(nextQueue)) {
+                size += qMap.get(nextQueue).size();
+            }
+        }
+        return size;
     }
     
     
+    public int size(String nodeId) {
+        HazelcastClient processingClient = HazelcastClientFactory.getProcessingClient();
+        int size = 0;
+        IMap<String,IQueue<Object>> priorityQueueMap = processingClient.getMap("dataone.synchronization.priority.queueMap");
+        IQueue<Object> queue = priorityQueueMap.get(nodeId);
+        size += queue == null ? 0 : queue.size();
+        
+        IMap<String,IQueue<Object>> qMap = processingClient.getMap("dataone.synchronization.queueMap");
+        queue = qMap.get(nodeId);
+        size += queue == null ? 0 : queue.size();
+        
+        return size;
+    }
+
+    
+    public String[] getQueueNames() {
+        return (String[]) this.nodeIdRoundRobin.toArray();
+    }
+    
+    
+    public IQueue<Object> getLegacyQueue() {
+        HazelcastClient processingClient = HazelcastClientFactory.getProcessingClient();
+        IMap<String,IQueue<Object>> qMap = processingClient.getMap("dataone.synchronization.queueMap");
+        return qMap.get("legacy");
+    }
     
     /**
      * Returns the map of non-prioritized synchronization queues
@@ -217,9 +280,13 @@ public class SyncQueueFacade implements EntryListener<String, IQueue<Object>> {
      * is maintained.
      */
     @Override
-    public void entryAdded(EntryEvent<String, IQueue<Object>> event) {
-        if (!nodeIdRoundRobin.contains(event.getKey()))
+    public synchronized void entryAdded(EntryEvent<String, IQueue<Object>> event) {
+        if (!nodeIdRoundRobin.contains(event.getKey())) {
             nodeIdRoundRobin.add(event.getKey());
+            logger.info("Added queue named '" + event.getKey() + "' to the nodeId round robin" );
+        } else {
+            logger.info("The queue named '" + event.getKey() + "' is already in the nodeId round robin" );
+        }
     }
 
     @Override

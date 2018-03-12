@@ -33,6 +33,7 @@ import org.dataone.cn.batch.service.v2.NodeRegistrySyncService;
 import org.dataone.cn.batch.synchronization.NodeCommFactory;
 import org.dataone.cn.batch.synchronization.NodeCommObjectListHarvestFactory;
 import org.dataone.cn.batch.synchronization.type.NodeComm;
+import org.dataone.cn.batch.synchronization.type.SyncQueueFacade;
 import org.dataone.cn.hazelcast.HazelcastClientFactory;
 import org.dataone.cn.log.MetricEvent;
 import org.dataone.cn.log.MetricLogClient;
@@ -139,13 +140,13 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
         NodeRegistrySyncService nodeRegistryService = mnNodeComm.getNodeRegistryService();
         
         // get SynchronizationQueue and stats
-        String synchronizationObjectQueue = Settings.getConfiguration().getString("dataone.hazelcast.synchronizationObjectQueue");
+//        String synchronizationObjectQueue = Settings.getConfiguration().getString("dataone.hazelcast.synchronizationObjectQueue");
         Integer maxSyncObjectQueueSize    = Settings.getConfiguration().getInt("Synchronization.max_syncobjectqueue_size",50000);
         Integer maxHarvestSize            = Settings.getConfiguration().getInt("Synchronization.max_harvest_size",50000);
         Integer requeueTolerance          = Settings.getConfiguration().getInt("Synchronization.harvest_update_latestHarvestDate_frequency",100);
         
-        HazelcastClient hazelcast = HazelcastClientFactory.getProcessingClient();        
-        BlockingQueue<SyncObject> hzSyncObjectQueue = hazelcast.getQueue(synchronizationObjectQueue);
+//        HazelcastClient hazelcast = HazelcastClientFactory.getProcessingClient();    
+        SyncQueueFacade hzSyncObjectQueue = new SyncQueueFacade(); // hazelcast.getQueue(synchronizationObjectQueue);
         
         
         // limit the number of pids to submit to the synchronization queue
@@ -194,7 +195,7 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
      */
     protected void spoolToSynchronizationQueue(
             SortedHarvestTimepointMap harvest, 
-            BlockingQueue<SyncObject> hzSyncObjectQueue, 
+            SyncQueueFacade hzSyncObjectQueue, 
             NodeRegistrySyncService nodeRegistryService,
             Integer requeueTolerance)  throws InterruptedException, ServiceFailure {
  
@@ -213,7 +214,7 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
                 SyncObject syncObject = new SyncObject(this.d1NodeReference.getValue(), pidString);
 
                 __syncMetricTotalSubmitted++;
-                hzSyncObjectQueue.put(syncObject);
+                hzSyncObjectQueue.add(syncObject);
                 __logger.trace("placed on hzSyncObjectQueue- " + syncObject.taskLabel());
                 vulnerableToReharvest++;
             }
