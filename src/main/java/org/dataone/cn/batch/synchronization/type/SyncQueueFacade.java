@@ -76,11 +76,24 @@ public class SyncQueueFacade implements EntryListener<String, String> {
      */
     public SyncQueueFacade() {
         this(new DistributedDataClient() {
-
+         
             @SuppressWarnings("unchecked")
             @Override
             public <K, V> Map<K, V> getMap(String mapName) {
-                return HazelcastClientFactory.getProcessingClient().getMap(mapName);
+                
+               return new AbstractListenableMapAdapter<K,V>(
+                    (Map<K,V>) HazelcastClientFactory.getProcessingClient().getMap(mapName)) {
+
+                        @Override
+                        public void notifyEntryListeners(String action, Object key, Object value) {
+                            // the wrapped IMap will handle this
+                        }
+
+                        @Override
+                        public void addEntryListener(EntryListener<K,V> listener, boolean includeValue) {
+                            ((IMap<K,V>)this.map).addEntryListener(listener, includeValue);
+                        }
+                };
             }
 
             @Override
