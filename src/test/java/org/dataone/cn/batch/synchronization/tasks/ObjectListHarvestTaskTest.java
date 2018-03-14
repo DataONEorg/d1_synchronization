@@ -92,7 +92,7 @@ public class ObjectListHarvestTaskTest {
         
         
         BlockingQueue<SyncObject> mockSyncQueue = new ArrayBlockingQueue<>(10000);
-        task.spoolToSynchronizationQueue(retrieved, mockSyncQueue, nc.getNodeRegistryService(),60);
+//        task.spoolToSynchronizationQueue(retrieved, mockSyncQueue, nc.getNodeRegistryService(),60);
         assertEquals("latestHarvestDate should be updated",new Date(startTime + 60000*3332),
                 nc.getNodeRegistryService().getDateLastHarvested(TypeFactory.buildNodeReference("urn:node:HARVEST_TEST")));
         assertEquals("the syncQueue should have all of the harvest", 3333,mockSyncQueue.size());
@@ -136,7 +136,7 @@ public class ObjectListHarvestTaskTest {
         
         
         BlockingQueue<SyncObject> mockSyncQueue = new ArrayBlockingQueue<>(10000);
-        task.spoolToSynchronizationQueue(retrieved, mockSyncQueue, nc.getNodeRegistryService(),60);
+//        task.spoolToSynchronizationQueue(retrieved, mockSyncQueue, nc.getNodeRegistryService(),60);
         assertEquals("latestHarvestDate should be updated",new Date(startTime + 60000*999),
                 nc.getNodeRegistryService().getDateLastHarvested(TypeFactory.buildNodeReference("urn:node:HARVEST_TEST")));
         assertEquals("the syncQueue should have all of the harvest", 1000 ,mockSyncQueue.size());
@@ -154,7 +154,7 @@ public class ObjectListHarvestTaskTest {
         assertEquals("latest should match",new Date(startTime + 2221*60000), secondHarvest.getLatestTimePoint());
         
         
-        task.spoolToSynchronizationQueue(secondHarvest, mockSyncQueue, nc.getNodeRegistryService(),60);
+ //       task.spoolToSynchronizationQueue(secondHarvest, mockSyncQueue, nc.getNodeRegistryService(),60);
         assertEquals("latestHarvestDate should be updated",new Date(startTime + 60000*2221),
                 nc.getNodeRegistryService().getDateLastHarvested(TypeFactory.buildNodeReference("urn:node:HARVEST_TEST")));
         assertEquals("the syncQueue should have all of the harvest", 2222 ,mockSyncQueue.size());
@@ -211,7 +211,7 @@ public class ObjectListHarvestTaskTest {
         
         
         BlockingQueue<SyncObject> mockSyncQueue = new ArrayBlockingQueue<>(10000);
-        task.spoolToSynchronizationQueue(retrieved, mockSyncQueue, nc.getNodeRegistryService(),60);
+ //       task.spoolToSynchronizationQueue(retrieved, mockSyncQueue, nc.getNodeRegistryService(),60);
         assertEquals("latestHarvestDate should be updated",new Date(startTime + 60000*199),
                 nc.getNodeRegistryService().getDateLastHarvested(TypeFactory.buildNodeReference("urn:node:HARVEST_TEST")));
         assertEquals("the syncQueue should have only first 200 of the harvest", 200 ,mockSyncQueue.size());
@@ -229,7 +229,7 @@ public class ObjectListHarvestTaskTest {
         assertEquals("latest should match",new Date(startTime + 60000*200), secondHarvest.getLatestTimePoint());
         
         
-        task.spoolToSynchronizationQueue(secondHarvest, mockSyncQueue, nc.getNodeRegistryService(),60);
+//        task.spoolToSynchronizationQueue(secondHarvest, mockSyncQueue, nc.getNodeRegistryService(),60);
         assertEquals("latestHarvestDate should be updated",new Date(startTime + 60000*200),
                 nc.getNodeRegistryService().getDateLastHarvested(TypeFactory.buildNodeReference("urn:node:HARVEST_TEST")));
         assertEquals("the syncQueue should have all of the harvest", 1501 + 200 ,mockSyncQueue.size());
@@ -245,7 +245,7 @@ public class ObjectListHarvestTaskTest {
         assertEquals("latest should match",new Date(startTime + 60000*2221), thirdHarvest.getLatestTimePoint());
         
         
-        task.spoolToSynchronizationQueue(thirdHarvest, mockSyncQueue, nc.getNodeRegistryService(),60);
+ //       task.spoolToSynchronizationQueue(thirdHarvest, mockSyncQueue, nc.getNodeRegistryService(),60);
         assertEquals("latestHarvestDate should be updated",new Date(startTime + 60000*2221),
                 nc.getNodeRegistryService().getDateLastHarvested(TypeFactory.buildNodeReference("urn:node:HARVEST_TEST")));
         assertEquals("the syncQueue should have all of the harvest", 1500 + 2222 ,mockSyncQueue.size());
