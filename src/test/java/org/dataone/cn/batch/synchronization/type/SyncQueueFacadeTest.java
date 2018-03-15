@@ -1,14 +1,11 @@
 package org.dataone.cn.batch.synchronization.type;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 import org.dataone.cn.synchronization.types.SyncObject;
@@ -16,13 +13,7 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-import com.hazelcast.client.HazelcastClient;
-import com.hazelcast.client.MapClientProxy;
-import com.hazelcast.core.EntryEvent;
-import com.hazelcast.core.EntryListener;
 import com.hazelcast.core.ILock;
-import com.hazelcast.core.IMap;
-import com.hazelcast.core.IQueue;
 import com.hazelcast.core.ISet;
 
 public class SyncQueueFacadeTest {
@@ -39,49 +30,12 @@ public class SyncQueueFacadeTest {
 
         sqf = new SyncQueueFacade(new DistributedDataClient() {
 
-            
-            class ListenableConcurentHashMap<K,V> extends ConcurrentHashMap<K,V> implements ListenableMap<K,V> {
-
-                HashMap<EntryListener,Boolean> listeners = new HashMap<>();
-                @Override
-                public V put(K key, V value) {
-                    
-                    V previous = null;
-                    if (containsKey(key)) {
-                        super.put(key, value);
-                    } else {
-                        previous = get(key);
-                        super.put(key, value);
-                        notifyEntryListeners("INSERT", key, value);
-                    }
-                    return previous;
-                }
-                
-                @Override
-                public void notifyEntryListeners(String action, K key, V value) {
-                    if (action.equals("INSERT")) {
-                        for (Map.Entry<EntryListener,Boolean> mapEntry : listeners.entrySet()) {
-                            
-                            EntryEvent event = new EntryEvent<K,V>(this.toString(), null,EntryEvent.TYPE_ADDED, key, mapEntry.getValue() ? value: null);
-                            mapEntry.getKey().entryAdded(event);
-                        }
-                    }
-                }
-
-                @Override
-                public void addEntryListener(EntryListener<K,V> listener,  boolean includeValue) {
-                    listeners.put(listener, includeValue);
-                    
-                }
-                
-            }
-            
             Map<String,Map> mapMap = new HashMap<>();
             Map<String,BlockingQueue> queueMap = new HashMap<>();
             {
                 // these first two define the top level data structures that are the directory for syncQueues
-                mapMap.put("dataone.synchronization.queueMap", new ListenableConcurentHashMap<String,String>());
-                mapMap.put("dataone.synchronization.priority.queueMap", new ListenableConcurentHashMap<String,String>());
+                mapMap.put("dataone.synchronization.queueMap", new ListenableConcurrentHashMap<String,String>());
+                mapMap.put("dataone.synchronization.priority.queueMap", new ListenableConcurrentHashMap<String,String>());
 
                 // adds an queue entry for fake MN "TestTest", populates it, and adds to the sync queue directory map
                 mapMap.get("dataone.synchronization.queueMap").put("urn:node:TestTest","dataone.synchronization.queueMap.urn:node:TestTest");
@@ -108,7 +62,7 @@ public class SyncQueueFacadeTest {
             @Override
             public <K, V> Map<K, V> getMap(String mapName) {
                 if (!mapMap.containsKey(mapName)) {
-                    mapMap.put(mapName, new ListenableConcurentHashMap<K,V>());
+                    mapMap.put(mapName, new ListenableConcurrentHashMap<K,V>());
                 }
                 return mapMap.get(mapName);
             }

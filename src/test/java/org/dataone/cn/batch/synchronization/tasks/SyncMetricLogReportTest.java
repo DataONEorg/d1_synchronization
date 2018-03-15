@@ -5,20 +5,29 @@
  */
 package org.dataone.cn.batch.synchronization.tasks;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import org.apache.log4j.Logger;
+import org.dataone.cn.batch.synchronization.type.DistributedDataClient;
+import org.dataone.cn.batch.synchronization.type.ListenableConcurrentHashMap;
 import org.dataone.cn.batch.synchronization.type.SyncQueueFacade;
 import org.dataone.cn.log.MockArrayWriterAppender;
 import org.dataone.cn.synchronization.types.SyncObject;
+
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Test;
+
+import com.hazelcast.core.ILock;
 
 /**
  *
@@ -68,40 +77,85 @@ public class SyncMetricLogReportTest {
         preciseTestQueue.add(new SyncObject(TEST_4_NODE, UUID.randomUUID().toString()));
         preciseTestQueue.add(new SyncObject(TEST_4_NODE, UUID.randomUUID().toString()));
     }
+    
+    SyncQueueFacade syncQueue;
+    
     @Before
     public void initTest() {
         MockArrayWriterAppender.logReset();
+        
+        syncQueue = new SyncQueueFacade(new DistributedDataClient(){
+
+            Map<String,Map<?,?>> mapMap = new HashMap<>();
+            Map<String,BlockingQueue<?>> queueMap = new HashMap<>();
+            
+            public <K, V> Map<K, V> getMap(String mapName) {
+                if (!mapMap.containsKey(mapName)) {
+                    mapMap.put(mapName, new ListenableConcurrentHashMap<K,V>());
+                }
+                return (Map<K,V>) mapMap.get(mapName);
+            }
+
+            @Override
+            public <E> BlockingQueue <E> getQueue(String queueName) {
+                if (!queueMap.containsKey(queueName)) {
+                    queueMap.put(queueName, new ArrayBlockingQueue<E>(200000));
+                }
+                return (BlockingQueue<E>) queueMap.get(queueName);
+            }
+
+            @Override
+            public <E> Set<E> getSet(String setName) {
+                // TODO Auto-generated method stub
+                return null;
+            }
+
+            @Override
+            public ILock getLock(String lockName) {
+                // TODO Auto-generated method stub
+                return null;
+            }
+            
+        });
+        
     }
     
     
-    @Ignore
+//    @Ignore
     @Test
     public void testLargeRandomArray() {
         
         long startTime = System.currentTimeMillis();
-SyncQueueFacade largeRandomTestQueue = new SyncQueueFacade();
+
+        for (SyncObject so : largeRandomTestQueue) {
+            syncQueue.add(so);
+        }
         
-        syncMetricLogReport.reportSyncMetrics(largeRandomTestQueue);
+        
+        
+        syncMetricLogReport.reportSyncMetrics(syncQueue);
         long endTime = System.currentTimeMillis();
         long duration = (endTime - startTime);
         String[] mockLoggingOutputArray = MockArrayWriterAppender.getOutputArray();
         logger.info("Time to Execute in Milliseconds: "+ duration);
         logger.info(mockLoggingOutputArray.length);
-        assertTrue(mockLoggingOutputArray.length == 8);
+        assertEquals("There should be 9 entries, one per each of the 8 MNs plus the legacy queue", 9, mockLoggingOutputArray.length);
 /*        for (int i = 0; i < mockLoggingOutputArray.length; ++i) {
             System.out.println(mockLoggingOutputArray[i]);
         } */
         
     }
 
-    @Ignore
+ //   @Ignore
     @Test
     public void testPreciseArray() {
 
         
-SyncQueueFacade preciseTestQueue = new SyncQueueFacade();
+        for (SyncObject so : preciseTestQueue) {
+                syncQueue.add(so);
+        }
         
-        syncMetricLogReport.reportSyncMetrics(preciseTestQueue);
+        syncMetricLogReport.reportSyncMetrics(syncQueue);
         String[] mockLoggingOutputArray = MockArrayWriterAppender.getOutputArray();
         for (int i = 0 ; i < mockLoggingOutputArray.length; ++i) {
             System.out.println(mockLoggingOutputArray[i]);
@@ -113,6 +167,8 @@ SyncQueueFacade preciseTestQueue = new SyncQueueFacade();
                 assertTrue(mockLoggingOutputArray[i].contains("Sync Objects Queued: 3"));
             } else if (mockLoggingOutputArray[i].contains(TEST_4_NODE)) {   
                 assertTrue(mockLoggingOutputArray[i].contains("Sync Objects Queued: 4"));
+            } else if (mockLoggingOutputArray[i].contains("Sync Objects Queued: 0")) {
+                assertTrue(mockLoggingOutputArray[i].contains("legacy"));
             } else if (mockLoggingOutputArray[i].contains("Total Sync Objects")) {
                 assertTrue(mockLoggingOutputArray[i].contains("Queued: 10"));
             } else {

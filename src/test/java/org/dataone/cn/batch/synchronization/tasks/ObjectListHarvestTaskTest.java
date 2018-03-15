@@ -1,6 +1,7 @@
 package org.dataone.cn.batch.synchronization.tasks;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
 
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -9,6 +10,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.SortedSet;
 import java.util.TimeZone;
 import java.util.TreeSet;
@@ -17,11 +19,11 @@ import java.util.concurrent.BlockingQueue;
 
 import org.dataone.cn.batch.exceptions.ExecutionDisabledException;
 import org.dataone.cn.batch.service.v2.NodeRegistrySyncService;
+import org.dataone.cn.batch.synchronization.type.DistributedDataClient;
+import org.dataone.cn.batch.synchronization.type.ListenableConcurrentHashMap;
 import org.dataone.cn.batch.synchronization.type.NodeComm;
-import org.dataone.cn.synchronization.types.SyncObject;
+import org.dataone.cn.batch.synchronization.type.SyncQueueFacade;
 import org.dataone.configuration.Settings;
-import org.dataone.service.cn.v2.NodeRegistryService;
-import org.dataone.service.exceptions.IdentifierNotUnique;
 import org.dataone.service.exceptions.InsufficientResources;
 import org.dataone.service.exceptions.InvalidRequest;
 import org.dataone.service.exceptions.InvalidToken;
@@ -47,15 +49,54 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import com.hazelcast.core.ILock;
+
 public class ObjectListHarvestTaskTest {
 
     @BeforeClass
     public static void setUpBeforeClass() throws Exception {
     }
 
+    SyncQueueFacade syncQueue;
+    
+    
     @Before
     public void setUp() throws Exception {
         Settings.getConfiguration().addProperty("Synchronization.active", true);
+        
+        syncQueue = new SyncQueueFacade(new DistributedDataClient(){
+
+            Map<String,Map<?,?>> mapMap = new HashMap<>();
+            Map<String,BlockingQueue<?>> queueMap = new HashMap<>();
+            
+            public <K, V> Map<K, V> getMap(String mapName) {
+                if (!mapMap.containsKey(mapName)) {
+                    mapMap.put(mapName, new ListenableConcurrentHashMap<K,V>());
+                }
+                return (Map<K,V>) mapMap.get(mapName);
+            }
+
+            @Override
+            public <E> BlockingQueue <E> getQueue(String queueName) {
+                if (!queueMap.containsKey(queueName)) {
+                    queueMap.put(queueName, new ArrayBlockingQueue<E>(100000));
+                }
+                return (BlockingQueue<E>) queueMap.get(queueName);
+            }
+
+            @Override
+            public <E> Set<E> getSet(String setName) {
+                // TODO Auto-generated method stub
+                return null;
+            }
+
+            @Override
+            public ILock getLock(String lockName) {
+                // TODO Auto-generated method stub
+                return null;
+            }
+            
+        });
     }
 
     
@@ -91,11 +132,10 @@ public class ObjectListHarvestTaskTest {
         assertEquals("latest should match",new Date(startTime + 3332*60000), retrieved.getLatestTimePoint());
         
         
-        BlockingQueue<SyncObject> mockSyncQueue = new ArrayBlockingQueue<>(10000);
-//        task.spoolToSynchronizationQueue(retrieved, mockSyncQueue, nc.getNodeRegistryService(),60);
+        task.spoolToSynchronizationQueue(retrieved, syncQueue, nc.getNodeRegistryService(),60);
         assertEquals("latestHarvestDate should be updated",new Date(startTime + 60000*3332),
                 nc.getNodeRegistryService().getDateLastHarvested(TypeFactory.buildNodeReference("urn:node:HARVEST_TEST")));
-        assertEquals("the syncQueue should have all of the harvest", 3333,mockSyncQueue.size());
+        assertEquals("the syncQueue should have all of the harvest", 3333,syncQueue.size());
     }
     
     
@@ -134,12 +174,10 @@ public class ObjectListHarvestTaskTest {
         assertEquals("earliest should match",new Date(startTime), retrieved.getEarliestTimePoint());
         assertEquals("latest should match",new Date(startTime + 999*60000), retrieved.getLatestTimePoint());
         
-        
-        BlockingQueue<SyncObject> mockSyncQueue = new ArrayBlockingQueue<>(10000);
-//        task.spoolToSynchronizationQueue(retrieved, mockSyncQueue, nc.getNodeRegistryService(),60);
+        task.spoolToSynchronizationQueue(retrieved, syncQueue, nc.getNodeRegistryService(),60);
         assertEquals("latestHarvestDate should be updated",new Date(startTime + 60000*999),
                 nc.getNodeRegistryService().getDateLastHarvested(TypeFactory.buildNodeReference("urn:node:HARVEST_TEST")));
-        assertEquals("the syncQueue should have all of the harvest", 1000 ,mockSyncQueue.size());
+        assertEquals("the syncQueue should have all of the harvest", 1000, syncQueue.size());
 
         assertEquals("the nodeRegistry last harvest date should equal the latest of those retrieved (and held)", 
                 retrieved.getLatestTimePoint(),
@@ -154,10 +192,10 @@ public class ObjectListHarvestTaskTest {
         assertEquals("latest should match",new Date(startTime + 2221*60000), secondHarvest.getLatestTimePoint());
         
         
- //       task.spoolToSynchronizationQueue(secondHarvest, mockSyncQueue, nc.getNodeRegistryService(),60);
+        task.spoolToSynchronizationQueue(secondHarvest, syncQueue, nc.getNodeRegistryService(),60);
         assertEquals("latestHarvestDate should be updated",new Date(startTime + 60000*2221),
                 nc.getNodeRegistryService().getDateLastHarvested(TypeFactory.buildNodeReference("urn:node:HARVEST_TEST")));
-        assertEquals("the syncQueue should have all of the harvest", 2222 ,mockSyncQueue.size());
+        assertEquals("the syncQueue should have all of the harvest", 2222 ,syncQueue.size());
         
     }
     
@@ -199,7 +237,7 @@ public class ObjectListHarvestTaskTest {
                 null,   // which exception to throw
                 null);  // when to throw it
         
-        SortedHarvestTimepointMap retrieved =task.getFullObjectList(nc,
+        SortedHarvestTimepointMap retrieved = task.getFullObjectList(nc,
                 1000    // maxToHarvest
                 );
         
@@ -210,11 +248,11 @@ public class ObjectListHarvestTaskTest {
         assertEquals("latest should match",new Date(startTime + 199*60000), retrieved.getLatestTimePoint());
         
         
-        BlockingQueue<SyncObject> mockSyncQueue = new ArrayBlockingQueue<>(10000);
- //       task.spoolToSynchronizationQueue(retrieved, mockSyncQueue, nc.getNodeRegistryService(),60);
+
+        task.spoolToSynchronizationQueue(retrieved, syncQueue, nc.getNodeRegistryService(),60);
         assertEquals("latestHarvestDate should be updated",new Date(startTime + 60000*199),
                 nc.getNodeRegistryService().getDateLastHarvested(TypeFactory.buildNodeReference("urn:node:HARVEST_TEST")));
-        assertEquals("the syncQueue should have only first 200 of the harvest", 200 ,mockSyncQueue.size());
+        assertEquals("the syncQueue should have only first 200 of the harvest", 200, syncQueue.size());
 
         assertEquals("the nodeRegistry last harvest date should equal the latest of those retrieved (and held)", 
                 retrieved.getLatestTimePoint(),
@@ -229,10 +267,10 @@ public class ObjectListHarvestTaskTest {
         assertEquals("latest should match",new Date(startTime + 60000*200), secondHarvest.getLatestTimePoint());
         
         
-//        task.spoolToSynchronizationQueue(secondHarvest, mockSyncQueue, nc.getNodeRegistryService(),60);
+        task.spoolToSynchronizationQueue(secondHarvest, syncQueue, nc.getNodeRegistryService(),60);
         assertEquals("latestHarvestDate should be updated",new Date(startTime + 60000*200),
                 nc.getNodeRegistryService().getDateLastHarvested(TypeFactory.buildNodeReference("urn:node:HARVEST_TEST")));
-        assertEquals("the syncQueue should have all of the harvest", 1501 + 200 ,mockSyncQueue.size());
+        assertEquals("the syncQueue should have all of the harvest", 1501 + 200, syncQueue.size());
         
         
         
@@ -245,10 +283,10 @@ public class ObjectListHarvestTaskTest {
         assertEquals("latest should match",new Date(startTime + 60000*2221), thirdHarvest.getLatestTimePoint());
         
         
- //       task.spoolToSynchronizationQueue(thirdHarvest, mockSyncQueue, nc.getNodeRegistryService(),60);
+        task.spoolToSynchronizationQueue(thirdHarvest, syncQueue, nc.getNodeRegistryService(),60);
         assertEquals("latestHarvestDate should be updated",new Date(startTime + 60000*2221),
                 nc.getNodeRegistryService().getDateLastHarvested(TypeFactory.buildNodeReference("urn:node:HARVEST_TEST")));
-        assertEquals("the syncQueue should have all of the harvest", 1500 + 2222 ,mockSyncQueue.size());
+        assertEquals("the syncQueue should have all of the harvest", 1500 + 2222, syncQueue.size());
         
     }
     

@@ -6,13 +6,12 @@
 
 package org.dataone.cn.batch.synchronization.tasks;
 
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.BlockingQueue;
+
 import org.apache.log4j.Logger;
 import org.dataone.cn.batch.synchronization.type.SyncQueueFacade;
 import org.dataone.cn.log.MetricEvent;
@@ -63,10 +62,12 @@ logger.debug("start");
         
         
         // create a superset of nodes to report on
-        Set<String> nodesToReport = legacySyncObjectPerNodeMap.keySet();
-        for (String qName : hzSyncObjectQueue.getQueueNames()) {
-            nodesToReport.add(qName);
-        }
+        Set<String> nodesToReport = new HashSet<String>();
+        nodesToReport.addAll(legacySyncObjectPerNodeMap.keySet());
+        nodesToReport.addAll(hzSyncObjectQueue.getQueueNames());
+ //       for (String qName : hzSyncObjectQueue.getQueueNames()) {
+   //         nodesToReport.add(qName);
+     //   }
         
         
         for (String nodeId : nodesToReport) {
