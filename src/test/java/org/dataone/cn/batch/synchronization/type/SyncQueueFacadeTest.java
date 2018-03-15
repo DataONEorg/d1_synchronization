@@ -201,10 +201,7 @@ public class SyncQueueFacadeTest {
                 System.out.println(remaining + ": " + syncO.getNodeId() + "\t" + syncO.getPid());
                 remaining--;
             }
-        }  
-        
- 
-        
+        }      
     }
 
     
