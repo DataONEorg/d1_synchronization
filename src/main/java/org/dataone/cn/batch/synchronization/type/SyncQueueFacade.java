@@ -6,8 +6,10 @@ import java.util.LinkedList;
 import java.util.Map;
 import java.util.TreeSet;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.Logger;
 import org.dataone.cn.batch.synchronization.tasks.SyncObjectTask;
 import org.dataone.cn.hazelcast.HazelcastClientFactory;
@@ -53,11 +55,11 @@ import com.hazelcast.core.ISet;
  */
 public class SyncQueueFacade implements EntryListener<String, String> {
 
-    static final Logger logger = Logger.getLogger(SyncObjectTask.class);
+    static final Logger __logger = Logger.getLogger(SyncQueueFacade.class);
     
     /* the list of nodeIds that are the keys of the queueMap(s) */
     /* for shared roundrobin, a "SyncQueueQueue" could be implemented instead... */
-    protected Deque<String> nodeIdRoundRobin = new LinkedList<String>(); 
+    protected Deque<String> nodeIdRoundRobin = new ConcurrentLinkedDeque<String>(); 
     
     protected String synchronizationObjectQueue = Settings.getConfiguration().getString("dataone.hazelcast.synchronizationObjectQueue","default"); 
     
@@ -121,27 +123,28 @@ public class SyncQueueFacade implements EntryListener<String, String> {
         
         
         queueMap = processingClient.getMap("dataone.synchronization.queueMap");
-        if (queueMap instanceof DistributedDataClient.ListenableMap)
+        if (queueMap instanceof DistributedDataClient.ListenableMap) {
             ((DistributedDataClient.ListenableMap<String,String>)queueMap).addEntryListener(this, false);
-        
+            __logger.info(this + " Added listener to 'dataone.synchronization.queueMap'");
+        }
         priorityQueueMap = processingClient.getMap("dataone.synchronization.priority.queueMap");      
-        if (priorityQueueMap instanceof DistributedDataClient.ListenableMap)
+        if (priorityQueueMap instanceof DistributedDataClient.ListenableMap) {
             ((DistributedDataClient.ListenableMap<String,String>)priorityQueueMap).addEntryListener(this, false);
-        
+            __logger.info(this + " Added listener to 'dataone.synchronization.queueMap'");
+        }
         
         // populate the local round-robin of queue names
         Iterator<String> it = getQueueNames().iterator();
         while (it.hasNext()) {
-            nodeIdRoundRobin.add(it.next());
+           String nodeId = it.next();
+            nodeIdRoundRobin.add(nodeId);
+            __logger.info(this + " added '" + nodeId + "' to its queue round-robin.");
         }
         
         // this adds the legacy all in one queue to the map
         // the listener should put this into the queue-name round robin
-        if (!queueMap.containsKey("legacy"))
+        if (!queueMap.containsKey("legacy")) 
             queueMap.put("legacy", synchronizationObjectQueue);
-    
-        
-
     }
     
     
@@ -200,17 +203,23 @@ public class SyncQueueFacade implements EntryListener<String, String> {
     public SyncObject poll(long perQueueTimeout, TimeUnit unit) throws InterruptedException {
  
         SyncObject item = null;            
-        
+        if (__logger.isTraceEnabled()) {
+            __logger.trace(String.format("poll perQueueTimeout = %d %s. nodeId RR size %d", perQueueTimeout, unit, nodeIdRoundRobin.size()) );
+        }
         //  go through the round robin no more than one time, or until you find an object
         for (int i=0; i< nodeIdRoundRobin.size(); i++) {
             String nextQueue = getNextNodeId();
-        
+            __logger.debug("...polling " + nextQueue);
 
             if (priorityQueueMap.containsKey(nextQueue)) {
+                if (__logger.isTraceEnabled()) 
+                    __logger.trace("...polling priority queue: " + nextQueue);
                 item = (SyncObject) processingClient.getQueue(priorityQueueMap.get(nextQueue)).poll(100,TimeUnit.MICROSECONDS);
             }
             if (item == null) {
                 if (queueMap.containsKey(nextQueue)) {
+                    if (__logger.isTraceEnabled()) 
+                        __logger.trace("...polling queue: " + nextQueue);
                     item = (SyncObject) processingClient.getQueue(queueMap.get(nextQueue)).poll(perQueueTimeout, unit);
                 }
             }
@@ -285,8 +294,19 @@ public class SyncQueueFacade implements EntryListener<String, String> {
      * @return
      */
     public TreeSet<String> getQueueNames() {
-        TreeSet<String> queueNames = new TreeSet<>(queueMap.keySet());
+        if (__logger.isTraceEnabled()) {
+            __logger.trace("...queueMap keyset: " + StringUtils.join(queueMap.keySet(), ','));
+            __logger.trace("...priorityQueueMap keyset: " + StringUtils.join(priorityQueueMap.keySet(), ','));
+        }
+        TreeSet<String> queueNames = new TreeSet<>();
+        queueNames.addAll(queueMap.keySet());
+        if (__logger.isTraceEnabled()) {
+            __logger.trace("...   size of queueNames set (1 of 2 addAlls)" + queueNames.size());
+        }
         queueNames.addAll(priorityQueueMap.keySet());
+        if (__logger.isTraceEnabled()) {
+            __logger.trace("...   size of queueNames set (2 of 2 addAlls)" + queueNames.size());
+        }
         return queueNames;
     }
     
@@ -325,9 +345,9 @@ public class SyncQueueFacade implements EntryListener<String, String> {
     public synchronized void entryAdded(EntryEvent<String, String> event) {
         if (!nodeIdRoundRobin.contains(event.getKey())) {
             nodeIdRoundRobin.add(event.getKey());
-            logger.info("Added queue named '" + event.getKey() + "' to the nodeId round robin" );
+            __logger.info(this + " added queue named '" + event.getKey() + "' to the queue round robin" );
         } else {
-            logger.info("The queue named '" + event.getKey() + "' is already in the nodeId round robin" );
+            __logger.info(this + " the queue named '" + event.getKey() + "' is already in the queue round robin" );
         }
     }
 
@@ -336,18 +356,21 @@ public class SyncQueueFacade implements EntryListener<String, String> {
         // we're not going to remove nodeIds because it wouldn't improve performance
         // (notice that the poll() skips the wait time if the queue doesn't exist, anyway).
         // and it complicates things because of the two maps we're listening to.
-        
+        if (__logger.isDebugEnabled()) 
+            __logger.debug(this + " received entryRemoved event for key '" + event.getKey() + "'.  (no-op)");
     }
 
     @Override
     public void entryUpdated(EntryEvent<String, String> event) {
-        // nothing to do here
+        if (__logger.isDebugEnabled())
+            __logger.debug(this + " received entryUpdated event for key '" + event.getKey() + "'.  (no-op)");
         
     }
 
     @Override
     public void entryEvicted(EntryEvent<String, String> event) {
-        // nothing to do here
+        if (__logger.isDebugEnabled())
+            __logger.debug(this + " received entryEvicted event for key '" + event.getKey() + "'.  (no-op)");
         
     }
     
