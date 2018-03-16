@@ -1,6 +1,7 @@
 package org.dataone.cn.batch.synchronization.type;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -160,7 +161,31 @@ public class SyncQueueFacadeTest {
 
     
         
+    @Test
+    public void testPollSpeed() throws InterruptedException {
+                
+        int remaining = 50;
+        while (remaining > 0) {
+            SyncObject syncO = sqf.poll(10, TimeUnit.MILLISECONDS);
+            if (syncO != null) {
+                System.out.println(syncO.getPid());
+                remaining--;
+            }
+        } 
         
+        long start = System.currentTimeMillis();
+        sqf.poll(1L, TimeUnit.SECONDS);
+        long stop = System.currentTimeMillis();
+        assertTrue("Time in poll should be 3 seconds or greater", stop >= start + 1000);
+        assertTrue("Time in poll should not be too much greater than 3 seconds", stop < start + 1200);
+        
+         start = System.currentTimeMillis();
+        sqf.poll(250L, TimeUnit.MILLISECONDS);
+         stop = System.currentTimeMillis();
+        assertTrue("Time in poll should be 250ms or greater", stop >= start + 250);
+        assertTrue("Time in poll should not be too much greater than 250ms", stop < start + 300);
+        
+    }   
         
        
         

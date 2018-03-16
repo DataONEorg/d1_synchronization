@@ -4,6 +4,8 @@ import java.util.Deque;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Map;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.TreeSet;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentLinkedDeque;
@@ -184,47 +186,51 @@ public class SyncQueueFacade implements EntryListener<String, String> {
 
     /**
      * Returns the next SyncObject from one of the syncQueues, or null if none
-     * exist in any of the SyncQueues.  This method iterates through all of the
-     * queues at most one time.
+     * exist in any of the SyncQueues.  
      * 
-     * Note that multiple queues may be polled, so the method may block for 
-     * multiple per-queue timeouts.
      * 
      * The general ordering strategy for pulling from the queues is to check the priority queue for
      * the first node, then the regular queue for the same node if nothing is returned, and then
      * to repeat for subsequent nodes until an item is found, or all of the queues have
      * been polled one time.
      * 
-     * @param perQueueTimeout
+     * @param timeout
      * @param unit
      * @return
      * @throws InterruptedException
      */
-    public SyncObject poll(long perQueueTimeout, TimeUnit unit) throws InterruptedException {
+    public SyncObject poll(long timeout, TimeUnit unit) throws InterruptedException {
  
         SyncObject item = null;            
         if (__logger.isTraceEnabled()) {
-            __logger.trace(String.format("poll perQueueTimeout = %d %s. nodeId RR size %d", perQueueTimeout, unit, nodeIdRoundRobin.size()) );
+            __logger.trace(String.format("poll timeout = %d %s. nodeId RR size %d", timeout, unit, nodeIdRoundRobin.size()) );
         }
-        //  go through the round robin no more than one time, or until you find an object
-        for (int i=0; i< nodeIdRoundRobin.size(); i++) {
+       
+        //  cycle through the round robin until an object is found, or time's up
+        
+        long now = System.currentTimeMillis();
+        long pollUntil = now + TimeUnit.MILLISECONDS.convert(timeout, unit);
+        while (now < pollUntil) {
             String nextQueue = getNextNodeId();
-            __logger.debug("...polling " + nextQueue);
 
             if (priorityQueueMap.containsKey(nextQueue)) {
                 if (__logger.isTraceEnabled()) 
                     __logger.trace("...polling priority queue: " + nextQueue);
+
                 item = (SyncObject) processingClient.getQueue(priorityQueueMap.get(nextQueue)).poll(100,TimeUnit.MICROSECONDS);
             }
             if (item == null) {
                 if (queueMap.containsKey(nextQueue)) {
                     if (__logger.isTraceEnabled()) 
                         __logger.trace("...polling queue: " + nextQueue);
-                    item = (SyncObject) processingClient.getQueue(queueMap.get(nextQueue)).poll(perQueueTimeout, unit);
+
+                    item = (SyncObject) processingClient.getQueue(queueMap.get(nextQueue)).poll(10, TimeUnit.MILLISECONDS);
                 }
             }
             if (item != null) 
                 break;
+            
+            now = System.currentTimeMillis();
         }
         return item;
     }

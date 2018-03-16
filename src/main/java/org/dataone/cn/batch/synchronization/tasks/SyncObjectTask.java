@@ -126,15 +126,9 @@ public class SyncObjectTask implements Callable<String> {
                 //
                 // Settings gets refreshed periodically           
                 if (ComponentActivationUtility.synchronizationIsActive()) {
+
                     // get next item off the SyncObject queue
-                    
-                    // when there was only one queue, it was ok to wait longer for the queue to populate
-                    //task = hzSyncObjectQueue.poll(60L, TimeUnit.SECONDS);
-                    
-                    // now with one queue per node, we don't want to wait to long at any one queue
-                    // so this should be much shorter than the previous minute
-                    task = hzSyncObjectQueue.poll(100L, TimeUnit.MILLISECONDS);
-                    
+                    task = hzSyncObjectQueue.poll(60L, TimeUnit.SECONDS);
                     
                     
 // XXX: this delayUntil was never fully implemented, (note that delayUntil value was never changed from the default -1)
