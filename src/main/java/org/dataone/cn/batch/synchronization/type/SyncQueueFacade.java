@@ -139,14 +139,18 @@ public class SyncQueueFacade implements EntryListener<String, String> {
         Iterator<String> it = getQueueNames().iterator();
         while (it.hasNext()) {
            String nodeId = it.next();
-            nodeIdRoundRobin.add(nodeId);
-            __logger.info(this + " added '" + nodeId + "' to its queue round-robin.");
+            nodeIdRoundRobin.add(nodeId);          
+            __logger.info(this + " added '" + nodeId + "' to its queue round-robin. size: " + size(nodeId));
         }
         
-        // this adds the legacy all in one queue to the map
-        // the listener should put this into the queue-name round robin
-        if (!queueMap.containsKey("legacy")) 
+        // this adds the legacy all-in-one queue to the map
+        // the listener will put this into the queue-name round robin
+        // this is needed because cn.synchronize doesn't use SyncQueueFacade (yet), and so
+        // it would not otherwise be added to the queueMap or priorityQueueMap
+        if (!queueMap.containsKey("legacy")) {
             queueMap.put("legacy", synchronizationObjectQueue);
+            __logger.info(this + " added 'legacy' queue to its queue round-robin. size: " + size("legacy"));
+        }
     }
     
     
@@ -353,6 +357,7 @@ public class SyncQueueFacade implements EntryListener<String, String> {
             nodeIdRoundRobin.add(event.getKey());
             __logger.info(this + " added queue named '" + event.getKey() + "' to the queue round robin" );
         } else {
+            // shouldn't really get this, but it's harmless
             __logger.info(this + " the queue named '" + event.getKey() + "' is already in the queue round robin" );
         }
     }

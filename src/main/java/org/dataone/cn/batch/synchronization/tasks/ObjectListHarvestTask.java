@@ -141,8 +141,8 @@ public class ObjectListHarvestTask implements Callable<Date>, Serializable {
         
         // get SynchronizationQueue and stats
 //        String synchronizationObjectQueue = Settings.getConfiguration().getString("dataone.hazelcast.synchronizationObjectQueue");
-        Integer maxSyncObjectQueueSize    = Settings.getConfiguration().getInt("Synchronization.max_syncobjectqueue_size",50000);
-        Integer maxHarvestSize            = Settings.getConfiguration().getInt("Synchronization.max_harvest_size",50000);
+        Integer maxSyncObjectQueueSize    = Settings.getConfiguration().getInt("Synchronization.max_syncobjectqueue_size",4000);
+        Integer maxHarvestSize            = Settings.getConfiguration().getInt("Synchronization.max_harvest_size",2000);
         Integer requeueTolerance          = Settings.getConfiguration().getInt("Synchronization.harvest_update_latestHarvestDate_frequency",100);
         
 //        HazelcastClient hazelcast = HazelcastClientFactory.getProcessingClient();    
