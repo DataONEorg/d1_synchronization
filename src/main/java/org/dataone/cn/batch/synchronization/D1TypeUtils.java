@@ -14,14 +14,17 @@ import org.dataone.service.util.TypeMarshaller;
 
 /**
  * This class offers direct and efficient equality comparison of DataONE types without having 
- * to do any null-checking prior to the comparison.  The 'equals' methods and 
+ * to do any null & empty-string checking prior to the comparison.  The 'equals' methods and 
  * 'serializedFormEquals' method follow the ObjectUtils and StringUtils pattern
- * if returning false if exactly 1 of the objects passed in is null.  
+ * of returning false if exactly 1 of the objects passed in is null.  
  * 
  * The 'valueEquals' methods will evaluate to true if a null Object is compared 
  * to a null-valued object  (like when identifier.getValue() == null).
  * 
- * TODO: Is there a need for equating empty-string to null and null-valued objects?
+ * The 'emptyEquals' methods considers null objects, null values, and empty strings as equivalent.
+ * So will evaluate to true if a null Object is compared to an empty string'ed object (like when 
+ * identifier.getValue() == "") 
+ * 
  * 
  * @author rnahf
  *
@@ -33,7 +36,10 @@ public class D1TypeUtils {
     }
     
     /**
-     * A null-safe equality test for two Identifiers
+     * A null-safe equality test for two Identifiers.  
+     * (null object and null object.getValue() are considered the equal)
+     * 
+     * @see valueEquals and emptyEquals
      * 
      * @param id1
      * @param id2
@@ -59,6 +65,9 @@ public class D1TypeUtils {
 
     /**
      * A null-safe equality test for two NodeReferences
+     * (null object and null object.getValue() are considered the equal)
+     * 
+     * @see valueEquals and emptyEquals
      * 
      * @param id1
      * @param id2
@@ -82,6 +91,9 @@ public class D1TypeUtils {
     
     /**
      * A null-safe equality test for two ObjectFormatIdentifiers
+     *(null object and null object.getValue() are considered the equal)
+     * 
+     * @see valueEquals and emptyEquals
      * 
      * @param id1
      * @param id2
@@ -104,7 +116,10 @@ public class D1TypeUtils {
     }
     
     /**
-     * A null-safe equality test for two Subjects
+     * A null-safe equality test for two Subjects.
+     * (null object and null object.getValue() are considered the equal)
+     * 
+     * @see valueEquals and emptyEquals
      * 
      * @param id1
      * @param id2
@@ -168,6 +183,9 @@ public class D1TypeUtils {
     /**
      * Similar to equals method, but also returns true if one ID is null, and
      * the other ID's value property is null.
+     * 
+     * @see equals and emptyEquals
+     * 
      * @param id1
      * @param id2
      * @return
@@ -201,6 +219,9 @@ public class D1TypeUtils {
     /**
      * Similar to equals method, but also returns true if one ID is null, and
      * the other ID's value property is null.
+     * 
+     * @see equals and emptyEquals
+     * 
      * @param id1
      * @param id2
      * @return
@@ -234,6 +255,9 @@ public class D1TypeUtils {
     /**
      * Similar to equals method, but also returns true if one ID is null, and
      * the other ID's value property is null.
+     * 
+     * @see equals and emptyEquals
+     * 
      * @param id1
      * @param id2
      * @return
@@ -269,6 +293,9 @@ public class D1TypeUtils {
      * the other ID's value property is null.
      * @param id1
      * @param id2
+     * 
+     * @see equals and emptyEquals
+     * 
      * @return
      */
     public static boolean valueEquals(Subject id1, Subject id2) {
@@ -296,10 +323,45 @@ public class D1TypeUtils {
         
         return (id1.getValue().equals(id2.getValue()));
     }
+    
+    /**
+     * Similar to equals, but treats a null object, null value-property, and empty string
+     * value-property as equal to each other.
+     * 
+     * @see equals and valueEquals
+     * 
+     * @param id1
+     * @param id2
+     * @return
+     */
+    public static boolean emptyEquals(Identifier id1, Identifier id2) {
+
+        // deal with all of the null & empty string cases first where:
+        // null == null-value == empty
+        if (id1 == null || id1.getValue() == null || id1.getValue().equals("")) 
+            if (id2 == null || id2.getValue() == null || id2.getValue().equals(""))
+                return true;
+            else
+                return false;
+
+        else if (id2 == null || id2.getValue() == null || id2.getValue().equals(""))
+            return false;
+
+        // only non-null and non-empty cases
+
+        if (id1 == id2)
+            return true;
+        
+        return (id1.getValue().equals(id2.getValue()));
+    }
+    
  
     /**
      * Similar to equals, but treats a null object, null value-property, and empty string
-     * value-property as equal to each other
+     * value-property as equal to each other.
+     * 
+     * @see equals and valueEquals
+     * 
      * @param id1
      * @param id2
      * @return
@@ -325,6 +387,67 @@ public class D1TypeUtils {
         return (id1.getValue().equals(id2.getValue()));
     }
 
+    /**
+     * Similar to equals, but treats a null object, null value-property, and empty string
+     * value-property as equal to each other.
+     * 
+     * @see equals and valueEquals
+     * 
+     * @param id1
+     * @param id2
+     * @return
+     */
+    public static boolean emptyEquals(ObjectFormatIdentifier id1, ObjectFormatIdentifier id2) {
+
+        // deal with all of the null & empty string cases first where:
+        // null == null-value == empty
+        if (id1 == null || id1.getValue() == null || id1.getValue().equals("")) 
+            if (id2 == null || id2.getValue() == null || id2.getValue().equals(""))
+                return true;
+            else
+                return false;
+
+        else if (id2 == null || id2.getValue() == null || id2.getValue().equals(""))
+            return false;
+
+        // only non-null and non-empty cases
+
+        if (id1 == id2)
+            return true;
+        
+        return (id1.getValue().equals(id2.getValue()));
+    }
     
+    
+    /**
+     * Similar to equals, but treats a null object, null value-property, and empty string
+     * value-property as equal to each other.
+     * 
+     * @see equals and valueEquals
+     * 
+     * @param id1
+     * @param id2
+     * @return
+     */
+    public static boolean emptyEquals(Subject id1, Subject id2) {
+
+        // deal with all of the null & empty string cases first where:
+        // null == null-value == empty
+        if (id1 == null || id1.getValue() == null || id1.getValue().equals("")) 
+            if (id2 == null || id2.getValue() == null || id2.getValue().equals(""))
+                return true;
+            else
+                return false;
+
+        else if (id2 == null || id2.getValue() == null || id2.getValue().equals(""))
+            return false;
+
+        // only non-null and non-empty cases
+
+        if (id1 == id2)
+            return true;
+        
+        return (id1.getValue().equals(id2.getValue()));
+    }
 }
 

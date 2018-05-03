@@ -417,19 +417,13 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
                 throw new UnrecoverableException(task.getPid() + 
                         "the retrieved SystemMetadata passed into processTask was null!");
             
-
-            validateSeriesId(mnSystemMetadata);
             if (resolvable(mnSystemMetadata.getIdentifier(), "PID")) {
                 processUpdates(mnSystemMetadata);
-            } else {
+            } 
+            else {
                 // not resolvable, so process as new object
                 processNewObject(mnSystemMetadata);
             }
-        } catch (NotAuthorized ex) {
-            logger.error(buildStandardLogMessage(ex, "NotAuthorized to claim the seriesId"), ex);
-            throw SyncFailedTask.createSynchronizationFailed(mnSystemMetadata.getIdentifier().getValue(),
-                    "NotAuthorized to claim the seriesId", ex);
-
         } catch (RetryableException ex) {
             logger.warn(buildStandardLogMessage(ex,"RetryableException "));
             throw ex;
@@ -462,6 +456,15 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
         // as per V1 logic (TransferObjectTask), this class currently does not check
         // the authoritativeMN field and allows the object to sync.
         logger.debug(task.taskLabel() + " entering processNewObject...");
+       
+        
+        try {
+        	validateSeriesId(mnSystemMetadata, null); 
+        } catch (NotAuthorized e) {
+            logger.error(buildStandardLogMessage(e, "NotAuthorized to claim the seriesId"), e);
+            throw SyncFailedTask.createSynchronizationFailed(mnSystemMetadata.getIdentifier().getValue(),
+                    "NotAuthorized to claim the seriesId", e);
+        }
        
         try {
 
@@ -568,23 +571,40 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
     }
 
     /**
-     * For any sync task, (update or newObject) the sysmeta.submitter needs to have control over the seriesId.
-     * This is true only if the seriesId is new, or in use by the person 
-     *
+     * For any sync task where the seriesId field is being set (any newObject task, and certain update tasks),
+     * we need to disallow collisions by different users and different series. Because synchronization order
+     * cannot be guaranteed, we can't rely on the obsoletes relationship, and so the checks will necessarily
+     * be incomplete.  See method source code for specific rules. 
+     * (see https://redmine.dataone.org/issues/7948)
+     * 
      * @param sysMeta - requires non-null systemMetadata object
      * @throws NotAuthorized - the seriesId is new and reserved by someone else OR is in use by another rightsHolder
      * @throws UnrecoverableException - internal problems keep this validation from completing
      * @throws RetryableException 
      */
-    private void validateSeriesId(SystemMetadata sysMeta) throws NotAuthorized, UnrecoverableException, RetryableException {
+    private void validateSeriesId(SystemMetadata sysMeta, SystemMetadata previousSysMeta) throws NotAuthorized, UnrecoverableException, RetryableException {
 
         logger.debug(task.taskLabel() + " entering validateSeriesId...");
         
+        // return early in cases where the seriesId value isn't changing   
+        // or there's no sid to check
         Identifier sid = sysMeta.getSeriesId();
-        if (sid == null || StringUtils.isBlank(sid.getValue())) {
+        Identifier prevSid = previousSysMeta == null ? null : previousSysMeta.getSeriesId();        
+        
+        if (D1TypeUtils.emptyEquals(sid, prevSid)) {
+        	// nothing changed
             return;
         }
-
+        
+        if (D1TypeUtils.emptyEquals(sid, null)) {
+        	// seriesId not being set, so nothing to validate.
+            return;
+        }
+        
+        // note, we don't check for the validity of removing a seriesId during a
+        // systemMetadata update.  Those types of mutability rules are checked by 
+        // SystemMetadataValidator.
+        
         try { // resolving the SID
 
             Identifier headPid = resolve(sid,"SID");
@@ -606,7 +626,7 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
                     Collections.singletonList(sysMeta.getRightsHolder()),
                     Permission.CHANGE_PERMISSION,
                     sidHeadSysMeta)) {
-                    throw new NotAuthorized("0000", "Both the submitter and rightsHolder does not have CHANGE rights on the SeriesId as determined by"
+                    throw new NotAuthorized("0000", "Neither the submitter nor rightsHolder have CHANGE rights on the SeriesId as determined by"
                             + " the current head of the Sid collection, whose pid is: " + headPid.getValue());
                 }
                 
@@ -988,23 +1008,30 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
         // hzSystemMetadata will not be null...can we make this assumption?
         SystemMetadata hzSystemMetadata = hzSystemMetaMap.get(pid);
         SystemMetadataValidator validator = null;
+        String errorTracker = "";
         try {
-            validator = new SystemMetadataValidator(hzSystemMetadata);
+            errorTracker = "validateSysMeta";
+        	validator = new SystemMetadataValidator(hzSystemMetadata);
             validator.validateEssentialProperties(newSystemMetadata, nodeCommunications.getMnRead());
 
             // if here, we know that the new system metadata is referring to the same
             // object, and we can consider updating other values.
             NodeList nl = nodeCommunications.getNodeRegistryService().listNodes();
             boolean isV1Object = AuthUtils.isCNAuthorityForSystemMetadataUpdate(nl, newSystemMetadata);
-
+            errorTracker = "processUpdate";
             if (task.getNodeId().contentEquals(hzSystemMetadata.getAuthoritativeMemberNode().getValue())) {
 
                 if (isV1Object) {
+                	// (no seriesId in V1 to validate)
                     processV1AuthoritativeUpdate(newSystemMetadata, hzSystemMetadata);
+                
                 } else {
-                    processV2AuthoritativeUpdate(newSystemMetadata, validator);
+                	validateSeriesId(newSystemMetadata,hzSystemMetadata);
+                	processV2AuthoritativeUpdate(newSystemMetadata, validator);
+                    
                 }
             } else {
+            	// not populating anything other than replica information
                 processPossibleNewReplica(newSystemMetadata, hzSystemMetadata, isV1Object);
             }
             logger.info(buildStandardLogMessage(null,  " Completed ProcessUpdate"));
@@ -1014,7 +1041,14 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
             } else {
                 throw new UnrecoverableException("In processUpdates, could not find authoritativeMN in the NodeList", e);
             }
-        } catch (IdentifierNotUnique | InvalidRequest | InvalidToken | NotAuthorized | NotFound e) {
+        } catch (NotAuthorized e) {
+        	if (errorTracker.equals("validateSysMeta")) {
+        		throw SyncFailedTask.createSynchronizationFailed(task.getPid(), "In processUpdates, while validating the checksum", e);
+        	} else {
+        		throw SyncFailedTask.createSynchronizationFailed(task.getPid(), "NotAuthorized to use the seriesId. ", e);
+        	}
+        } catch (IdentifierNotUnique | InvalidRequest | InvalidToken  | NotFound e) {
+        
             throw SyncFailedTask.createSynchronizationFailed(task.getPid(), "In processUpdates, while validating the checksum", e);
         } catch (ServiceFailure e) {
             extractRetryableException(e);
