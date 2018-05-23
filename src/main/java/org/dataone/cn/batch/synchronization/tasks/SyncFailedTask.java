@@ -101,7 +101,7 @@ public class SyncFailedTask implements Callable<String> {
                         be.getClass().getSimpleName(),
                         be.getDescription())
                 );
-        syncFailed.setPid(pid);
+        syncFailed.setIdentifier(pid);
         syncFailed.setNodeId(nodeId);
         return syncFailed;
     }
@@ -113,32 +113,43 @@ public class SyncFailedTask implements Callable<String> {
     }
         
     public void submitSynchronizationFailed(SynchronizationFailed syncFailed) {
-        logger.warn(String.format("%s - SynchronizationFailed: detail code: %s id:%s nodeId:%s description:%s", 
-                task.taskLabel(), 
-                syncFailed.getDetail_code(),
-                syncFailed.getIdentifier(),
-                syncFailed.getNodeId(),
-                syncFailed.getDescription()
-                ));
-
         try {
             Object mnRead = nodeCommunications.getMnRead();
+            
             if (mnRead instanceof MNRead) {
-                ((MNRead) mnRead).synchronizationFailed(session, syncFailed);;
+                logger.warn(String.format("%s - SynchronizationFailed: detail code:%s pid:%s id:%s nodeId:%s description:%s", 
+                        task.taskLabel(), 
+                        syncFailed.getDetail_code(),
+                        syncFailed.getPid(),
+                        syncFailed.getIdentifier(),
+                        syncFailed.getNodeId(),
+                        syncFailed.getDescription()
+                        ));
+                ((MNRead) mnRead).synchronizationFailed(session, syncFailed);
             }
+
             if (mnRead instanceof org.dataone.service.mn.tier1.v1.MNRead) {
+                
+                // convert the syncFailed object to v1 semantics
+                // see https://redmine.dataone.org/issues/7967
+                syncFailed.setPid(syncFailed.getIdentifier());
+                syncFailed.setIdentifier(null);
+                logger.warn(String.format("%s - SynchronizationFailed: detail code:%s pid:%s id:%s nodeId:%s description:%s", 
+                        task.taskLabel(), 
+                        syncFailed.getDetail_code(),
+                        syncFailed.getPid(),
+                        syncFailed.getIdentifier(),
+                        syncFailed.getNodeId(),
+                        syncFailed.getDescription()
+                        ));
                ((org.dataone.service.mn.tier1.v1.MNRead) mnRead).synchronizationFailed(session, syncFailed);
             }
-        } catch (InvalidToken ex) {
-            logger.error(task.taskLabel() + " " + ex.serialize(BaseException.FMT_XML));
-        } catch (NotAuthorized ex) {
-            logger.error(task.taskLabel() + " " + ex.serialize(BaseException.FMT_XML));
-        } catch (NotImplemented ex) {
-            logger.error(task.taskLabel() + " " + ex.serialize(BaseException.FMT_XML));
-        } catch (ServiceFailure ex) {
-            logger.error(task.taskLabel() + " " + ex.serialize(BaseException.FMT_XML));
+        } catch (InvalidToken | NotAuthorized | NotImplemented | ServiceFailure ex) {
+            logger.error(task.taskLabel() + " Failed to send SynchronizationFaile to MN: " + ex.serialize(BaseException.FMT_XML));
+       
         } catch (Exception ex) {
-            logger.error(task.taskLabel() + " " + ex.getMessage());
+            logger.error(task.taskLabel() + " Failed to send SynchronizationFaile to MN: " 
+                    + ex.getClass().getCanonicalName() + ": " + ex.getMessage());
         }
     }
 }
