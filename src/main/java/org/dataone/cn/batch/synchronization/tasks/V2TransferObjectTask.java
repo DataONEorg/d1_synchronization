@@ -26,7 +26,9 @@ import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
@@ -37,6 +39,8 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.Logger;
 import org.dataone.client.exception.ClientSideException;
 import org.dataone.client.v1.types.D1TypeBuilder;
+import org.dataone.client.v2.CNode;
+import org.dataone.client.v2.itk.D1Client;
 import org.dataone.cn.batch.exceptions.NodeCommUnavailable;
 import org.dataone.cn.batch.exceptions.RetryableException;
 import org.dataone.cn.batch.exceptions.UnrecoverableException;
@@ -70,6 +74,7 @@ import org.dataone.service.exceptions.UnsupportedType;
 import org.dataone.service.exceptions.VersionMismatch;
 import org.dataone.service.mn.tier1.v2.MNRead;
 import org.dataone.service.types.v1.Checksum;
+import org.dataone.service.types.v1.Group;
 import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.NodeReference;
 import org.dataone.service.types.v1.NodeType;
@@ -80,6 +85,8 @@ import org.dataone.service.types.v1.Replica;
 import org.dataone.service.types.v1.ReplicationStatus;
 import org.dataone.service.types.v1.Service;
 import org.dataone.service.types.v1.Session;
+import org.dataone.service.types.v1.Subject;
+import org.dataone.service.types.v1.SubjectInfo;
 import org.dataone.service.types.v1.util.ChecksumUtil;
 import org.dataone.service.types.v2.Node;
 import org.dataone.service.types.v2.NodeList;
@@ -601,6 +608,15 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
             return;
         }
         
+        //Come from the same node, we trust them
+        if(D1TypeUtils.equals(sysMeta.getAuthoritativeMemberNode(), previousSysMeta.getAuthoritativeMemberNode())) {
+            return;
+        }
+        //If rights holder or submitters are still same, we trust it
+        if(D1TypeUtils.equals(sysMeta.getRightsHolder(), previousSysMeta.getRightsHolder()) || D1TypeUtils.equals(sysMeta.getSubmitter(), previousSysMeta.getSubmitter())) {
+            return;
+        }
+        
         // note, we don't check for the validity of removing a seriesId during a
         // systemMetadata update.  Those types of mutability rules are checked by 
         // SystemMetadataValidator.
@@ -614,16 +630,24 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
 
             // checking that the new object's submitter is authorized via SID head's accessPolicy
             SystemMetadata sidHeadSysMeta = getSystemMetadataHandleRetry(nodeCommunications.getCnRead(), headPid);
+            //Get submitter's all subjects - groups and equivalent subjects.
+            CNode cn = D1Client.getCN();
+            SubjectInfo submitterInfo = cn.getSubjectInfo(null, sysMeta.getSubmitter());
+            HashSet<Subject> submitterAllSubjects = new HashSet<Subject>();
+            AuthUtils.findPersonsSubjects(submitterAllSubjects, submitterInfo, sysMeta.getSubmitter());
             if (!AuthUtils.isAuthorized(
-                    Collections.singletonList(sysMeta.getSubmitter()),
+                    submitterAllSubjects,
                     Permission.CHANGE_PERMISSION,
                     sidHeadSysMeta)) {
 
                 if (logger.isDebugEnabled()) 
                     logger.debug("Submitter doesn't have the change permission on the pid "
                             + headPid.getValue() + ". We will try if the rights holder has the permission.");
+                
+                SubjectInfo rightsHolderInfo = cn.getSubjectInfo(null, sysMeta.getRightsHolder());
+                Set<Subject> rightsHolderAllSubjects = findEquivalentSubjects(rightsHolderInfo, sysMeta.getRightsHolder());
                 if(!AuthUtils.isAuthorized(
-                    Collections.singletonList(sysMeta.getRightsHolder()),
+                    rightsHolderAllSubjects,
                     Permission.CHANGE_PERMISSION,
                     sidHeadSysMeta)) {
                     throw new NotAuthorized("0000", "Neither the submitter nor rightsHolder have CHANGE rights on the SeriesId as determined by"
@@ -674,6 +698,71 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
                 throw new UnrecoverableException(message, e1);
             }
         }
+    }
+    
+    /**
+     * Look for the equivalent authorization subjects for a given subject which can be either a person or a group.
+     * For a given person subject, it will returns the person itself, all equivalent identities and all groups (include the child groups)
+     * that itself and equivalent identities belong to.
+     * For a given group subject, it will returns the group itself and its recursive all ancestor groups.
+     * @param subjectInfo  the subject info for the given subject. 
+     * @param targetSubject  the subject needs to be looked
+     * @return the set of equivalent authorization subjects
+     */
+    private static Set<Subject> findEquivalentSubjects(SubjectInfo subjectInfo, Subject targetSubject) {
+        Set<Subject> subjects = new HashSet<Subject>();
+        //first to try if this is a person 
+        AuthUtils.findPersonsSubjects(subjects, subjectInfo, targetSubject);
+        if(subjects.isEmpty() || subjects.size() == 1) {
+            //the return subjects from looking persons is o or 1. This means it can be group or a person without any groups.
+            //let's try the group
+            findEquivalentSubjectsForGroup(subjects, subjectInfo, targetSubject);
+        }
+        return subjects;
+    }
+    
+    /**
+     * Find all subjects which can be authorized as same as the given group subject (target). It is equivalent 
+     * to the findPersonsSubjects method except that the target is a group subject.
+     * For a given group subject, its all equivalent subjects are itself and its recursive all ancestor groups.
+     * For example, group a is the parent group b, b is the parent group c and c is the parent of group d. If the given group project is c,
+     * the foundSubjects should be c, b and a. 
+     * @param foundSubjects the set which holds all subjects which can be authorized as same as the given group subject (target). It likes
+     *                       the return value in the method.
+     * @param subjectInfo the subject info object for the given group subject. 
+     * @param targetGrouupSubject the group subject needs to be looked
+     */
+    private static void findEquivalentSubjectsForGroup(Set<Subject> foundSubjects, SubjectInfo subjectInfo, Subject targetGroupSubject) {
+        if (targetGroupSubject != null && targetGroupSubject.getValue() != null && !targetGroupSubject.getValue().trim().equals("")) {
+                //first, add it self
+                foundSubjects.add(targetGroupSubject);
+                // setting this up for subsequent searches in the loop
+            List<Group> groupList = null;
+                if(subjectInfo != null) {
+                    groupList = subjectInfo.getGroupList();
+                    if (groupList != null) {
+                        for(Group group : groupList) {
+                            if(group != null && group.getHasMemberList() != null && group.getSubject() != null) {
+                                for(Subject subject : group.getHasMemberList()) {
+                                    if(subject.getValue() != null && subject.getValue().equals(targetGroupSubject.getValue())) {
+                                        //find the target group is in the hasMemberList. We need to put the parent group into the vector
+                                        if(foundSubjects.contains(group.getSubject())) {
+                                            //this means it is circular group. We should break the loop
+                                            //System.out.println("in the loop, we need to break it =======================");
+                                            return;
+                                        } else {
+                                            foundSubjects.add(group.getSubject());
+                                            //recursive to find the parent groups
+                                            findEquivalentSubjectsForGroup(foundSubjects, subjectInfo, group.getSubject());
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+        }
+        
     }
 
     /**
