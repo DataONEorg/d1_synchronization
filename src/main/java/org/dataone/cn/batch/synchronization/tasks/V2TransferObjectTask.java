@@ -608,15 +608,21 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
             return;
         }
         
-        //Come from the same node, we trust them
-        if(D1TypeUtils.equals(sysMeta.getAuthoritativeMemberNode(), previousSysMeta.getAuthoritativeMemberNode())) {
-            return;
+        if (sysMeta != null && previousSysMeta != null) {
+            //Come from the same node, we trust them
+            if(sysMeta.getAuthoritativeMemberNode() != null && previousSysMeta.getAuthoritativeMemberNode() != null && 
+                    D1TypeUtils.equals(sysMeta.getAuthoritativeMemberNode(), previousSysMeta.getAuthoritativeMemberNode())) {
+                return;
+            }
+            //If rights holders  are still same, we trust it
+            if(sysMeta.getRightsHolder() != null && previousSysMeta.getRightsHolder() != null && D1TypeUtils.equals(sysMeta.getRightsHolder(), previousSysMeta.getRightsHolder())) {
+                return;
+            }
+            //If submitters are still same, we trust it
+            if (sysMeta.getSubmitter() != null && previousSysMeta.getSubmitter() != null && D1TypeUtils.equals(sysMeta.getSubmitter(), previousSysMeta.getSubmitter())) {
+                return;
+            }
         }
-        //If rights holder or submitters are still same, we trust it
-        if(D1TypeUtils.equals(sysMeta.getRightsHolder(), previousSysMeta.getRightsHolder()) || D1TypeUtils.equals(sysMeta.getSubmitter(), previousSysMeta.getSubmitter())) {
-            return;
-        }
-        
         // note, we don't check for the validity of removing a seriesId during a
         // systemMetadata update.  Those types of mutability rules are checked by 
         // SystemMetadataValidator.
