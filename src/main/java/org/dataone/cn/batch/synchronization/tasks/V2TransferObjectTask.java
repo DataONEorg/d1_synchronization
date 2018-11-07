@@ -620,7 +620,7 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
             if (logger.isDebugEnabled()) 
                 logger.debug(task.taskLabel() + " SeriesId is in use by " + headPid.getValue());
 
-            SystemMetadata sidHeadSysMeta = getSystemMetadataHandleRetry(nodeCommunications.getCnRead(), headPid);
+            SystemMetadata sidHeadSysMeta = this.hzSystemMetaMap.get(headPid);
             if (sysMeta != null && sidHeadSysMeta != null) {
                 //Come from the same node, we trust them
                 if(sysMeta.getAuthoritativeMemberNode() != null && sidHeadSysMeta.getAuthoritativeMemberNode() != null && 
