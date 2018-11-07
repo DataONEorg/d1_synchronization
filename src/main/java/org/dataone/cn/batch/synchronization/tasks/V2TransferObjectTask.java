@@ -608,21 +608,7 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
             return;
         }
         
-        if (sysMeta != null && previousSysMeta != null) {
-            //Come from the same node, we trust them
-            if(sysMeta.getAuthoritativeMemberNode() != null && previousSysMeta.getAuthoritativeMemberNode() != null && 
-                    D1TypeUtils.equals(sysMeta.getAuthoritativeMemberNode(), previousSysMeta.getAuthoritativeMemberNode())) {
-                return;
-            }
-            //If rights holders  are still same, we trust it
-            if(sysMeta.getRightsHolder() != null && previousSysMeta.getRightsHolder() != null && D1TypeUtils.equals(sysMeta.getRightsHolder(), previousSysMeta.getRightsHolder())) {
-                return;
-            }
-            //If submitters are still same, we trust it
-            if (sysMeta.getSubmitter() != null && previousSysMeta.getSubmitter() != null && D1TypeUtils.equals(sysMeta.getSubmitter(), previousSysMeta.getSubmitter())) {
-                return;
-            }
-        }
+
         // note, we don't check for the validity of removing a seriesId during a
         // systemMetadata update.  Those types of mutability rules are checked by 
         // SystemMetadataValidator.
@@ -634,10 +620,25 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
             if (logger.isDebugEnabled()) 
                 logger.debug(task.taskLabel() + " SeriesId is in use by " + headPid.getValue());
 
-            // checking that the new object's submitter is authorized via SID head's accessPolicy
             SystemMetadata sidHeadSysMeta = getSystemMetadataHandleRetry(nodeCommunications.getCnRead(), headPid);
+            if (sysMeta != null && sidHeadSysMeta != null) {
+                //Come from the same node, we trust them
+                if(sysMeta.getAuthoritativeMemberNode() != null && sidHeadSysMeta.getAuthoritativeMemberNode() != null && 
+                        D1TypeUtils.equals(sysMeta.getAuthoritativeMemberNode(), sidHeadSysMeta.getAuthoritativeMemberNode())) {
+                    return;
+                }
+                //If rights holders  are still same, we trust it
+                if(sysMeta.getRightsHolder() != null && sidHeadSysMeta.getRightsHolder() != null && D1TypeUtils.equals(sysMeta.getRightsHolder(), sidHeadSysMeta.getRightsHolder())) {
+                    return;
+                }
+                //If submitters are still same, we trust it
+                if (sysMeta.getSubmitter() != null && sidHeadSysMeta.getSubmitter() != null && D1TypeUtils.equals(sysMeta.getSubmitter(), sidHeadSysMeta.getSubmitter())) {
+                    return;
+                }
+            }
+            // checking that the new object's submitter is authorized via SID head's accessPolicy
             //Get submitter's all subjects - groups and equivalent subjects.
-            CNode cn = D1Client.getCN();
+            CNode cn = D1Client.getCN(); // TODO We should use the LDAP calls to get the identity service in order to get rid of API calls.
             SubjectInfo submitterInfo = cn.getSubjectInfo(null, sysMeta.getSubmitter());
             HashSet<Subject> submitterAllSubjects = new HashSet<Subject>();
             AuthUtils.findPersonsSubjects(submitterAllSubjects, submitterInfo, sysMeta.getSubmitter());
@@ -650,19 +651,24 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
                     logger.debug("Submitter doesn't have the change permission on the pid "
                             + headPid.getValue() + ". We will try if the rights holder has the permission.");
                 
-                SubjectInfo rightsHolderInfo = cn.getSubjectInfo(null, sysMeta.getRightsHolder());
-                Set<Subject> rightsHolderAllSubjects = findEquivalentSubjects(rightsHolderInfo, sysMeta.getRightsHolder());
-                if(!AuthUtils.isAuthorized(
-                    rightsHolderAllSubjects,
-                    Permission.CHANGE_PERMISSION,
-                    sidHeadSysMeta)) {
+                if(!sysMeta.getSubmitter().equals(sysMeta.getRightsHolder())) {
+                    SubjectInfo rightsHolderInfo = cn.getSubjectInfo(null, sysMeta.getRightsHolder());
+                    Set<Subject> rightsHolderAllSubjects = findEquivalentSubjects(rightsHolderInfo, sysMeta.getRightsHolder());
+                    if(!AuthUtils.isAuthorized(
+                        rightsHolderAllSubjects,
+                        Permission.CHANGE_PERMISSION,
+                        sidHeadSysMeta)) {
+                        throw new NotAuthorized("0000", "Neither the submitter nor rightsHolder have CHANGE rights on the SeriesId as determined by"
+                                + " the current head of the Sid collection, whose pid is: " + headPid.getValue());
+                    }
+                } else {
                     throw new NotAuthorized("0000", "Neither the submitter nor rightsHolder have CHANGE rights on the SeriesId as determined by"
                             + " the current head of the Sid collection, whose pid is: " + headPid.getValue());
                 }
-                
             }
-            // TODO: should we check to see that if the current head of the series
-            // is obsoleted, that it is not obsoleted by a PID with a different SID?
+            // Note: we don't check to see that if the current head of the series
+            // is obsoleted, that it is not obsoleted by a PID with a different SID,
+            // because we leave this to the CN.storage component.
         } catch (ServiceFailure e) {
             extractRetryableException(e);
             String message = " couldn't access the CN /meta endpoint to check seriesId!! Reason: " + e.getDescription();
