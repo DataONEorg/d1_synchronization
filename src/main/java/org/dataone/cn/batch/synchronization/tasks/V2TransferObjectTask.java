@@ -635,35 +635,36 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
                 if (sysMeta.getSubmitter() != null && sidHeadSysMeta.getSubmitter() != null && D1TypeUtils.equals(sysMeta.getSubmitter(), sidHeadSysMeta.getSubmitter())) {
                     return;
                 }
-            }
-            // checking that the new object's submitter is authorized via SID head's accessPolicy
-            //Get submitter's all subjects - groups and equivalent subjects.
-            CNode cn = D1Client.getCN(); // TODO We should use the LDAP calls to get the identity service in order to get rid of API calls.
-            SubjectInfo submitterInfo = cn.getSubjectInfo(null, sysMeta.getSubmitter());
-            HashSet<Subject> submitterAllSubjects = new HashSet<Subject>();
-            AuthUtils.findPersonsSubjects(submitterAllSubjects, submitterInfo, sysMeta.getSubmitter());
-            if (!AuthUtils.isAuthorized(
-                    submitterAllSubjects,
-                    Permission.CHANGE_PERMISSION,
-                    sidHeadSysMeta)) {
-
-                if (logger.isDebugEnabled()) 
-                    logger.debug("Submitter doesn't have the change permission on the pid "
-                            + headPid.getValue() + ". We will try if the rights holder has the permission.");
-                
-                if(!sysMeta.getSubmitter().equals(sysMeta.getRightsHolder())) {
-                    SubjectInfo rightsHolderInfo = cn.getSubjectInfo(null, sysMeta.getRightsHolder());
-                    Set<Subject> rightsHolderAllSubjects = findEquivalentSubjects(rightsHolderInfo, sysMeta.getRightsHolder());
-                    if(!AuthUtils.isAuthorized(
-                        rightsHolderAllSubjects,
+            
+                // checking that the new object's submitter is authorized via SID head's accessPolicy
+                //Get submitter's all subjects - groups and equivalent subjects.
+                CNode cn = D1Client.getCN(); // TODO We should use the LDAP calls to get the identity service in order to get rid of API calls.
+                SubjectInfo submitterInfo = cn.getSubjectInfo(null, sysMeta.getSubmitter());
+                HashSet<Subject> submitterAllSubjects = new HashSet<Subject>();
+                AuthUtils.findPersonsSubjects(submitterAllSubjects, submitterInfo, sysMeta.getSubmitter());
+                if (!AuthUtils.isAuthorized(
+                        submitterAllSubjects,
                         Permission.CHANGE_PERMISSION,
                         sidHeadSysMeta)) {
+    
+                    if (logger.isDebugEnabled()) 
+                        logger.debug("Submitter doesn't have the change permission on the pid "
+                                + headPid.getValue() + ". We will try if the rights holder has the permission.");
+                    
+                    if(!sysMeta.getSubmitter().equals(sysMeta.getRightsHolder())) {
+                        SubjectInfo rightsHolderInfo = cn.getSubjectInfo(null, sysMeta.getRightsHolder());
+                        Set<Subject> rightsHolderAllSubjects = findEquivalentSubjects(rightsHolderInfo, sysMeta.getRightsHolder());
+                        if(!AuthUtils.isAuthorized(
+                            rightsHolderAllSubjects,
+                            Permission.CHANGE_PERMISSION,
+                            sidHeadSysMeta)) {
+                            throw new NotAuthorized("0000", "Neither the submitter nor rightsHolder have CHANGE rights on the SeriesId as determined by"
+                                    + " the current head of the Sid collection, whose pid is: " + headPid.getValue());
+                        }
+                    } else {
                         throw new NotAuthorized("0000", "Neither the submitter nor rightsHolder have CHANGE rights on the SeriesId as determined by"
                                 + " the current head of the Sid collection, whose pid is: " + headPid.getValue());
                     }
-                } else {
-                    throw new NotAuthorized("0000", "Neither the submitter nor rightsHolder have CHANGE rights on the SeriesId as determined by"
-                            + " the current head of the Sid collection, whose pid is: " + headPid.getValue());
                 }
             }
             // Note: we don't check to see that if the current head of the series
