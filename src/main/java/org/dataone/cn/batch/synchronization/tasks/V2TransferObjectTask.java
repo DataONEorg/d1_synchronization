@@ -26,7 +26,9 @@ import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
@@ -37,6 +39,8 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.Logger;
 import org.dataone.client.exception.ClientSideException;
 import org.dataone.client.v1.types.D1TypeBuilder;
+import org.dataone.client.v2.CNode;
+import org.dataone.client.v2.itk.D1Client;
 import org.dataone.cn.batch.exceptions.NodeCommUnavailable;
 import org.dataone.cn.batch.exceptions.RetryableException;
 import org.dataone.cn.batch.exceptions.UnrecoverableException;
@@ -70,6 +74,7 @@ import org.dataone.service.exceptions.UnsupportedType;
 import org.dataone.service.exceptions.VersionMismatch;
 import org.dataone.service.mn.tier1.v2.MNRead;
 import org.dataone.service.types.v1.Checksum;
+import org.dataone.service.types.v1.Group;
 import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.NodeReference;
 import org.dataone.service.types.v1.NodeType;
@@ -80,6 +85,8 @@ import org.dataone.service.types.v1.Replica;
 import org.dataone.service.types.v1.ReplicationStatus;
 import org.dataone.service.types.v1.Service;
 import org.dataone.service.types.v1.Session;
+import org.dataone.service.types.v1.Subject;
+import org.dataone.service.types.v1.SubjectInfo;
 import org.dataone.service.types.v1.util.ChecksumUtil;
 import org.dataone.service.types.v2.Node;
 import org.dataone.service.types.v2.NodeList;
@@ -415,19 +422,13 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
                 throw new UnrecoverableException(task.getPid() + 
                         "the retrieved SystemMetadata passed into processTask was null!");
             
-
-            validateSeriesId(mnSystemMetadata);
             if (resolvable(mnSystemMetadata.getIdentifier(), "PID")) {
                 processUpdates(mnSystemMetadata);
-            } else {
+            } 
+            else {
                 // not resolvable, so process as new object
                 processNewObject(mnSystemMetadata);
             }
-        } catch (NotAuthorized ex) {
-            logger.error(buildStandardLogMessage(ex, "NotAuthorized to claim the seriesId"), ex);
-            throw SyncFailedTask.createSynchronizationFailed(mnSystemMetadata.getIdentifier().getValue(),
-                    "NotAuthorized to claim the seriesId", ex);
-
         } catch (RetryableException ex) {
             logger.warn(buildStandardLogMessage(ex,"RetryableException "));
             throw ex;
@@ -460,6 +461,15 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
         // as per V1 logic (TransferObjectTask), this class currently does not check
         // the authoritativeMN field and allows the object to sync.
         logger.debug(task.taskLabel() + " entering processNewObject...");
+       
+        
+        try {
+        	validateSeriesId(mnSystemMetadata, null); 
+        } catch (NotAuthorized e) {
+            logger.error(buildStandardLogMessage(e, "NotAuthorized to claim the seriesId"), e);
+            throw SyncFailedTask.createSynchronizationFailed(mnSystemMetadata.getIdentifier().getValue(),
+                    "NotAuthorized to claim the seriesId", e);
+        }
        
         try {
 
@@ -566,50 +576,98 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
     }
 
     /**
-     * For any sync task, (update or newObject) the sysmeta.submitter needs to have control over the seriesId.
-     * This is true only if the seriesId is new, or in use by the person 
-     *
+     * For any sync task where the seriesId field is being set (any newObject task, and certain update tasks),
+     * we need to disallow collisions by different users and different series. Because synchronization order
+     * cannot be guaranteed, we can't rely on the obsoletes relationship, and so the checks will necessarily
+     * be incomplete.  See method source code for specific rules. 
+     * (see https://redmine.dataone.org/issues/7948)
+     * 
      * @param sysMeta - requires non-null systemMetadata object
      * @throws NotAuthorized - the seriesId is new and reserved by someone else OR is in use by another rightsHolder
      * @throws UnrecoverableException - internal problems keep this validation from completing
      * @throws RetryableException 
      */
-    private void validateSeriesId(SystemMetadata sysMeta) throws NotAuthorized, UnrecoverableException, RetryableException {
+    private void validateSeriesId(SystemMetadata sysMeta, SystemMetadata previousSysMeta) throws NotAuthorized, UnrecoverableException, RetryableException {
 
         logger.debug(task.taskLabel() + " entering validateSeriesId...");
+        
+        // return early in cases where the seriesId value isn't changing   
+        // or there's no sid to check
         Identifier sid = sysMeta.getSeriesId();
-
-        if (sid == null || StringUtils.isBlank(sid.getValue())) {
+        Identifier prevSid = previousSysMeta == null ? null : previousSysMeta.getSeriesId();        
+        
+        if (D1TypeUtils.emptyEquals(sid, prevSid)) {
+        	// nothing changed
             return;
         }
+        
+        if (D1TypeUtils.emptyEquals(sid, null)) {
+        	// seriesId not being set, so nothing to validate.
+            return;
+        }
+        
 
+        // note, we don't check for the validity of removing a seriesId during a
+        // systemMetadata update.  Those types of mutability rules are checked by 
+        // SystemMetadataValidator.
+        
         try { // resolving the SID
 
-            Identifier pid = resolve(sysMeta.getIdentifier(),"SID");
+            Identifier headPid = resolve(sid,"SID");
 
             if (logger.isDebugEnabled()) 
-                logger.debug(task.taskLabel() + " SeriesId is in use by " + pid.getValue());
+                logger.debug(task.taskLabel() + " SeriesId is in use by " + headPid.getValue());
 
-            // checking that the new object's submitter is authorized via SID head's accessPolicy
-            SystemMetadata sidHeadSysMeta = getSystemMetadataHandleRetry(nodeCommunications.getCnRead(), sid);
-            if (!AuthUtils.isAuthorized(
-                    Collections.singletonList(sysMeta.getSubmitter()),
-                    Permission.CHANGE_PERMISSION,
-                    sidHeadSysMeta)) {
-
-                if (logger.isDebugEnabled()) 
-                    logger.debug("Submitter doesn't have the change permission on the pid "
-                            + pid.getValue() + ". We will try if the rights holder has the permission.");
-                if(!AuthUtils.isAuthorized(
-                    Collections.singletonList(sysMeta.getRightsHolder()),
-                    Permission.CHANGE_PERMISSION,
-                    sidHeadSysMeta)) {
-                    throw new NotAuthorized("0000", "Both the submitter and rightsHolder does not have CHANGE rights on the SeriesId as determined by"
-                            + " the current head of the Sid collection, whose pid is: " + pid.getValue());
+            SystemMetadata sidHeadSysMeta = this.hzSystemMetaMap.get(headPid);
+            if (sysMeta != null && sidHeadSysMeta != null) {
+                //Come from the same node, we trust them
+                if(sysMeta.getAuthoritativeMemberNode() != null && sidHeadSysMeta.getAuthoritativeMemberNode() != null && 
+                        D1TypeUtils.equals(sysMeta.getAuthoritativeMemberNode(), sidHeadSysMeta.getAuthoritativeMemberNode())) {
+                    return;
+                }
+                //If rights holders  are still same, we trust it
+                if(sysMeta.getRightsHolder() != null && sidHeadSysMeta.getRightsHolder() != null && D1TypeUtils.equals(sysMeta.getRightsHolder(), sidHeadSysMeta.getRightsHolder())) {
+                    return;
+                }
+                //If submitters are still same, we trust it
+                if (sysMeta.getSubmitter() != null && sidHeadSysMeta.getSubmitter() != null && D1TypeUtils.equals(sysMeta.getSubmitter(), sidHeadSysMeta.getSubmitter())) {
+                    return;
+                }
+            
+                // checking that the new object's submitter is authorized via SID head's accessPolicy
+                //Get submitter's all subjects - groups and equivalent subjects.
+                CNode cn = D1Client.getCN(); // TODO We should use the LDAP calls to get the identity service in order to get rid of API calls.
+                SubjectInfo submitterInfo = cn.getSubjectInfo(null, sysMeta.getSubmitter());
+                HashSet<Subject> submitterAllSubjects = new HashSet<Subject>();
+                AuthUtils.findPersonsSubjects(submitterAllSubjects, submitterInfo, sysMeta.getSubmitter());
+                if (!AuthUtils.isAuthorized(
+                        submitterAllSubjects,
+                        Permission.CHANGE_PERMISSION,
+                        sidHeadSysMeta)) {
+    
+                    if (logger.isDebugEnabled()) 
+                        logger.debug("Submitter doesn't have the change permission on the pid "
+                                + headPid.getValue() + ". We will try if the rights holder has the permission.");
+                    
+                    if(!sysMeta.getSubmitter().equals(sysMeta.getRightsHolder())) {
+                        SubjectInfo rightsHolderInfo = cn.getSubjectInfo(null, sysMeta.getRightsHolder());
+                        Set<Subject> rightsHolderAllSubjects = findEquivalentSubjects(rightsHolderInfo, sysMeta.getRightsHolder());
+                        if(!AuthUtils.isAuthorized(
+                            rightsHolderAllSubjects,
+                            Permission.CHANGE_PERMISSION,
+                            sidHeadSysMeta)) {
+                            throw new NotAuthorized("0000", "Neither the submitter nor rightsHolder have CHANGE rights on the SeriesId as determined by"
+                                    + " the current head of the Sid collection, whose pid is: " + headPid.getValue());
+                        }
+                    } else {
+                        throw new NotAuthorized("0000", "Neither the submitter nor rightsHolder have CHANGE rights on the SeriesId as determined by"
+                                + " the current head of the Sid collection, whose pid is: " + headPid.getValue());
+                    }
                 }
             }
-            // TODO: should we check to see that if the current head of the series
-            // is obsoleted, that it is not obsoleted by a PID with a different SID?
+            // Note: we don't check to see that if the current head of the series
+            // is obsoleted, that it is not obsoleted by a PID with a different SID,
+            // because we leave this to the CN.storage component.
         } catch (ServiceFailure e) {
             extractRetryableException(e);
             String message = " couldn't access the CN /meta endpoint to check seriesId!! Reason: " + e.getDescription();
@@ -651,6 +709,71 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
                 throw new UnrecoverableException(message, e1);
             }
         }
+    }
+    
+    /**
+     * Look for the equivalent authorization subjects for a given subject which can be either a person or a group.
+     * For a given person subject, it will returns the person itself, all equivalent identities and all groups (include the child groups)
+     * that itself and equivalent identities belong to.
+     * For a given group subject, it will returns the group itself and its recursive all ancestor groups.
+     * @param subjectInfo  the subject info for the given subject. 
+     * @param targetSubject  the subject needs to be looked
+     * @return the set of equivalent authorization subjects
+     */
+    private static Set<Subject> findEquivalentSubjects(SubjectInfo subjectInfo, Subject targetSubject) {
+        Set<Subject> subjects = new HashSet<Subject>();
+        //first to try if this is a person 
+        AuthUtils.findPersonsSubjects(subjects, subjectInfo, targetSubject);
+        if(subjects.isEmpty() || subjects.size() == 1) {
+            //the return subjects from looking persons is o or 1. This means it can be group or a person without any groups.
+            //let's try the group
+            findEquivalentSubjectsForGroup(subjects, subjectInfo, targetSubject);
+        }
+        return subjects;
+    }
+    
+    /**
+     * Find all subjects which can be authorized as same as the given group subject (target). It is equivalent 
+     * to the findPersonsSubjects method except that the target is a group subject.
+     * For a given group subject, its all equivalent subjects are itself and its recursive all ancestor groups.
+     * For example, group a is the parent group b, b is the parent group c and c is the parent of group d. If the given group project is c,
+     * the foundSubjects should be c, b and a. 
+     * @param foundSubjects the set which holds all subjects which can be authorized as same as the given group subject (target). It likes
+     *                       the return value in the method.
+     * @param subjectInfo the subject info object for the given group subject. 
+     * @param targetGrouupSubject the group subject needs to be looked
+     */
+    private static void findEquivalentSubjectsForGroup(Set<Subject> foundSubjects, SubjectInfo subjectInfo, Subject targetGroupSubject) {
+        if (targetGroupSubject != null && targetGroupSubject.getValue() != null && !targetGroupSubject.getValue().trim().equals("")) {
+                //first, add it self
+                foundSubjects.add(targetGroupSubject);
+                // setting this up for subsequent searches in the loop
+            List<Group> groupList = null;
+                if(subjectInfo != null) {
+                    groupList = subjectInfo.getGroupList();
+                    if (groupList != null) {
+                        for(Group group : groupList) {
+                            if(group != null && group.getHasMemberList() != null && group.getSubject() != null) {
+                                for(Subject subject : group.getHasMemberList()) {
+                                    if(subject.getValue() != null && subject.getValue().equals(targetGroupSubject.getValue())) {
+                                        //find the target group is in the hasMemberList. We need to put the parent group into the vector
+                                        if(foundSubjects.contains(group.getSubject())) {
+                                            //this means it is circular group. We should break the loop
+                                            //System.out.println("in the loop, we need to break it =======================");
+                                            return;
+                                        } else {
+                                            foundSubjects.add(group.getSubject());
+                                            //recursive to find the parent groups
+                                            findEquivalentSubjectsForGroup(foundSubjects, subjectInfo, group.getSubject());
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+        }
+        
     }
 
     /**
@@ -997,23 +1120,30 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
         // hzSystemMetadata will not be null...can we make this assumption?
         SystemMetadata hzSystemMetadata = hzSystemMetaMap.get(pid);
         SystemMetadataValidator validator = null;
+        String errorTracker = "";
         try {
-            validator = new SystemMetadataValidator(hzSystemMetadata);
+            errorTracker = "validateSysMeta";
+        	validator = new SystemMetadataValidator(hzSystemMetadata);
             validator.validateEssentialProperties(newSystemMetadata, nodeCommunications.getMnRead());
 
             // if here, we know that the new system metadata is referring to the same
             // object, and we can consider updating other values.
             NodeList nl = nodeCommunications.getNodeRegistryService().listNodes();
             boolean isV1Object = AuthUtils.isCNAuthorityForSystemMetadataUpdate(nl, newSystemMetadata);
-
+            errorTracker = "processUpdate";
             if (task.getNodeId().contentEquals(hzSystemMetadata.getAuthoritativeMemberNode().getValue())) {
 
                 if (isV1Object) {
+                	// (no seriesId in V1 to validate)
                     processV1AuthoritativeUpdate(newSystemMetadata, hzSystemMetadata);
+                
                 } else {
-                    processV2AuthoritativeUpdate(newSystemMetadata, validator);
+                	validateSeriesId(newSystemMetadata,hzSystemMetadata);
+                	processV2AuthoritativeUpdate(newSystemMetadata, validator);
+                    
                 }
             } else {
+            	// not populating anything other than replica information
                 processPossibleNewReplica(newSystemMetadata, hzSystemMetadata, isV1Object);
             }
             logger.info(buildStandardLogMessage(null,  " Completed ProcessUpdate"));
@@ -1023,7 +1153,14 @@ public class V2TransferObjectTask implements Callable<SyncObjectState> {
             } else {
                 throw new UnrecoverableException("In processUpdates, could not find authoritativeMN in the NodeList", e);
             }
-        } catch (IdentifierNotUnique | InvalidRequest | InvalidToken | NotAuthorized | NotFound e) {
+        } catch (NotAuthorized e) {
+        	if (errorTracker.equals("validateSysMeta")) {
+        		throw SyncFailedTask.createSynchronizationFailed(task.getPid(), "In processUpdates, while validating the checksum", e);
+        	} else {
+        		throw SyncFailedTask.createSynchronizationFailed(task.getPid(), "NotAuthorized to use the seriesId. ", e);
+        	}
+        } catch (IdentifierNotUnique | InvalidRequest | InvalidToken  | NotFound e) {
+        
             throw SyncFailedTask.createSynchronizationFailed(task.getPid(), "In processUpdates, while validating the checksum", e);
         } catch (ServiceFailure e) {
             extractRetryableException(e);

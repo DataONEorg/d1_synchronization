@@ -24,6 +24,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
@@ -38,6 +39,7 @@ import org.dataone.cn.batch.synchronization.NodeCommSyncObjectFactory;
 import org.dataone.cn.batch.synchronization.type.NodeComm;
 import org.dataone.cn.batch.synchronization.type.NodeCommState;
 import org.dataone.cn.batch.synchronization.type.SyncObjectState;
+import org.dataone.cn.batch.synchronization.type.SyncQueueFacade;
 import org.dataone.cn.hazelcast.HazelcastClientFactory;
 import org.dataone.cn.synchronization.types.SyncObject;
 import org.dataone.configuration.Settings;
@@ -80,6 +82,7 @@ public class SyncObjectTask implements Callable<String> {
     private static final long threadTimeout = Settings.getConfiguration()
             .getLong("Synchronization.SyncObjectTask.threadTimeout", 900000L); //900000L represents fifteen minutes
 
+    private static long FUTURE_REAP_WAIT = Settings.getConfiguration().getLong("Synchronization.SyncObjectTask.reapFutureWait", 250L);
     private static CircularFifoQueue<SyncObjectState> latestResults = new CircularFifoQueue<>(50);
     private static long delayUntil = -1;
     /**
@@ -95,9 +98,11 @@ public class SyncObjectTask implements Callable<String> {
         HazelcastClient hazelcast = HazelcastClientFactory.getProcessingClient();
         logger.info("Starting SyncObjectTask");
 
-        String syncObjectQueue = Settings.getConfiguration().getString("dataone.hazelcast.synchronizationObjectQueue");
-        BlockingQueue<SyncObject> hzSyncObjectQueue = hazelcast.getQueue(syncObjectQueue);
+//        String syncObjectQueue = Settings.getConfiguration().getString("dataone.hazelcast.synchronizationObjectQueue");
+//        BlockingQueue<SyncObject> hzSyncObjectQueue = hazelcast.getQueue(syncObjectQueue);
 
+        SyncQueueFacade hzSyncObjectQueue = new SyncQueueFacade();
+        
         HashMap<FutureTask<SyncObjectState>, HashMap<String, Object>> futuresMap = new HashMap<>();
         // the futures map is helpful in tracking the state of a TransferObjectTask
         // submitted to the task executor as a FutureTask
@@ -111,27 +116,42 @@ public class SyncObjectTask implements Callable<String> {
         //     informed of the synchronization failure. 
         // Hence, the SyncObject is needed to create and schedule a SyncFailedTask
 
-        SyncObject task = null;
+        
         try {
             do {  // forever, (unless exception thrown)
 
+                SyncObject task = null;
+                //
+                // (A). pull a task from the queue if synchronization is active and there is one
+                //
                 // Settings gets refreshed periodically           
                 if (ComponentActivationUtility.synchronizationIsActive()) {
+
                     // get next item off the SyncObject queue
-                    Long nowTime = (new Date()).getTime();
-                    if (nowTime > delayUntil) {
-                        task = hzSyncObjectQueue.poll(90L, TimeUnit.SECONDS);
-                    } 
-                    else if (nowTime + 500 > delayUntil) {
-                        // sleep instead of requeue
-                        interruptableSleep(delayUntil-nowTime);
-                        task = hzSyncObjectQueue.poll(90L, TimeUnit.SECONDS);
-                    } 
-                    else {
-                        // let the task be null and allow a requeue
-                        task = null;
-                    }
+                    task = hzSyncObjectQueue.poll(60L, TimeUnit.SECONDS);
+                    
+                    
+// XXX: this delayUntil was never fully implemented, (note that delayUntil value was never changed from the default -1)
+// so commenting out for now.  The idea was to use the
+// task.getSleepUntil() value to induce a sleep assuming that 
+// any future tasks in the queue would have later task.getSleepUntils
+//                    Long nowTime = (new Date()).getTime();
+//                    if (nowTime > delayUntil) {
+//                        task = hzSyncObjectQueue.poll(90L, TimeUnit.SECONDS);
+//                    } 
+//                    else if (nowTime + 500 > delayUntil) {
+//                        // sleep instead of requeue
+//                        interruptableSleep(delayUntil-nowTime);
+//                        task = hzSyncObjectQueue.poll(90L, TimeUnit.SECONDS);
+//                    } 
+                    
                 } else {
+                                        
+                    //
+                    // (B).  Try to shutdown gracefully - exit if all tasks are complete,
+                    //          and slow the infinite loop down, because there is not
+                    //          a wait for tasks happening
+                    //
                     // see if we can shutdown
                     if (futuresMap.isEmpty()) {
                         // ok futures Map is empty, no need to keep spinning here, shut this thread down
@@ -141,30 +161,55 @@ public class SyncObjectTask implements Callable<String> {
                     // slow down the rate of future-reaping while sync is not active
                     //
                     // we really don't want to slow down things when sync becomes 
-                    // inactive, because it means that we wish to top the process
+                    // inactive, because it means that we wish to stop the process
                     // fairly quickly. -rpw
-                    //interruptableSleep(10000L);
+                    // 
+                    // true, but since each task takes about 3-4 seconds to complete, we can avoid 
+                    // unnecessary loops and many log statements while waiting.
+                    interruptableSleep(1000L);
                 }
                 
+                
+                // (C).  try to free up executor threads and nodeComms
+                
+                // reapFutures serially waits FUTURE_REAP_WAIT ms per future, so with the number of futures limited
+                // by number of nodeComms (defaluts to 5) * number of member nodes (limited to 100), there can be up to
+                // 100 * FUTURE_REAP_WAIT ms imposed blocking time.
+                // (although, unless a job is stuck, the upper limit is the processing time of a single task - since they
+                // are all being processed in concurrently)
+
                 reapFutures(futuresMap);
 
+                // (D). try to get a NodeComm for the task and assign it to the executor
+                
                 if (task != null) {
                     boolean success = executeTransferObjectTask(task, futuresMap);
                     if (!success) {
                         logger.info(task.taskLabel() + " - requeueing task.");
-                        hzSyncObjectQueue.put(task);
+                        // with the syn facade, we can express priority - this won't go to the back of a very long queue
+
+                        hzSyncObjectQueue.addWithPriority(task);
                         // if queue is short, try to pass off this task to another
                         // CN by sleeping a bit
-                        if (hzSyncObjectQueue.size() < 3) {
-                            interruptableSleep(5000L);
-                        }
+//                        if (hzSyncObjectQueue.size() < 3) {
+//                            interruptableSleep(5000L);
+//                        }
                     }
                 }
                 
-                logger.debug("ActiveCount: " + taskExecutor.getActiveCount() + " Pool size " 
-                        + taskExecutor.getPoolSize() + " Max Pool Size " + taskExecutor.getMaxPoolSize());
+                if (logger.isDebugEnabled()) {
+                    logger.debug("ActiveCount: " + taskExecutor.getActiveCount() + "  Pool size: " 
+                            + taskExecutor.getPoolSize() + "  Max Pool Size: " + taskExecutor.getMaxPoolSize());
+                }
+                
+                
+                // (E).  an orthogonal method to manage the taskExecutor (beyond the TaskRejectedException in executteTransferObjectTask method)
+                //  
+                // 
                 
                 if ((taskExecutor.getActiveCount()) >= taskExecutor.getPoolSize()) {
+                    // removes tasks when the futuresMap is empty, and the executor is full
+                    // (how effective is this?)
                     if ((taskExecutor.getPoolSize() == taskExecutor.getMaxPoolSize()) && futuresMap.isEmpty()) {
                         BlockingQueue<Runnable> blockingTaskQueue = taskExecutor.getThreadPoolExecutor().getQueue();
                         Runnable[] taskArray = {};
@@ -181,11 +226,40 @@ public class SyncObjectTask implements Callable<String> {
         catch (InterruptedException ex) {
             // XXX determine which exceptions are acceptable for restart and which ones 
             // are truly fatal. otherwise could cause an infinite loop of continuous failures
-            //
+
             logger.error("Interrupted! by something " + ex.getMessage() + "\n", ex);
             return "Interrupted";
         }
     }
+  
+    
+    /**
+     * (Straight from the ExecutorService javadoc)
+     * The following method shuts down an ExecutorService in two phases, first by calling 
+     * shutdown to reject incoming tasks, and then calling shutdownNow, if necessary, 
+     * to cancel any lingering tasks
+     * @param pool
+     */
+    private void shutdownAndAwaitTermination(ExecutorService pool) {
+        pool.shutdown(); // Disable new tasks from being submitted
+        try {
+            // Wait a while for existing tasks to terminate
+            if (!pool.awaitTermination(60, TimeUnit.SECONDS)) {
+                pool.shutdownNow(); // Cancel currently executing tasks
+                // Wait a while for tasks to respond to being cancelled
+                if (!pool.awaitTermination(60, TimeUnit.SECONDS))
+                    System.err.println("Pool did not terminate");
+            }
+        } catch (InterruptedException ie) {
+            // (Re-)Cancel if current thread also interrupted
+            pool.shutdownNow();
+            // Preserve interrupt status
+            Thread.currentThread().interrupt();
+        }
+    }
+
+
+
     
     /**
      * sleeps but wakes upon interruption (without failing)
@@ -236,7 +310,7 @@ public class SyncObjectTask implements Callable<String> {
                 logger.info(task.taskLabel() + " submitted for execution");
                 isSuccess = true;
             } catch (TaskRejectedException ex) {
-                // Tasks maybe rejected because of the pool has filled up 
+                // Tasks maybe rejected because of the executor's work queue has filled up 
                 // and no more tasks may be executed.
                 // TODO: Q. Is it the responsibility of this class to avoid this situation?
                 // This situation is dire since it should never be allowed to occur!
@@ -293,16 +367,20 @@ public class SyncObjectTask implements Callable<String> {
                 logger.debug("trying future " + futureTask.taskLabel());
                 try {
                     
-                    SyncObjectState futureOutcome = future.get(250L, TimeUnit.MILLISECONDS);
+                    // don't wait long, because we are in a loop.  
+                    SyncObjectState futureOutcome = future.get(FUTURE_REAP_WAIT, TimeUnit.MILLISECONDS);
                     logger.info(futureTask.taskLabel() + " SyncObjectState: " + futureOutcome);
                     // retries are already requeued in (V2)TransferObjectTask, so nothing to do here
                     latestResults.add(futureOutcome);
                     // the future is now, reset the state of the NodeCommunication object
                     // so that it will be re-used
-                    logger.debug("futureMap is done? " + future.isDone());
-                    logger.debug(futureTask.taskLabel() + " Returned from the Future "
+                    
+                    if (logger.isDebugEnabled()) {
+                        logger.debug("futureMap is done? " + future.isDone());
+                    
+                        logger.debug(futureTask.taskLabel() + " Returned from the Future "
                             + ":(" + futureNodeComm.getNumber() + "):");
-
+                    }
                     futureNodeComm.setState(NodeCommState.AVAILABLE);
                     removalList.add(future);
                     
@@ -335,7 +413,7 @@ public class SyncObjectTask implements Callable<String> {
                             + ":(" + futureNodeComm.getNumber() + "):" + " since " 
                             + DateTimeMarshaller.serializeDateToUTC(futureNodeComm.getRunningStartDate()));
                     Date now = new Date();
-                    // if the thread is running longer than an hour, kill it
+                    // if the thread is running longer than a specified time, kill it
                     if ((now.getTime() - futureNodeComm.getRunningStartDate().getTime()) > threadTimeout) {
                         logger.warn(futureTask.taskLabel() + " Cancelling. " 
                                 + ":(" + futureNodeComm.getNumber() + "):" + " Waiting since " 
@@ -358,7 +436,7 @@ public class SyncObjectTask implements Callable<String> {
                 }
             }
             if (!removalList.isEmpty()) {
-                for (Future key : removalList) {
+                for (Future<SyncObjectState> key : removalList) {
                     futuresMap.remove(key);
                 }
             }
@@ -374,7 +452,7 @@ public class SyncObjectTask implements Callable<String> {
             NodeComm nodeCommunications = nodeCommunicationsFactory.getNodeComm(mnNodeId);
             SyncFailedTask syncFailedTask = new SyncFailedTask(nodeCommunications, task);
 
-            FutureTask futureTask = new FutureTask(syncFailedTask);
+            FutureTask<String> futureTask = new FutureTask<String>(syncFailedTask);
             taskExecutor.execute(futureTask);
         } catch (TaskRejectedException ex) {
             // Tasks maybe rejected because of the pool has filled up and no

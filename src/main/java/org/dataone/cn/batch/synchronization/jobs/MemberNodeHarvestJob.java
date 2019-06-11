@@ -57,9 +57,9 @@ public class MemberNodeHarvestJob implements Job {
 
                 nodeReference.setValue(mnIdentifier);
 
-                Integer batchSize = Settings.getConfiguration().getInt("Synchronization.mn_listobjects_batch_size");
+                Integer pageSize = Settings.getConfiguration().getInt("Synchronization.mn_listobjects_page_size");
 
-                ObjectListHarvestTask harvestTask = new ObjectListHarvestTask(nodeReference, batchSize);
+                ObjectListHarvestTask harvestTask = new ObjectListHarvestTask(nodeReference, pageSize);
 
                 Date lastProcessingCompletedDate = harvestTask.call();
 

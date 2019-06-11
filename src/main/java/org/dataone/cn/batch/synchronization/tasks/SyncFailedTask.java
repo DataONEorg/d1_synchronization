@@ -113,6 +113,14 @@ public class SyncFailedTask implements Callable<String> {
     }
         
     public void submitSynchronizationFailed(SynchronizationFailed syncFailed) {
+        logger.warn(String.format("%s - SynchronizationFailed: detail code: %s id:%s nodeId:%s description:%s", 
+                task.taskLabel(), 
+                syncFailed.getDetail_code(),
+                syncFailed.getPid(),
+                syncFailed.getNodeId(),
+                syncFailed.getDescription()
+                ));
+
         try {
             Object mnRead = nodeCommunications.getMnRead();
             
