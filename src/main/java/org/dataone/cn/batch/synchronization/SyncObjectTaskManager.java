@@ -24,6 +24,7 @@ import org.apache.log4j.Logger;
 import org.dataone.cn.ComponentActivationUtility;
 import org.dataone.cn.batch.exceptions.ExecutionDisabledException;
 import org.dataone.cn.batch.synchronization.tasks.SyncObjectTask;
+import org.dataone.configuration.Settings;
 import org.quartz.SchedulerException;
 import org.springframework.core.task.SimpleAsyncTaskExecutor;
 
@@ -47,6 +48,9 @@ public class SyncObjectTaskManager implements Runnable {
     // but maybe it will force the executor to remove the thread (???)
     Future syncObjectTaskManagerFuture = null;
     HarvestSchedulingManager harvestSchedulingManager;
+    private static final String TIMEOUT_ERROR = "[CONCURRENT_MAP_CONTAINS_KEY] Operation Timeout";
+    private static int hazelcastTimeoutWaitTime = Settings.getConfiguration().getInteger("Synchronization.SyncObjectTaskManager.hazelcastTimeoutWaitTime", 30)*1000;
+    private static int hazelcastTimeoutTryTimes = Settings.getConfiguration().getInteger("Synchronization.SyncObjectTaskManager.hazelcastTimeoutTryTimes", 5);
     
     public void init() {
         syncObjectTaskManagerFuture = taskExecutor.submit(this);
@@ -72,22 +76,48 @@ public class SyncObjectTaskManager implements Runnable {
                 FutureTask futureTask = new FutureTask(syncObjectTask);
                 taskExecutor.execute(futureTask);
 
-                try {
-                    futureTask.get();
-                } catch (InterruptedException ex) {
-                    logger.warn(ex.getMessage());
-                } catch (ExecutionException ex) {
-                    if (ex.getCause() instanceof ExecutionDisabledException) {
-                        logger.warn("Excecution Disabled continue polling until shutdown");
-                        shouldContinueRunning = true; 
-                    } else {
+                //in order to recover hazlecast timeout issue, we will try to run the futureTask couple times
+                //when the exception is a timeout exception
+                boolean tryAgain = false;
+                int count = 0;
+                do {
+                    //reset the try again to false during a retry cycle. Otherwise, the code may be in a infinite loop.
+                    if (tryAgain) {
+                        tryAgain = false;
+                        logger.info("SyncObjectTaskManager start to retry when it encounters the timeout exception of the hazelcast service. The time of trying is " + 
+                                    count + " and the maximum try times is " + hazelcastTimeoutTryTimes);
+                    }
+                    try {
+                        futureTask.get();
+                    } catch (InterruptedException ex) {
+                        logger.warn(ex.getMessage());
+                    } catch (ExecutionException ex) {
+                        if (ex.getCause() instanceof ExecutionDisabledException) {
+                            logger.warn("Excecution Disabled continue polling until shutdown");
+                            shouldContinueRunning = true; 
+                        } else {
+                            logger.error(ex,ex);
+                            logger.info("Running the statement of futureTask.get() got an error " + ex.getMessage());
+                            if (ex.getMessage().contains(TIMEOUT_ERROR) && count <= hazelcastTimeoutTryTimes) {
+                                logger.info("This is a hazelcast timeout exception and we will wait for " + hazelcastTimeoutWaitTime + " milliseconds and try again." );
+                                tryAgain = true;
+                                count ++;
+                                try {
+                                    Thread.sleep(hazelcastTimeoutWaitTime);
+                                } catch (Exception ee) {
+                                    logger.warn("SyncObjectTaskManager can't be paused to wait the recovery of the hazelcast service the since " + ee.getMessage());
+                                }
+                            } else {
+                                logger.info("Running the statement of futureTask.get() still got an error even though it may be to try couple times :" + ex.getMessage());
+                                shouldContinueRunning = false;
+                            }
+                        }
+                    } catch (Exception ex) {
                         logger.error(ex,ex);
                         shouldContinueRunning = false;
                     }
-                } catch (Exception ex) {
-                    logger.error(ex,ex);
-                    shouldContinueRunning = false;
-                }
+                } while (tryAgain);
+                
                 if (futureTask.isCancelled()) {
                     logger.warn("SyncObjectTask was cancelled");
                     shouldContinueRunning = false;
